@@ -43,3 +43,9 @@ For every release build (1.0.0, 1.0.1, 1.0.2, ...), in order:
 3. Download the artifact, compute `sha256sum` of the APK, and publish `gh release create vX.Y.Z <apk> <mapping> <sha256sums.txt> --title "Appine vX.Y.Z"`.
 4. Write the release body in the KZKT convention: `# Appine vX.Y.Z`, the version's `### Added`/`### Changed`/`### Fixed` items copied from `CHANGELOG.md`, then `---`, `## APK` with each file name and its sha256, a download line, `---`, and `*Full changelog: [CHANGELOG.md](.../blob/master/CHANGELOG.md)*`. For AGPL, state that the complete corresponding source is this public repository at the build commit.
 5. Refresh `.agents/maps/android/build.md` and `.agents/maps/harness.md` when this flow changes. Never commit the keystore, its passwords, or the signing secrets to the repository.
+
+## Committing changes
+
+- Commit and push after any change that is more than trivial: a feature, a fix, a build or CI change, or a documentation update that affects how the project is built or released. Keep unrelated work out of the same commit.
+- Update `CHANGELOG.md` in the same commit when the change is user-visible or changes how a release is built; put the item under the current version's `Added`, `Changed` or `Fixed` section.
+- Keep the git author identity in local repository configuration only. Never write a name, email address, account handle, or other personal detail into tracked files, code, commit messages, release notes, or generated assets.
