@@ -5,7 +5,7 @@
 >
 > Verified: 2026-11-10 (full mapping: 4 research concerns; 15 claims checked by 3 independent verifiers — 12 confirmed and 3 partial, corrected below; bugs and debts recorded)
 >
-> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: on-demand signed release APK in android.yml and CHANGELOG-driven release notes)
+> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: release.yml manual version trigger and automatic GitHub Release with CHANGELOG notes)
 
 ## Responsibilities
 
@@ -110,6 +110,10 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
   API level 30, `assembleDebug lintDebug`, the APK as an artifact; `workflow_dispatch` can select
   `build=release` to build and sign the release APK with a keystore from Actions secrets. Both quick
   workflows cancel a run in progress when the same branch is pushed again.
+- `release.yml`, on `v*` tags or `workflow_dispatch` with a `version` input: the same toolchain and
+  signing key, `-PversionName` (and optional `-PversionCode`) passed to Gradle, the APK renamed to
+  `Appine-arm64-v8a-v<version>.apk`, the R8 mapping copied, `sha256sums.txt` written, and a GitHub
+  Release published with a body built by `scripts/release-notes` from `CHANGELOG.md`.
 - `full.yml`, nightly at 18:00 UTC on develop when its tip was committed in the last 25 hours, on
   pushes to master and on demand: the network test, a lockstep run of 200,000 iterations,
   `scripts/build-starnix-tests` (its tarball cached by the hash of the script and

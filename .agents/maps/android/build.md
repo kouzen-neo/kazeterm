@@ -5,7 +5,7 @@
 >
 > Verified: 2026-11-15 (split out of the android/native full mapping of 2026-11-10; the boundary was checked against the source at the split)
 >
-> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: CI release signing via Actions secrets and an on-demand signed release APK)
+> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: release.yml version trigger, versioned APK name and CHANGELOG-driven release notes)
 
 ## Responsibilities
 
@@ -34,7 +34,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 
 ## Public entry points
 
-- Build: `./gradlew assembleDebug lintDebug` (CI's default), `assembleRelease` (the optimized APK, also built by CI when `workflow_dispatch` selects `build=release`), `connectedDebugAndroidTest` (with
+- Build: `./gradlew assembleDebug lintDebug` (CI's default), `assembleRelease` (the optimized APK, also built by CI when `workflow_dispatch` selects `build=release`), `release.yml` (manual `version` input or `v*` tag; publishes a signed `Appine-arm64-v8a-vX.Y.Z.apk`), `scripts/release-notes <version>`, `connectedDebugAndroidTest` (with
   `-Pandroid.testInstrumentationRunnerArguments.network=true` for the download of a distribution),
   `scripts/fetch-ghostty [dir]` (default `target/ghostty`), `scripts/release-sources [dir]` (default
   `target/release-sources`).
@@ -49,6 +49,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
   executable; it is never up to date. Debug variants add the `test-hooks` and `borrow-check`
   features and use Cargo's `release` profile. The release APK selects the workspace's
   `android-release` profile, which inherits `release` and enables cross-crate LTO.
+- Gradle defaults are versionCode 1 and versionName 1.0.0; `-PversionName` and `-PversionCode` override them. `release.yml` passes the dispatched version, signs the APK, renames it to `Appine-arm64-v8a-v<version>.apk`, copies the R8 mapping, writes `sha256sums.txt` and publishes a Release whose body `scripts/release-notes` builds from the matching `CHANGELOG.md` section.
 - Gradle resolves Zig from a nonblank, trimmed `zig.path` in `android/local.properties`, then the
   `ZIG` environment variable, then `zig` on `PATH`. `BrowserAssetTask` invokes that executable;
   `CargoNdkTask` passes the same value as `ZIG` to cargo and its build script. The local file is
@@ -97,7 +98,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
   included) treats compiler warnings as errors, and lint treats its warnings as errors, except
   `GradleDependency`, `AndroidGradlePluginVersion`, `OldTargetApi`, `ExpiringTargetSdkVersion` and
   `OutdatedLibrary`, which follow data outside the repository and are informational.
-- Release: versionCode 1 and versionName 1.0.0. Local builds are signed with the debug key; CI can sign with a PKCS#12 keystore from Actions secrets. R8 uses the
+- Release: versionCode 1 and versionName 1.0.0 by default, overridable with Gradle properties. Local builds are signed with the debug key; CI can sign with a PKCS#12 keystore from Actions secrets. R8 uses the
   optimized Android defaults and shrinks unused resources. `app/proguard-rules.pro` keeps app
   JNI declarations and the public void `VtSession.on*` callbacks looked up by the native pump;
   callbacks outside that pattern need a matching keep rule. The release mapping is under
@@ -183,7 +184,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 
 ### Inbound
 
-- CI (`harness`) runs `assembleDebug lintDebug` and cargo-ndk clippy by default; an on-demand `build=release` run builds `assembleRelease` with a signing key from Actions secrets.
+- CI (`harness`) runs `assembleDebug lintDebug` and cargo-ndk clippy by default; an on-demand `build=release` run builds `assembleRelease` with a signing key from Actions secrets. `release.yml` builds the versioned signed APK and publishes the GitHub Release with the changelog section and checksums.
 - `android/native` and `android/vtcore` require the native build; `android/tests` uses the debug
   app and instrumentation runner. `android/setup` reads assets and `BuildConfig`;
   `android/licenses` reads static notice assets.

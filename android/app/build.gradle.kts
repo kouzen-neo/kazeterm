@@ -75,8 +75,8 @@ android {
         applicationId = "io.github.mthli.appine"
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()
+        versionName = providers.gradleProperty("versionName").orElse("1.0.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "ALPINE_BRANCH", "\"$alpineBranch\"")
     }

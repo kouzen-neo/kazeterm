@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **Signed release APK from CI.** `android.yml` can build `assembleRelease` on demand with `build=release`. The PKCS#12 keystore is restored from Actions secrets into a runner-temp file and removed after the build; local builds keep using the debug key.
-- **R8 mapping shipped with the APK.** The release artifact includes `mapping/release/mapping.txt` beside `app-release.apk` so stack traces can be decoded.
-- **Release notes workflow.** `CHANGELOG.md` is the single source for release descriptions, following the Keep a Changelog format used by KZKT, and `AGENTS.md` records the procedure for building and publishing later versions.
+- **Signed release APK from CI.** `release.yml` builds and signs the arm64-v8a APK with a PKCS#12 keystore restored from Actions secrets into a runner-temp file, then removes it. `android.yml` can also build a signed release on demand for testing.
+- **Versioned release files.** The published APK is named `Appine-arm64-v8a-vX.Y.Z.apk`, and its R8 mapping and `sha256sums.txt` are attached to the same GitHub Release. The version passed to the trigger overrides the Gradle defaults.
+- **Automatic release notes.** `scripts/release-notes` extracts the matching `CHANGELOG.md` section and the release job turns it into the GitHub Release body, with the APK checksum, a download line and a link to the full changelog.
 
 ### Changed
 

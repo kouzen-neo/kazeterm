@@ -38,10 +38,10 @@ Use the repository's `.agents/` paths for the module registry, maps, and decisio
 
 For every release build (1.0.0, 1.0.1, 1.0.2, ...), in order:
 
-1. Bump `versionName` and `versionCode` in `android/app/build.gradle.kts`, and add the matching `## [vX.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`.
-2. Dispatch the signed arm64-v8a build with `gh workflow run android.yml --ref master --repo <owner>/appine -f build=release`. The workflow restores the PKCS#12 keystore from `SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD` into a runner-temp file, runs `assembleRelease lintDebug`, then deletes the key. Artifact `appine-release-apk` holds `app-release.apk` and `mapping/release/mapping.txt`.
-3. Download the artifact, compute `sha256sum` of the APK, and publish `gh release create vX.Y.Z <apk> <mapping> <sha256sums.txt> --title "Appine vX.Y.Z"`.
-4. Write the release body in the KZKT convention: `# Appine vX.Y.Z`, the version's `### Added`/`### Changed`/`### Fixed` items copied from `CHANGELOG.md`, then `---`, `## APK` with each file name and its sha256, a download line, `---`, and `*Full changelog: [CHANGELOG.md](.../blob/master/CHANGELOG.md)*`. For AGPL, state that the complete corresponding source is this public repository at the build commit.
+1. Add the matching `## [vX.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`. The defaults in `android/app/build.gradle.kts` are only a fallback: the release job passes `-PversionName` and, when supplied, `-PversionCode`, so the APK version comes from the trigger.
+2. Dispatch the release with `gh workflow run release.yml --ref master --repo <owner>/appine -f version=X.Y.Z`, or push a `vX.Y.Z` tag. The job restores the PKCS#12 keystore from `SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD` into a runner-temp file, builds and lints the signed arm64-v8a APK, then deletes the key.
+3. The job renames the APK to `Appine-arm64-v8a-vX.Y.Z.apk`, copies the R8 mapping, writes `sha256sums.txt`, builds the body from the CHANGELOG section with `scripts/release-notes`, and publishes the GitHub Release with all three files. Do not create the Release by hand.
+4. The release body follows the KZKT convention: `# Appine vX.Y.Z`, the version's `### Added`/`### Changed`/`### Fixed` items, then `---`, `## APK` with the file name and sha256, a download line, `---`, and `*Full changelog: [CHANGELOG.md](.../blob/master/CHANGELOG.md)*`. It also states that the complete corresponding source is this public repository at the build commit.
 5. Refresh `.agents/maps/android/build.md` and `.agents/maps/harness.md` when this flow changes. Never commit the keystore, its passwords, or the signing secrets to the repository.
 
 ## Committing changes

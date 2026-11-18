@@ -1,0 +1,13 @@
+#!/bin/sh
+# Print the CHANGELOG section for one version, without its heading, for release notes.
+#
+#   scripts/release-notes 1.0.1
+set -eu
+
+version=${1:?usage: scripts/release-notes <version>}
+
+awk -v heading="## [v$version]" '
+  index($0, heading) == 1 { found = 1; next }
+  found && /^## \[/ { exit }
+  found { print }
+' CHANGELOG.md
