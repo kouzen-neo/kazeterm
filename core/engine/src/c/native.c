@@ -6,7 +6,7 @@
  *
  * Each instruction encoding has one stub, cached in a block of executable memory:
  *
- *   void stub(struct appine_cpu *cpu, void *host_addr);
+ *   void stub(struct kazeterm_cpu *cpu, void *host_addr);
  *
  * General register fields are replaced with host x2–x7 (a register pair takes two), and the
  * address field with x1; x9 and x10 are the stub's own temporaries. Integer vector add/subtract
@@ -17,7 +17,7 @@
  * The cache is shared by all threads and flushed entirely when full. To avoid overwriting a stub
  * another thread is executing, lookup and execution both happen under the read lock, while
  * generating and flushing need the write lock. The cache is double-mapped for W^X
- * (appine_map_code), and stubs are generated in the writable alias.
+ * (kazeterm_map_code), and stubs are generated in the writable alias.
  */
 #define _GNU_SOURCE /* needed for pthread_rwlock_t and mremap under -std=c17 */
 
@@ -54,7 +54,7 @@ static size_t used_words;
 static size_t table_count;
 static struct slot table[TABLE_SIZE];
 
-uint32_t *appine_map_code(size_t bytes, intptr_t *delta)
+uint32_t *kazeterm_map_code(size_t bytes, intptr_t *delta)
 {
     /* Duplicate the shared mapping with mremap, without depending on memfd */
     void *w = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -73,7 +73,7 @@ uint32_t *appine_map_code(size_t bytes, intptr_t *delta)
     return c == MAP_FAILED ? NULL : c;
 }
 
-void appine_unmap_code(uint32_t *code, size_t bytes, intptr_t delta)
+void kazeterm_unmap_code(uint32_t *code, size_t bytes, intptr_t delta)
 {
     munmap(code, bytes);
     if (delta)
@@ -82,10 +82,10 @@ void appine_unmap_code(uint32_t *code, size_t bytes, intptr_t delta)
 
 static void init(void)
 {
-    cache = appine_map_code(CACHE_BYTES, &rw_delta);
+    cache = kazeterm_map_code(CACHE_BYTES, &rw_delta);
 }
 
-bool appine_native_available(void)
+bool kazeterm_native_available(void)
 {
     pthread_once(&once, init);
     return cache != NULL;
@@ -118,13 +118,13 @@ static void put_add(struct buf *b, unsigned rd, unsigned rn, size_t off)
 
 static size_t x_off(unsigned r)
 {
-    return offsetof(struct appine_cpu, x) + 8 * r;
+    return offsetof(struct kazeterm_cpu, x) + 8 * r;
 }
 
 static void generate(struct buf *b, uint32_t insn, const struct native_desc *d)
 {
     enum { CPU = 0, ADDR = 1, VBASE = 9, TMP = 10 };
-    size_t v_off = offsetof(struct appine_cpu, v);
+    size_t v_off = offsetof(struct kazeterm_cpu, v);
     uint32_t out = insn;
     unsigned host[3];
 
@@ -150,11 +150,11 @@ static void generate(struct buf *b, uint32_t insn, const struct native_desc *d)
         put(b, enc_stp_d(14, 15, 31, 48));
         put(b, enc_mrs_fpcr(TMP));
         put(b, enc_str_x(TMP, 31, 64));
-        put(b, enc_ldr_x(TMP, CPU, offsetof(struct appine_cpu, fpcr)));
+        put(b, enc_ldr_x(TMP, CPU, offsetof(struct kazeterm_cpu, fpcr)));
         put(b, enc_msr_fpcr(TMP));
-        put(b, enc_ldr_x(TMP, CPU, offsetof(struct appine_cpu, fpsr)));
+        put(b, enc_ldr_x(TMP, CPU, offsetof(struct kazeterm_cpu, fpsr)));
         put(b, enc_msr_fpsr(TMP));
-        put(b, enc_ldr_x(TMP, CPU, offsetof(struct appine_cpu, nzcv)));
+        put(b, enc_ldr_x(TMP, CPU, offsetof(struct kazeterm_cpu, nzcv)));
         put(b, enc_msr_nzcv(TMP));
         put_add(b, VBASE, CPU, v_off);
         for (unsigned q = 0; q < 32; q += 2)
@@ -198,9 +198,9 @@ static void generate(struct buf *b, uint32_t insn, const struct native_desc *d)
         for (unsigned q = 0; q < 32; q += 2)
             put(b, enc_stp_q(q, q + 1, VBASE, (int)(16 * q)));
         put(b, enc_mrs_fpsr(TMP));
-        put(b, enc_str_x(TMP, CPU, offsetof(struct appine_cpu, fpsr)));
+        put(b, enc_str_x(TMP, CPU, offsetof(struct kazeterm_cpu, fpsr)));
         put(b, enc_mrs_nzcv(TMP));
-        put(b, enc_str_x(TMP, CPU, offsetof(struct appine_cpu, nzcv)));
+        put(b, enc_str_x(TMP, CPU, offsetof(struct kazeterm_cpu, nzcv)));
         put(b, enc_ldr_x(TMP, 31, 64));
         put(b, enc_msr_fpcr(TMP));
         put(b, enc_ldp_d(14, 15, 31, 48));
@@ -241,51 +241,51 @@ static void insert(uint32_t insn, const struct native_desc *desc)
     struct buf b = {(uint32_t *)((char *)code + rw_delta), 0}; /* stubs have no relative branches */
     generate(&b, insn, desc);
     if (b.n > MAX_STUB_WORDS)
-        appine_guard_fail(); /* the upper-bound estimate was wrong: an engine bug */
+        kazeterm_guard_fail(); /* the upper-bound estimate was wrong: an engine bug */
     sync_code((void *)code, (void *)(code + b.n), rw_delta);
     used_words += b.n;
     table[i] = (struct slot){insn, (native_fn)(uintptr_t)code};
     table_count++;
 }
 
-bool appine_native_exec(uint32_t insn, const struct native_desc *desc, struct appine_cpu *cpu,
+bool kazeterm_native_exec(uint32_t insn, const struct native_desc *desc, struct kazeterm_cpu *cpu,
                         void *host_addr)
 {
-    if (!appine_native_available())
+    if (!kazeterm_native_available())
         return false;
     /* Stubs access memory at host addresses: if an address is wrong (an engine bug), the host
      * fault guard must release this lock */
     for (;;) {
         pthread_rwlock_rdlock(&lock);
-        appine_guard_hold(&lock, true);
+        kazeterm_guard_hold(&lock, true);
         native_fn fn = lookup(insn);
         if (fn) {
             fn(cpu, host_addr);
-            appine_guard_drop();
+            kazeterm_guard_drop();
             pthread_rwlock_unlock(&lock);
             return true;
         }
-        appine_guard_drop();
+        kazeterm_guard_drop();
         pthread_rwlock_unlock(&lock);
         /* Look up again after switching to the write lock: another thread may have generated the
          * same stub */
         pthread_rwlock_wrlock(&lock);
-        appine_guard_hold(&lock, true);
+        kazeterm_guard_hold(&lock, true);
         if (!lookup(insn))
             insert(insn, desc);
-        appine_guard_drop();
+        kazeterm_guard_drop();
         pthread_rwlock_unlock(&lock);
     }
 }
 
 #else /* !NATIVE_SUPPORTED */
 
-bool appine_native_available(void)
+bool kazeterm_native_available(void)
 {
     return false;
 }
 
-bool appine_native_exec(uint32_t insn, const struct native_desc *desc, struct appine_cpu *cpu,
+bool kazeterm_native_exec(uint32_t insn, const struct native_desc *desc, struct kazeterm_cpu *cpu,
                         void *host_addr)
 {
     (void)insn;

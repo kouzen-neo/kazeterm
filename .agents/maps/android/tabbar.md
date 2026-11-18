@@ -11,7 +11,7 @@
 
 `android/tabbar` owns tab-bar/list presentation, number animations and progress/status drawing.
 Root: `TabBarView.kt`, `TabListView.kt`, `TabNumber.kt`, `TabMarks.kt` and `ProgressLine.kt` in
-`android/app/src/main/java/io/github/mthli/appine/`.
+`android/app/src/main/java/com/kazeterm/`.
 
 All MainActivity target adapters, session selection/closing, menu policy, focus/Back coordination
 and layout placement remain `android/terminal`; session state is `android/vt`. Shared indicator

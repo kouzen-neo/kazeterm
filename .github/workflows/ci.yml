@@ -75,6 +75,6 @@ jobs:
 
       - name: Test (includes lockstep, guest programs and busybox in the rootfs)
         env:
-          APPINE_REQUIRE_ROOTFS: "1"
-          APPINE_REQUIRE_MUSL: "1"
+          KAZETERM_REQUIRE_ROOTFS: "1"
+          KAZETERM_REQUIRE_MUSL: "1"
         run: cargo test --workspace

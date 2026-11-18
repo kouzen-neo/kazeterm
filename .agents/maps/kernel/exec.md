@@ -130,7 +130,7 @@ writer checks (`kernel/files`); noexec and nosuid (`kernel/mount`); FUSE program
 - The main program's code and data bounds (Linux 6.1's `start_code`, `end_code`, `start_data`,
   `end_data` from its segments) are recorded in the address space for `/proc/<pid>/stat`.
 - A Go build-ID note in the main program selects the translator's Go register set (`engine`;
-  `APPINE_DBT_REGS` overrides it).
+  `KAZETERM_DBT_REGS` overrides it).
 - Opened store and overlay executables are cached (32 entries, checked against the host file's
   device, inode, ctime and size; forgotten when rehomed, cleared under memory pressure).
   `Machine::spawn` loads through `loader::load`.

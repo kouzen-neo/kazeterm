@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use appine_engine::Cpu;
+use kazeterm_engine::Cpu;
 
 use crate::cell::RefCell;
 use crate::cred::Cred;
@@ -863,7 +863,7 @@ pub(crate) const EXCEPTION_TRACE: &[u8] = b"sys/debug/exception-trace";
 /// `comm[tid]: unhandled exception: `, the exception class and `esr` when it is not 0, `what`, and
 /// the file mapped at the pc or above it, then the registers (`__show_regs`). At most 10 reports
 /// pass per 5 seconds across the kernel. Linux also reports every exception of the initial pid
-/// namespace's init, which in Appine is not guest code.
+/// namespace's init, which in KazeTerm is not guest code.
 pub(crate) fn show_unhandled(cx: &mut Cx<'_>, cpu: &Cpu, sig: Signal, esr: u64, what: &str) {
     let handler = cx.t.group.borrow().sighand.borrow().get(sig).handler;
     if crate::pseudo::recorded_value(cx.kr(), EXCEPTION_TRACE) == 0
@@ -920,7 +920,7 @@ pub(crate) fn show_unhandled(cx: &mut Cx<'_>, cpu: &Cpu, sig: Signal, esr: u64, 
     let mut head = format!("CPU: {cpu_nr} PID: {} Comm: ", cx.tid()).into_bytes();
     head.extend_from_slice(comm);
     head.extend_from_slice(
-        format!(" {} 6.1.0-appine #1\n", tainted_text(cx.kr().tainted)).as_bytes(),
+        format!(" {} 6.1.0-kazeterm #1\n", tainted_text(cx.kr().tainted)).as_bytes(),
     );
     crate::klog::emit(&log, 0, level, &head);
     for text in show_regs(crate::ptrace::pstate_of(st), &st.x, st.sp, st.pc) {
@@ -965,7 +965,7 @@ fn show_regs(p: u64, x: &[u64; 31], sp: u64, pc: u64) -> Vec<String> {
     lines
 }
 
-/// `esr_get_class_string`, for the exception classes Appine synthesizes (the others share Linux's
+/// `esr_get_class_string`, for the exception classes KazeTerm synthesizes (the others share Linux's
 /// "UNRECOGNIZED EC").
 fn class_name(esr: u64) -> &'static str {
     match esr >> 26 & 0x3f {
@@ -979,7 +979,7 @@ fn class_name(esr: u64) -> &'static str {
     }
 }
 
-/// The name arm64 Linux's `fault_info` gives an abort's fault status code, for the codes Appine
+/// The name arm64 Linux's `fault_info` gives an abort's fault status code, for the codes KazeTerm
 /// synthesizes (crate::task) and the other translation and permission levels.
 pub(crate) fn abort_name(esr: u64) -> &'static str {
     match esr & 0x3f {
@@ -1789,7 +1789,7 @@ mod tests {
     }
 
     /// The register lines of an unhandled-exception report, as Linux 6.8 on arm64 printed them
-    /// for a static program writing to address 16 (the pstate without SSBS, which Appine does
+    /// for a static program writing to address 16 (the pstate without SSBS, which KazeTerm does
     /// not set).
     #[test]
     fn unhandled_reports_print_registers_as_linux() {
@@ -1831,7 +1831,7 @@ mod tests {
         );
     }
 
-    /// The exception classes and fault names Appine's synthesized ESRs get, and print_tainted.
+    /// The exception classes and fault names KazeTerm's synthesized ESRs get, and print_tainted.
     #[test]
     fn unhandled_reports_name_exceptions_as_linux() {
         assert_eq!(class_name(0x9200_0047), "DABT (lower EL)");

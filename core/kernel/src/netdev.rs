@@ -33,7 +33,7 @@
 
 use std::rc::{Rc, Weak};
 
-use appine_hal::net::Interface;
+use kazeterm_hal::net::Interface;
 
 use crate::cell::RefCell;
 use crate::cred::{Cred, cap};
@@ -804,7 +804,7 @@ fn new_dev(
 
 fn random_mac() -> [u8; 6] {
     let mut m = [0u8; 6];
-    let _ = appine_hal::fill_random(&mut m);
+    let _ = kazeterm_hal::fill_random(&mut m);
     // A unicast, locally administered address (eth_random_addr)
     m[0] = (m[0] & 0xfe) | 0x02;
     m
@@ -2962,7 +2962,7 @@ pub(crate) fn interfaces(ns: &NetNs) -> Vec<Interface> {
 /// The two tables of namespace `ns` (the host's or lo's, plus those on virtual devices).
 /// `host_routes` are the routes in the host's main table (the initial namespace,
 /// [`crate::route::host_routes`]).
-pub(crate) fn tables(ns: &NetNs, host_routes: Option<Vec<appine_hal::net::Route>>) -> Vec<Entry> {
+pub(crate) fn tables(ns: &NetNs, host_routes: Option<Vec<kazeterm_hal::net::Route>>) -> Vec<Entry> {
     let base_ifaces = base(ns);
     let host = if ns.host_net.is_none() {
         crate::route::tables(&base_ifaces, host_routes)
@@ -3039,7 +3039,7 @@ fn devs(ns: &NetNs) -> crate::cell::RefMut<'_, Devices> {
 /// namespace, lo in a new one.
 pub(crate) fn base(ns: &NetNs) -> Vec<Interface> {
     if ns.host_net.is_none() {
-        appine_hal::net::interfaces()
+        kazeterm_hal::net::interfaces()
     } else {
         vec![crate::netns::lo_interface(ns)]
     }

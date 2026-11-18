@@ -1,11 +1,11 @@
 #!/bin/sh
-# Workload survey (docs/rounds/62-workload-survey.md): runs common services and tools inside Appine
+# Workload survey (docs/rounds/62-workload-survey.md): runs common services and tools inside KazeTerm
 # and collects failures and the kernel layer's logs. Run on a host with docker:
 #
 #   scripts/survey [-t tier] [-s store directory] [-n image] [workload name…]
 #
 # Workloads are tests/survey/<name>.sh (names may include subdirectories), copied into the store and
-# run by the guest's /bin/sh (stdin is /dev/null), with APPINE_LOG=1. stdout is written to
+# run by the guest's /bin/sh (stdin is /dev/null), with KAZETERM_LOG=1. stdout is written to
 # target/survey/<name>.out and stderr (including the kernel layer's logs) to <name>.err; at the end
 # there is one line per workload: the exit code, the time, the number of internal errors reported by
 # the kernel layer (kernel bugs, kernel objects borrowed while the BKL is released), the
@@ -23,7 +23,7 @@
 # native container (such as `--cap-add SYS_ADMIN --security-opt apparmor=unconfined` for sandboxes).
 # The image can be exported from the store (docs/rounds/70-survey-suites.md):
 #
-#   appine-run --rootfs <store> --no-pty -- /bin/tar -C / -cf - --exclude ./proc \
+#   kazeterm-run --rootfs <store> --no-pty -- /bin/tar -C / -cf - --exclude ./proc \
 #       --exclude ./sys --exclude ./dev --exclude ./tmp . > store.tar
 #   docker import --platform linux/arm64 store.tar <image>
 #
@@ -83,8 +83,8 @@ fi
 if [ "$(uname -sm)" != "Linux aarch64" ]; then
     exec scripts/dev env SURVEY_TIMEOUT="$limit" scripts/survey -t "$tier" -s "$store" "$@"
 fi
-run=${APPINE_RUN:-target/linux-arm64/release/appine-run}
-[ -x "$run" ] || run=target/release/appine-run
+run=${KAZETERM_RUN:-target/linux-arm64/release/kazeterm-run}
+[ -x "$run" ] || run=target/release/kazeterm-run
 proxy() {
     for kv in "http_proxy=${http_proxy:-}" "https_proxy=${https_proxy:-}"; do
         [ -n "${kv#*=}" ] && printf -- '--env %s ' "$kv"
@@ -122,17 +122,17 @@ for name in "$@"; do
     start=$(date +%s)
     set +e
     # shellcheck disable=SC2046
-    APPINE_LOG=1 timeout "$limit" "$run" --tier "$tier" --rootfs "$store" \
+    KAZETERM_LOG=1 timeout "$limit" "$run" --tier "$tier" --rootfs "$store" \
         --env PATH=/usr/sbin:/usr/bin:/sbin:/bin --env HOME=/root --env TERM=xterm $(proxy) \
         -- /bin/sh -c 'cat > /tmp/survey.sh && exec sh /tmp/survey.sh </dev/null' \
         <"tests/survey/$name.sh" >"$out/$name.out" 2>"$out/$name.err"
     code=$?
     set -e
     # The kernel layer writes one line the first time each path is reached
-    paths=$(sed -n 's/^appine: unimplemented \(.*\), first by .*/\1/p' "$out/$name.err")
+    paths=$(sed -n 's/^kazeterm: unimplemented \(.*\), first by .*/\1/p' "$out/$name.err")
     enosys=$(printf '%s\n' "$paths" | sed -n 's/^syscall //p' | sort -nu | tr '\n' ' ')
     stubs=$(printf '%s\n' "$paths" | grep -v '^syscall ' | grep . | sort -u | paste -sd ';' - || true)
-    bugs=$(grep -c '^appine: internal error' "$out/$name.err" || true)
+    bugs=$(grep -c '^kazeterm: internal error' "$out/$name.err" || true)
     [ "$bugs" != 0 ] || bugs=""
     printf '%-10s exit %-3s %4ss  %s%s%s\n' "$name" "$code" "$(($(date +%s) - start))" \
         "${bugs:+INTERNAL ERRORS: $bugs  }" "${enosys:+ENOSYS: $enosys }" "${stubs:+UNIMPLEMENTED: $stubs}"

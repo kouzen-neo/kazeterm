@@ -173,7 +173,7 @@ impl Klog {
             text = rest;
             flags |= LOG_NEWLINE;
         }
-        let ts_nsec = appine_hal::clock_gettime(CLOCK_MONOTONIC)
+        let ts_nsec = kazeterm_hal::clock_gettime(CLOCK_MONOTONIC)
             .map_or(0, |(s, ns)| s as u64 * 1_000_000_000 + ns as u64);
         let record = Record {
             seq: self.next_seq,

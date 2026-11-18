@@ -243,7 +243,7 @@ provider and rootfs installation UI (`android`).
   in the same process; each host call (`browse`, `browse_changing`, `write_file`, `read_file`) opens
   its own short-lived connection, and while it is open every operation commits immediately. A count
   leaked by a crash can only persist while another process holds the shared lock (e.g. several
-  `appine-run` processes on one store), so on Android the next open is exclusive and resets it.
+  `kazeterm-run` processes on one store), so on Android the next open is exclusive and resets it.
 - Changes made by host calls are replayed to running kernels of the same store in this process
   (found in the machine's registry), under their BKL, as inotify events. Directories the guest
   changes are recorded (up to 256 per poll, starting from the first poll) and handed to the
@@ -285,11 +285,11 @@ provider and rootfs installation UI (`android`).
   (`Vfs::open`'s boot with the volatile list), `kernel/process` (`syscall::fast`), the machine
   (waker, timer `commit_due`, `sync`, `trim_memory`, teardown, the store registry,
   `take_changed_dirs`), `kernel/inotify` (`host_change`), host wrappers in `lib.rs` (JNI and
-  `appine-run`).
+  `kazeterm-run`).
 
 ### Outbound
 
-- rusqlite with bundled SQLite (WAL hook, checkpoints); `appine_hal` (`open_at`, `stat_at`,
+- rusqlite with bundled SQLite (WAL hook, checkpoints); `kazeterm_hal` (`open_at`, `stat_at`,
   `chmod_at`, `unlink_at`, times, `flock`, `map_file`, `fsync`, `syncfs`, `sync_file_range`,
   `statvfs`); the `tar` and `flate2` crates; `kernel::bkl_holder`; `bug::catch`.
 

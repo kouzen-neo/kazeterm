@@ -182,7 +182,7 @@ impl Traffic {
     /// interface (module docs).
     fn route(&mut self, s: &mut InetSocket, peer: &[u8]) -> (Rc<str>, u32) {
         if s.route.is_none() {
-            let local = appine_hal::net::sockname(s.fd, false)
+            let local = kazeterm_hal::net::sockname(s.fd, false)
                 .ok()
                 .and_then(|a| ip_of(&a));
             s.route = match local {
@@ -252,7 +252,7 @@ impl Traffic {
     }
 
     fn refresh(&mut self) {
-        let list = appine_hal::net::interfaces();
+        let list = kazeterm_hal::net::interfaces();
         let mut addrs = Vec::new();
         for i in &list {
             let name: Rc<str> = i.name.as_str().into();
@@ -325,7 +325,7 @@ fn is_loopback(ip: &[u8]) -> bool {
 }
 
 /// The local address the host chooses for sending to the internet
-/// ([`appine_hal::net::source_for`]), or None when there is no route for this address family.
+/// ([`kazeterm_hal::net::source_for`]), or None when there is no route for this address family.
 pub(crate) fn outgoing_source(family: i32) -> Option<Vec<u8>> {
     let dst: &[u8] = if family == AF_INET {
         &[8, 8, 8, 8]
@@ -334,7 +334,7 @@ pub(crate) fn outgoing_source(family: i32) -> Option<Vec<u8>> {
             0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0x88, 0x88,
         ]
     };
-    appine_hal::net::source_for(dst).ok()
+    kazeterm_hal::net::source_for(dst).ok()
 }
 
 #[cfg(test)]
@@ -343,7 +343,7 @@ mod tests {
     use crate::net::SOCK_DGRAM;
 
     fn sockaddr(s: &str) -> Vec<u8> {
-        appine_hal::net::sockaddr(s.parse().unwrap())
+        kazeterm_hal::net::sockaddr(s.parse().unwrap())
     }
 
     #[test]
@@ -397,7 +397,7 @@ mod tests {
     /// identifies the interface by its peer.
     #[test]
     fn unconnected_datagrams_count_by_peer() {
-        let fd = appine_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
+        let fd = kazeterm_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
         let mut s = InetSocket::new(fd, AF_INET, SOCK_DGRAM);
         let mut t = Traffic::default();
         t.account(&mut s, false, 100, &sockaddr("127.0.0.1:9"));

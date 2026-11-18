@@ -247,7 +247,7 @@ shared memory and shm VMAs (`SharedMemory`, `attach_shm`, `detach_shm`, `shm_att
 - `kernel/signal`: `send_to_group` with `SigInfo` for notifications.
 - `kernel/netlink`: netlink socket queues for `SIGEV_THREAD`.
 - `kernel/files`: fd tables and `OpenFile`; `kernel/vfs`: `Vfs::mq_dev` for fstat.
-- `appine_hal`: the realtime clock for SysV times.
+- `kazeterm_hal`: the realtime clock for SysV times.
 
 ## Invariants and gotchas
 

@@ -5,7 +5,7 @@
 # queued real-time signals, alarm, ptrace and futexes. Run by tests/diff/gtest/run.sh, one process
 # per test. Tests that differ for a reason recorded in a map, or that cannot be compared, are
 # skipped, with the reason above them.
-# kernel/signal D5: no Yama (ptrace_scope reads 0, so these skip themselves on Appine)
+# kernel/signal D5: no Yama (ptrace_scope reads 0, so these skip themselves on KazeTerm)
 P=PtraceTest
 SKIP="$P.PrctlSetPtracer:$P.PrctlSetPtracerPersistsPastTraceeThreadExit"
 SKIP="$SKIP:$P.PrctlSetPtracerPersistsPastLeaderExec:$P.PrctlSetPtracerDoesNotPersistPastNonLeaderExec"
@@ -20,7 +20,7 @@ SKIP="$SKIP:TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClon
 SKIP="$SKIP:$P.AttachingConvertsGroupStopToPtraceStop"
 # kernel/cred D2: no ACLs
 SKIP="$SKIP:ExecTest.ACLExecuteOnlyBinary"
-# Cannot be compared: PIDFD_THREAD came in 6.9, so these skip themselves on 6.8 and Appine and run
+# Cannot be compared: PIDFD_THREAD came in 6.9, so these skip themselves on 6.8 and KazeTerm and run
 # on CI's newer kernel; the set-id execs fail natively on CI's runner (not investigated); the
 # non-consuming wait fails on both sides on 6.8 and hangs natively on CI until the 60 s timeout
 SKIP="$SKIP:PidfdTest.PidfdThread*:ExecTest.SUIDExecGainsUID:ExecTest.SGIDExecGainsGID"

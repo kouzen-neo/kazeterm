@@ -1,11 +1,11 @@
 # docker-run-options: --cap-add SYS_ADMIN --security-opt apparmor=unconfined
 # overlayfs nodes of removed names: after thousands of files were made and removed through an
-# overlay (enough for Appine to drop the nodes behind them), what still uses a removed name works
+# overlay (enough for KazeTerm to drop the nodes behind them), what still uses a removed name works
 # as before: a file open after its unlink, an O_PATH descriptor and a cwd of removed directories,
 # /proc/<pid>/exe of a program whose directory was removed (read, and run again), and of one
 # renamed while it runs (opened), and an open of a FIFO that waits for a writer while its name is
 # removed and the writer comes through another link. Not compared: opening the removed program
-# through exe, which Linux allows and Appine refuses (ENOENT, kernel/vfs map)
+# through exe, which Linux allows and KazeTerm refuses (ENOENT, kernel/vfs map)
 cd /tmp
 umount -R /tmp/ovs 2>/dev/null
 rm -rf ovs

@@ -18,7 +18,7 @@
 - packet mode;
 - job control: controlling terminals, sessions and foreground groups, background-access checks,
   terminal-generated signals;
-- the host console: kernel-held masters for the app's terminal tabs and the `appine-run` bridge.
+- the host console: kernel-held masters for the app's terminal tabs and the `kazeterm-run` bridge.
 
 Root: `core/kernel/src/tty.rs`, `syscall/tty.rs`, `terminal.rs`.
 
@@ -294,7 +294,7 @@ exit-time orphan signals (`kernel/process`); the host terminal's raw mode and si
   Host threads take the BKL and wait on the terminal's wake object like guest threads; a panic in
   a console read, write or resize closes the console and returns `EIO`. A kill report names the
   console of the killed process's controlling terminal.
-- `bridge` (`appine-run`'s `run`, on its own thread): `appine-run` puts the host terminal in raw
+- `bridge` (`kazeterm-run`'s `run`, on its own thread): `kazeterm-run` puts the host terminal in raw
   mode and sets up the `SIGWINCH` pipe when stdin and stdout are terminals; the console starts at
   the host terminal's size, else 24×80 (no size fd, `TIOCGWINSZ` failing or reporting 0). Output
   goes to the host (dropped on a write error); input is read only while there is room, and any
@@ -305,7 +305,7 @@ exit-time orphan signals (`kernel/process`); the host terminal's raw mode and si
   line editor) reads the `VEOF` character instead of Linux's NUL, which the line editor would
   insert into its line and then wait forever. The bridge stops when the console closes, the
   session ends, or the program has exited and no task is left (once output is drained); `run`
-  joins it. Stop signals to `appine-run` reach the program through `Machine::signal`, not the
+  joins it. Stop signals to `kazeterm-run` reach the program through `Machine::signal`, not the
   console.
 
 ## Dependencies (inbound / outbound)
@@ -323,7 +323,7 @@ exit-time orphan signals (`kernel/process`); the host terminal's raw mode and si
 - `kernel/signal` (`send_to_pgrp`, `send_to_group`, `pgrp_orphaned`, kernel siginfo, the
   unimplemented-path counter), the kernel's wake objects and `wait_objects`, pid-namespace
   translation (`pid_in`/`pid_out`), credentials (`capable`), the VFS (`devpts_options`, `path_of`,
-  fd installation), `appine_hal` (polling, read, write, drain and `TIOCGWINSZ` of host fds, the
+  fd installation), `kazeterm_hal` (polling, read, write, drain and `TIOCGWINSZ` of host fds, the
   clock).
 
 ## Invariants and gotchas
@@ -383,7 +383,7 @@ exit-time orphan signals (`kernel/process`); the host terminal's raw mode and si
 
 - Linux 6.1's `TIOCOUTQ` and `TIOCSBRK`/`TIOCCBRK` results on ptys (believed 0 and success; here
   the output queue length and `ENOTTY`); whether Linux notifies an edge-triggered slave watcher
-  again for each input batch while an unread line waits, as Appine does.
+  again for each input batch while an unread line waits, as KazeTerm does.
 - The comparisons with Linux in this map come from knowledge of `tty_io.c`, `tty_jobctrl.c` and
   `pty.c`, not from a source checkout; of `n_tty.c`, only the special-character order, erasing,
   output processing and mode switches were checked against 6.1's source. The differential tests

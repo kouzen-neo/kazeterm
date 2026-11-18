@@ -1,8 +1,8 @@
-//! Appine's Android native library (design doc §3, the android/native map): the Kotlin shell uses
+//! KazeTerm's Android native library (design doc §3, the android/native map): the Kotlin shell uses
 //! the kernel layer through JNI.
 //!
 //! The matching Kotlin declarations are in
-//! `android/app/src/main/java/io/github/mthli/appine/Native.kt`.
+//! `android/app/src/main/java/com/kazeterm/Native.kt`.
 //! [`Machine`]s are registered in a table, and Kotlin gets a number (a `long` handle). Each call
 //! takes a temporary reference, so `stop` is safe even concurrently with a read blocked on another
 //! thread: the Machine is dropped only when the last reference goes away. `stop` removes it from
@@ -25,8 +25,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, Once, PoisonError};
 
-use appine_kernel::vfs::browse;
-use appine_kernel::{ExitStatus, HostRoute, Machine, MachineOptions, Power, Stdio, Tier};
+use kazeterm_kernel::vfs::browse;
+use kazeterm_kernel::{ExitStatus, HostRoute, Machine, MachineOptions, Power, Stdio, Tier};
 use jni::JNIEnv;
 use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString};
 use jni::sys::{jboolean, jbooleanArray, jbyteArray, jint, jlong, jobjectArray, jstring};
@@ -64,7 +64,7 @@ mod vt;
 /// A JNI function's body panicked ([`guarded`]): logs it, and when Kotlin expects an exception
 /// from the call, throws one unless one is already pending.
 fn panicked(function: &str, env: Option<*mut jni::sys::JNIEnv>) {
-    eprintln!("appine: internal error in {function} (a panic, logged above); the call failed");
+    eprintln!("kazeterm: internal error in {function} (a panic, logged above); the call failed");
     // SAFETY: the pointer is the JNIEnv this call was made with, on this thread
     if let Some(Ok(mut env)) = env.map(|raw| unsafe { JNIEnv::from_raw(raw) })
         && !env.exception_check().unwrap_or(true)
@@ -76,7 +76,7 @@ fn panicked(function: &str, env: Option<*mut jni::sys::JNIEnv>) {
 /// Called before any other function: stderr goes to logcat, and with `verbose` the kernel layer's
 /// debug log is turned on.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_init<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_init<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     verbose: jboolean,
@@ -85,7 +85,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_init<'l>(
         redirect_stderr();
         if verbose != 0 {
             // SAFETY: set before the kernel layer is used; no other thread reads the environment yet
-            unsafe { std::env::set_var("APPINE_LOG", "1") };
+            unsafe { std::env::set_var("KAZETERM_LOG", "1") };
         }
     })
 }
@@ -115,7 +115,7 @@ fn redirect_stderr() {
                 use std::io::{BufRead, BufReader};
                 use std::os::fd::FromRawFd;
                 let input = unsafe { std::fs::File::from_raw_fd(read_end) };
-                let tag = c"appine";
+                let tag = c"kazeterm";
                 for line in BufReader::new(input).split(b'\n').map_while(Result::ok) {
                     if let Ok(text) = CString::new(line) {
                         unsafe {
@@ -128,7 +128,7 @@ fn redirect_stderr() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_importRootfs<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_importRootfs<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -139,7 +139,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_importRootfs<'l>(
         else {
             return;
         };
-        if let Err(e) = appine_kernel::import_rootfs(store.as_ref(), tarball.as_ref()) {
+        if let Err(e) = kazeterm_kernel::import_rootfs(store.as_ref(), tarball.as_ref()) {
             throw(&mut env, format!("cannot import the rootfs: {e}"));
         }
     })
@@ -148,7 +148,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_importRootfs<'l>(
 /// Writes the store to disk (after an import and writing the configuration, before renaming it into
 /// place).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_syncRootfs<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_syncRootfs<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -157,14 +157,14 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_syncRootfs<'l>(
         let Some(store) = string(&mut env, &store) else {
             return;
         };
-        if let Err(e) = appine_kernel::sync_store(store.as_ref()) {
+        if let Err(e) = kazeterm_kernel::sync_store(store.as_ref()) {
             throw(&mut env, format!("cannot sync the rootfs: {e}"));
         }
     })
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_writeFile<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_writeFile<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -180,7 +180,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_writeFile<'l>(
         let Ok(data) = env.convert_byte_array(&data) else {
             return;
         };
-        let r = appine_kernel::write_file(store.as_ref(), &path, &data, mode as u32, overwrite != 0);
+        let r = kazeterm_kernel::write_file(store.as_ref(), &path, &data, mode as u32, overwrite != 0);
         if let Err(e) = r {
             throw(&mut env, format!("cannot write {path}: {e}"));
         }
@@ -192,7 +192,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_writeFile<'l>(
 /// errors. Also works while the kernel runs: when the store is opened separately, the kernel's
 /// deferred write transaction commits first.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_readFile<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_readFile<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -202,12 +202,12 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_readFile<'l>(
         let (Some(store), Some(path)) = (string(&mut env, &store), string(&mut env, &path)) else {
             return std::ptr::null_mut();
         };
-        match appine_kernel::read_file(store.as_ref(), &path) {
+        match kazeterm_kernel::read_file(store.as_ref(), &path) {
             Ok(data) => env
                 .byte_array_from_slice(&data)
                 .map(JByteArray::into_raw)
                 .unwrap_or(std::ptr::null_mut()),
-            Err(appine_kernel::errno::Errno::ENOENT) => std::ptr::null_mut(),
+            Err(kazeterm_kernel::errno::Errno::ENOENT) => std::ptr::null_mut(),
             Err(e) => {
                 throw(&mut env, format!("cannot read {path}: {e}"));
                 std::ptr::null_mut()
@@ -232,7 +232,7 @@ const SEARCH_BUDGET: usize = 50_000;
 
 /// The directory or regular file a path (document ID) points at (following symbolic links).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseStat<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseStat<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -242,7 +242,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseStat<'l>(
         let (Some(store), Some(path)) = (string(&mut env, &store), string(&mut env, &path)) else {
             return std::ptr::null_mut();
         };
-        let r = appine_kernel::browse(store.as_ref(), |s| {
+        let r = kazeterm_kernel::browse(store.as_ref(), |s| {
             browse::stat(s, &browse::decode_path(&path))
         });
         match r {
@@ -261,7 +261,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseStat<'l>(
 /// Lists a directory: each entry is `<name>\t<type>\t…`, with the name written by
 /// [`browse::encode_path`].
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseList<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseList<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -271,7 +271,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseList<'l>(
         let (Some(store), Some(dir)) = (string(&mut env, &store), string(&mut env, &dir)) else {
             return std::ptr::null_mut();
         };
-        let r = appine_kernel::browse(store.as_ref(), |s| {
+        let r = kazeterm_kernel::browse(store.as_ref(), |s| {
             browse::list(s, &browse::decode_path(&dir))
         });
         match r {
@@ -293,7 +293,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseList<'l>(
 /// Opens a regular file for reading and returns the host fd (handed to
 /// ParcelFileDescriptor.adoptFd, which closes it).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseOpen<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseOpen<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -304,7 +304,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseOpen<'l>(
         let (Some(store), Some(path)) = (string(&mut env, &store), string(&mut env, &path)) else {
             return -1;
         };
-        let r = appine_kernel::browse(store.as_ref(), |s| {
+        let r = kazeterm_kernel::browse(store.as_ref(), |s| {
             browse::open(s, &browse::decode_path(&path))
         });
         match r {
@@ -321,7 +321,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseOpen<'l>(
 /// checked with one opening of the store. Only the first 1000 are looked at; the rest count as not
 /// text.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseSniff<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseSniff<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -334,7 +334,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseSniff<'l>(
         let (Some(store), Some(paths)) = (string(&mut env, &store), strings(&mut env, &paths)) else {
             return std::ptr::null_mut();
         };
-        let r = appine_kernel::browse(store.as_ref(), |s| {
+        let r = kazeterm_kernel::browse(store.as_ref(), |s| {
             Ok(paths
                 .iter()
                 .enumerate()
@@ -363,7 +363,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseSniff<'l>(
 
 /// Searches by name under a directory (case-insensitive): each entry is `<path>\t<type>\t…`.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseSearch<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseSearch<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -379,7 +379,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseSearch<'l>(
         ) else {
             return std::ptr::null_mut();
         };
-        let r = appine_kernel::browse(store.as_ref(), |s| {
+        let r = kazeterm_kernel::browse(store.as_ref(), |s| {
             browse::search(
                 s,
                 &browse::decode_path(&dir),
@@ -412,7 +412,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseSearch<'l>(
 /// name is taken another one is used, and the name actually used is returned.
 #[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseCreate<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseCreate<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -432,7 +432,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseCreate<'l>(
         ) else {
             return std::ptr::null_mut();
         };
-        let r = appine_kernel::browse_changing(store.as_ref(), |s, changes| {
+        let r = kazeterm_kernel::browse_changing(store.as_ref(), |s, changes| {
             browse::create(
                 s,
                 &browse::decode_path(&top),
@@ -458,7 +458,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseCreate<'l>(
 
 /// Removes a file, a symbolic link or a whole directory tree.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseRemove<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseRemove<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -473,7 +473,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseRemove<'l>(
         ) else {
             return;
         };
-        let r = appine_kernel::browse_changing(store.as_ref(), |s, changes| {
+        let r = kazeterm_kernel::browse_changing(store.as_ref(), |s, changes| {
             browse::remove(
                 s,
                 &browse::decode_path(&top),
@@ -489,7 +489,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseRemove<'l>(
 
 /// Renames within the same directory ([name] is the new name), without replacing.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseRename<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseRename<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -506,7 +506,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseRename<'l>(
         ) else {
             return std::ptr::null_mut();
         };
-        let r = appine_kernel::browse_changing(store.as_ref(), |s, changes| {
+        let r = kazeterm_kernel::browse_changing(store.as_ref(), |s, changes| {
             browse::rename(
                 s,
                 &browse::decode_path(&top),
@@ -530,7 +530,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseRename<'l>(
 
 /// Moves to another directory [to], keeping the name, without replacing.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseMove<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseMove<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -547,7 +547,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseMove<'l>(
         ) else {
             return;
         };
-        let r = appine_kernel::browse_changing(store.as_ref(), |s, changes| {
+        let r = kazeterm_kernel::browse_changing(store.as_ref(), |s, changes| {
             browse::move_to(
                 s,
                 &browse::decode_path(&top),
@@ -565,7 +565,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseMove<'l>(
 /// Opens a regular file for reading and writing (truncating first with [truncate], opening with
 /// O_APPEND with [append]) and returns the host fd.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseOpenWrite<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseOpenWrite<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -583,7 +583,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseOpenWrite<'l>(
         ) else {
             return -1;
         };
-        let r = appine_kernel::browse_changing(store.as_ref(), |s, changes| {
+        let r = kazeterm_kernel::browse_changing(store.as_ref(), |s, changes| {
             browse::open_write(
                 s,
                 &browse::decode_path(&top),
@@ -607,7 +607,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseOpenWrite<'l>(
 /// (programs watching in the guest receive `IN_MODIFY` and `IN_CLOSE_WRITE`). No error if the file
 /// disappeared meanwhile.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_browseWritten<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_browseWritten<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -622,7 +622,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseWritten<'l>(
         ) else {
             return;
         };
-        let _ = appine_kernel::browse_changing(store.as_ref(), |s, changes| {
+        let _ = kazeterm_kernel::browse_changing(store.as_ref(), |s, changes| {
             browse::written(
                 s,
                 &browse::decode_path(&top),
@@ -633,7 +633,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_browseWritten<'l>(
     })
 }
 
-fn stat_fields(st: &appine_kernel::vfs::store::Stat) -> String {
+fn stat_fields(st: &kazeterm_kernel::vfs::store::Stat) -> String {
     let kind = if st.is_dir() { 'd' } else { 'f' };
     let perm = st.mode & 0o7777;
     format!(
@@ -643,7 +643,7 @@ fn stat_fields(st: &appine_kernel::vfs::store::Stat) -> String {
     )
 }
 
-fn not_found(env: &mut JNIEnv<'_>, what: &str, path: &str, e: appine_kernel::errno::Errno) {
+fn not_found(env: &mut JNIEnv<'_>, what: &str, path: &str, e: kazeterm_kernel::errno::Errno) {
     let _ = env.throw_new(
         "java/io/FileNotFoundException",
         format!("cannot {what} {path}: {e}"),
@@ -657,7 +657,7 @@ static MACHINES: Mutex<BTreeMap<jlong, Arc<Machine>>> = Mutex::new(BTreeMap::new
 static NEXT_HANDLE: AtomicI64 = AtomicI64::new(1);
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_start<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_start<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     store: JString<'l>,
@@ -697,7 +697,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_start<'l>(
 /// Boots by `/etc/inittab` (the kernel/boot map): blocks until the sysinit and wait commands
 /// have all finished.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_boot<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_boot<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -713,7 +713,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_boot<'l>(
 /// entry as in [`parse_route`]); with null it goes back to being synthesised from the interfaces'
 /// addresses.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_setRoutes<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_setRoutes<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -783,7 +783,7 @@ fn parse_route(line: &str) -> Option<HostRoute> {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_openConsole<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_openConsole<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -807,7 +807,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_openConsole<'l>(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_spawn<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_spawn<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -842,7 +842,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_spawn<'l>(
 /// Reads console output: returns the number of bytes read, 0 when the session ended, -1 when the
 /// console is closed.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_read<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_read<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -874,7 +874,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_read<'l>(
 /// Input to a console: returns the number of bytes written, -1 when the session ended or the
 /// console is closed.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_write<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_write<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -908,7 +908,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_write<'l>(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_resize<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_resize<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -928,7 +928,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_resize<'l>(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_closeConsole<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_closeConsole<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -945,7 +945,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_closeConsole<'l>(
 /// terminated it (the same convention as Termux). Once the kernel is stopped, all processes have
 /// been ended by SIGKILL.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_waitFor<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_waitFor<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -966,7 +966,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_waitFor<'l>(
 /// tabs start): null when it cannot be had (the shell has exited, the handle is invalid). A
 /// path that is not UTF-8 is converted with UTF-8 replacement rules.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_consoleCwd<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_consoleCwd<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -986,7 +986,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_consoleCwd<'l>(
 /// §12 item 7): each entry is `<process name>\t<port>\t<host port>`; an empty array when there are
 /// none.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_takeListens<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_takeListens<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1020,7 +1020,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_takeListens<'l>(
 /// the usage and the limit (bytes). Newlines, tabs and U+001E inside the fields are replaced by
 /// spaces.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_takeKills<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_takeKills<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1036,7 +1036,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_takeKills<'l>(
         for (i, k) in kills.iter().enumerate() {
             let console = k.console.map_or(-1, i64::from);
             let tail = match &k.reason {
-                appine_kernel::KillReason::Bug { report, log, stubs } => {
+                kazeterm_kernel::KillReason::Bug { report, log, stubs } => {
                     let join = |lines: &[String]| {
                         lines
                             .iter()
@@ -1046,7 +1046,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_takeKills<'l>(
                     };
                     format!("bug\t{}\t{}\t{}", clean(report), join(log), join(stubs))
                 }
-                appine_kernel::KillReason::OutOfMemory {
+                kazeterm_kernel::KillReason::OutOfMemory {
                     cgroup,
                     used,
                     limit,
@@ -1072,7 +1072,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_takeKills<'l>(
 /// Does not take the BKL, so the app can call it on the main thread while the worker waits for
 /// that hold to end. Tabs and newlines inside the fields are replaced by spaces.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_bklStall<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_bklStall<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1093,7 +1093,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_bklStall<'l>(
 /// Takes the guest's power request (busybox's reboot, halt, poweroff): 0 none, 1 reboot, 2 halt,
 /// 3 power off.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_takePower<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_takePower<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1110,7 +1110,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_takePower<'l>(
 
 /// Number of guest processes still running (not counting init).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_processes<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_processes<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1122,7 +1122,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_processes<'l>(
 
 /// Guest CPU nanoseconds, including exited threads; unavailable samples must not imply idleness.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_guestCpuTime<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_guestCpuTime<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1135,7 +1135,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_guestCpuTime<'l>(
 /// Takes the directories whose entries the guest changed (written as by [`browse::encode_path`],
 /// that is, document IDs): the Files app refreshes them.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_takeChangedDirs<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_takeChangedDirs<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1154,7 +1154,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_takeChangedDirs<'l>(
 /// The host is short of memory: drop caches that can be rebuilt (translations kept in the pool and
 /// so on) and commit the deferred write transaction.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_trimMemory<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_trimMemory<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1170,14 +1170,14 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_trimMemory<'l>(
 /// processes, ends those left, and then removes the handle from the table. Other calls keep working
 /// during the shutdown commands.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_shutdown<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_shutdown<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) {
     guarded!("Native.shutdown", (), {
         if let Some(m) = machine(handle) {
-            m.shutdown(Power::PowerOff, appine_kernel::SHUTDOWN_TIMEOUT);
+            m.shutdown(Power::PowerOff, kazeterm_kernel::SHUTDOWN_TIMEOUT);
         }
         // Dropped only after the table's lock is released: when this is the last reference, Machine's
         // drop syncs the store and joins threads, and every other call would wait for it
@@ -1188,7 +1188,7 @@ pub extern "system" fn Java_io_github_mthli_appine_Native_shutdown<'l>(
 
 /// Ends all guest processes and removes the handle from the table.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_Native_stop<'l>(
+pub extern "system" fn Java_com_kazeterm_Native_stop<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,

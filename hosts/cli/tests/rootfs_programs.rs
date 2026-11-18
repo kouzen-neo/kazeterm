@@ -2,16 +2,16 @@
 //! `ld-musl` (the exit criteria of M1b, M3a and M3b). Each test case runs under Tier 0 and under
 //! Tier 1 separately.
 //!
-//! Interactive test cases run `sh -i` on an in-process PTY with `appine-run --pty`, send keys
+//! Interactive test cases run `sh -i` on an in-process PTY with `kazeterm-run --pty`, send keys
 //! through a pipe (^C and ^Z are just the bytes 0x03 and 0x1a), and wait until the expected text
 //! appears in the output before sending the next step.
 //!
 //! The rootfs is downloaded into `target/rootfs/` by `scripts/fetch-rootfs`, or can be given with
-//! the environment variable `APPINE_ROOTFS_TARBALL`. Without it these tests are skipped; with
-//! `APPINE_REQUIRE_ROOTFS=1` (as CI sets) that becomes a failure.
+//! the environment variable `KAZETERM_ROOTFS_TARBALL`. Without it these tests are skipped; with
+//! `KAZETERM_REQUIRE_ROOTFS=1` (as CI sets) that becomes a failure.
 //!
 //! Test cases that need outside network (the M4 exit criteria: apk installing packages, git
-//! cloning over HTTPS) run only when `APPINE_NETWORK_TESTS=1` is set, and the host's `http_proxy`
+//! cloning over HTTPS) run only when `KAZETERM_NETWORK_TESTS=1` is set, and the host's `http_proxy`
 //! and `https_proxy` are passed to the guest.
 #![cfg(all(target_os = "linux", target_arch = "aarch64"))]
 
@@ -69,7 +69,7 @@ fn cat_reads_files_and_follows_symlinks() {
 fn uname_reports_the_abi_contract() {
     for (tier, out) in run(&["/bin/uname", "-srm"]) {
         assert_ok(tier, &out);
-        assert_eq!(stdout(&out), "Linux 6.1.0-appine aarch64\n", "tier {tier}");
+        assert_eq!(stdout(&out), "Linux 6.1.0-kazeterm aarch64\n", "tier {tier}");
     }
 }
 
@@ -268,7 +268,7 @@ fn fatal_signals_write_core_files() {
 fn every_kind_of_wait_releases_the_bkl_without_borrows() {
     // Every kind of system call that waits in the kernel waits once (tests/guest/waits.c): the
     // kernel layer of debug builds checks on releasing the BKL that no kernel object is borrowed
-    // (crate::cell); if one is, it panics and appine-run terminates
+    // (crate::cell); if one is, it panics and kazeterm-run terminates
     let (Some(store), Some(program)) = (store(), build_static("waits")) else {
         return;
     };
@@ -334,7 +334,7 @@ fn answers_of_linux_6_1_that_newer_kernels_changed() {
 
 #[test]
 fn kernel_log_is_empty_and_keeps_console_levels() {
-    // A new kernel's log is empty (Appine writes no boot messages): dmesg prints nothing; the
+    // A new kernel's log is empty (KazeTerm writes no boot messages): dmesg prints nothing; the
     // console level dmesg -n changes is visible in /proc/sys/kernel/printk; with dmesg_restrict at
     // 1 ordinary users cannot read it, and only 0 and 1 can be written
     let script = "dmesg; echo rc=$?; dmesg -n 3; cat /proc/sys/kernel/printk; \
@@ -359,15 +359,15 @@ fn kernel_log_is_empty_and_keeps_console_levels() {
 
 #[test]
 fn recorded_sysctls_keep_what_is_written() {
-    // Sysctls Appine only records take what Linux 6.1's handlers take and read it back:
-    // swappiness 0 to 200, drop_caches write-only, overcommit_memory 0 to 2, tainted only adds
+    // Sysctls KazeTerm only records take what Linux 6.1's handlers take and read it back:
+    // swkazetermss 0 to 200, drop_caches write-only, overcommit_memory 0 to 2, tainted only adds
     // flags (of the 19 defined), modules_disabled only goes to 1, modprobe a string;
     // randomize_va_space starts at 0, as nothing is randomized
     let script = "cd /proc/sys; \
         stat -c '%a %n' vm/drop_caches vm/mmap_rnd_bits kernel/tainted vm/overcommit_memory; \
-        cat vm/swappiness kernel/overflowuid kernel/modprobe kernel/randomize_va_space; \
-        echo 10 > vm/swappiness; echo 300 > vm/swappiness 2>/dev/null || echo rejected; \
-        cat vm/swappiness; echo 3 > vm/drop_caches; cat vm/drop_caches 2>/dev/null || echo unread; \
+        cat vm/swkazetermss kernel/overflowuid kernel/modprobe kernel/randomize_va_space; \
+        echo 10 > vm/swkazetermss; echo 300 > vm/swkazetermss 2>/dev/null || echo rejected; \
+        cat vm/swkazetermss; echo 3 > vm/drop_caches; cat vm/drop_caches 2>/dev/null || echo unread; \
         echo 1 > vm/overcommit_memory; cat vm/overcommit_memory; echo 0 > vm/overcommit_memory; \
         echo 2101249 > kernel/tainted; echo 1 > kernel/tainted; cat kernel/tainted; \
         echo 0 > kernel/modules_disabled 2>/dev/null || echo rejected; \
@@ -440,7 +440,7 @@ fn io_priority_reaches_the_host_thread() {
             let prios: Vec<u16> = std::fs::read_dir(format!("/proc/{}/task", child.id()))
                 .unwrap()
                 .filter_map(|e| e.ok()?.file_name().to_str()?.parse().ok())
-                .filter_map(appine_hal::thread_ioprio)
+                .filter_map(kazeterm_hal::thread_ioprio)
                 .collect();
             child.stdin.take().unwrap().write_all(b"\n").unwrap();
             assert!(child.wait().unwrap().success(), "tier {tier}");
@@ -549,7 +549,7 @@ fn unhandled_exceptions_are_reported_in_the_kernel_log() {
 fn machines_can_start_with_exception_reports_on() {
     // The app starts its kernel with debug.exception-trace at 1 (MachineOptions::exception_trace)
     // rather than arm64 Linux's 0, and the guest can still turn it off
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -579,7 +579,7 @@ fn console_tells_password_input() {
     // The app draws a lock for the cursor while a console reads lines without echoing them
     // (ICANON on, ECHO off), as programs read passwords (Machine::console_password_input); not in
     // non-canonical mode, where line editors turn echo off too
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -625,7 +625,7 @@ fn console_tells_password_input() {
     machine.close_console(id).unwrap();
     assert_eq!(
         machine.console_password_input(id),
-        Err(appine_kernel::errno::Errno::ENOENT)
+        Err(kazeterm_kernel::errno::Errno::ENOENT)
     );
 }
 
@@ -635,7 +635,7 @@ fn console_tells_background_output() {
     // output starts, and must not take those of a job left in the background for the shell's
     // (Machine::read_console_run): output is read in runs by whether the console's foreground
     // process group wrote it
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -725,8 +725,8 @@ fn each_step_of_finishing_a_process_survives_kernel_bugs() {
     for tier in TIERS {
         let script = "cat > /tmp/finish && chmod +x /tmp/finish && /tmp/finish";
         let out = command(store, tier, &["/bin/sh", "-c", script])
-            .env("APPINE_TEST_HOOKS", "1")
-            .env("APPINE_ON_BUG", "kill")
+            .env("KAZETERM_TEST_HOOKS", "1")
+            .env("KAZETERM_ON_BUG", "kill")
             .stdin(std::fs::File::open(&program).unwrap())
             .output()
             .unwrap();
@@ -970,7 +970,7 @@ fn device_nodes_work() {
 
 #[test]
 fn unimplemented_paths_are_logged_once() {
-    // With APPINE_LOG=1 the first hit of each path the kernel layer does not implement is written
+    // With KAZETERM_LOG=1 the first hit of each path the kernel layer does not implement is written
     // to stderr (crate::stub): names Linux would have under /proc, /sys and /dev, with the pid
     // replaced, and a device without a driver; a process, fd or CPU that does not exist is no gap
     let Some(store) = store() else {
@@ -983,13 +983,13 @@ fn unimplemented_paths_are_logged_once() {
                   mknod /tmp/tun c 10 200 && cat /tmp/tun 2>/dev/null; rm -f /tmp/tun; true";
     for tier in TIERS {
         let out = command(store, tier, &["/bin/sh", "-c", script])
-            .env("APPINE_LOG", "1")
+            .env("KAZETERM_LOG", "1")
             .output()
             .unwrap();
         assert_ok(tier, &out);
         let lines: Vec<&str> = stderr(&out)
             .lines()
-            .filter_map(|l| l.strip_prefix("appine: unimplemented "))
+            .filter_map(|l| l.strip_prefix("kazeterm: unimplemented "))
             .map(|l| l.split(" (pid ").next().unwrap())
             .collect();
         for expected in [
@@ -1195,13 +1195,13 @@ fn syslog_messages_travel_over_a_unix_socket() {
         "/bin/sh",
         "-c",
         "rm -f /tmp/syslog.txt; syslogd -n -O /tmp/syslog.txt & sleep 0.5; \
-         test -S /dev/log && echo socket; logger -t appine hello; sleep 0.5; kill $!; wait; \
-         grep -o 'appine: hello' /tmp/syslog.txt",
+         test -S /dev/log && echo socket; logger -t kazeterm hello; sleep 0.5; kill $!; wait; \
+         grep -o 'kazeterm: hello' /tmp/syslog.txt",
     ]) {
         let out = shell(tier, &out);
         assert_eq!(
             out.lines().collect::<Vec<_>>(),
-            ["socket", "appine: hello"],
+            ["socket", "kazeterm: hello"],
             "tier {tier}"
         );
     }
@@ -1256,11 +1256,11 @@ struct Interactive {
     tier: &'static str,
 }
 
-const PROMPT: &str = "appine$ ";
+const PROMPT: &str = "kazeterm$ ";
 
 impl Interactive {
     fn start(store: &Path, tier: &'static str) -> Interactive {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args([
                 "--tier",
                 tier,
@@ -1350,7 +1350,7 @@ impl Interactive {
 }
 
 impl Drop for Interactive {
-    /// Leaves no appine-run still waiting for input when a test case fails.
+    /// Leaves no kazeterm-run still waiting for input when a test case fails.
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
@@ -1371,7 +1371,7 @@ fn end_of_piped_input_is_an_eof_on_the_terminal() {
             (&["/bin/sh", "-i"][..], "echo $((6*7))\n", "42", 1),
             (&["/bin/cat"][..], "one\ntwo\n", "two", 2),
         ] {
-            let mut child = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+            let mut child = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
                 .args(["--tier", tier, "--pty", "--env", PATH, "--rootfs"])
                 .arg(store)
                 .arg("--")
@@ -1424,7 +1424,7 @@ fn end_of_piped_input_survives_leaving_canonical_mode() {
         return;
     };
     for tier in TIERS {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier, "--pty", "--"])
             .arg(&program)
             .stdin(Stdio::piped())
@@ -1529,8 +1529,8 @@ fn vi_edits_a_file() {
 
 #[test]
 fn apk_installs_packages_and_git_clones_over_https() {
-    if std::env::var_os("APPINE_NETWORK_TESTS").is_none_or(|v| v != "1") {
-        eprintln!("skipping network test: set APPINE_NETWORK_TESTS=1 to enable it");
+    if std::env::var_os("KAZETERM_NETWORK_TESTS").is_none_or(|v| v != "1") {
+        eprintln!("skipping network test: set KAZETERM_NETWORK_TESTS=1 to enable it");
         return;
     }
     let Some(tarball) = find_tarball() else {
@@ -1540,7 +1540,7 @@ fn apk_installs_packages_and_git_clones_over_https() {
     // cases
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("network-store");
     let _ = std::fs::remove_dir_all(&dir);
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
         .arg("--rootfs")
         .arg(&dir)
         .arg("--import")
@@ -1549,7 +1549,7 @@ fn apk_installs_packages_and_git_clones_over_https() {
         .unwrap();
     assert!(out.status.success(), "import failed: {}", stderr(&out));
 
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_appine-run"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"));
     // Tier 0 is too slow, so run only under Tier 1
     cmd.args(["--tier", "1", "--env", PATH, "--env", "HOME=/root"]);
     for var in ["http_proxy", "https_proxy", "no_proxy"] {
@@ -1582,7 +1582,7 @@ fn importing_into_an_existing_store_fails() {
     let (Some(store), Some(tarball)) = (store(), find_tarball()) else {
         return;
     };
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
         .arg("--rootfs")
         .arg(store)
         .arg("--import")
@@ -1686,7 +1686,7 @@ fn oom_killer_honours_oom_score_adj() {
     let script = "(echo 1000 > /proc/self/oom_score_adj && exec sleep 30) & sleep 0.2; \
                   awk 'BEGIN { s = \"x\"; for (i = 0; i < 27; i++) s = s s; print length(s) }'; \
                   echo awk $?; wait $!; echo sleep $?";
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
         .args([
             "--tier",
             "1",
@@ -1715,7 +1715,7 @@ fn cgroup_memory_files_follow_the_oom_killer() {
         return;
     };
     let run = |limit: &str, script: &str| {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args([
                 "--tier",
                 "1",
@@ -1752,7 +1752,7 @@ fn oom_kills_are_reported_to_the_app() {
     // Run only under Tier 1, for the same reason. The awk in the cgroup keeps running for a while
     // after building a 64 MB string: the OOM killer measures usage periodically, and would not
     // notice a process that exits as soon as it has used it all
-    use appine_kernel::{ExitStatus, KillReason, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, KillReason, Machine, MachineOptions, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -1975,7 +1975,7 @@ fn processes_of_one_program_share_translations() {
 /// the next.
 #[test]
 fn low_ports_bind_the_real_port_or_elsewhere() {
-    use appine_kernel::{ExitStatus, ListenEvent, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, ListenEvent, Machine, MachineOptions, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -2042,7 +2042,7 @@ fn low_ports_bind_the_real_port_or_elsewhere() {
         assert_eq!(&got, b"hello\n", "{tier:?}");
         drop(conn);
         let out = read_console(&machine, id);
-        let log = format!("appine: port {port}/tcp is {host_port} on the host");
+        let log = format!("kazeterm: port {port}/tcp is {host_port} on the host");
         // Nothing is logged when the original port can be bound
         assert_eq!(out.contains(&log), host_port != port, "{tier:?}: {out}");
         assert_eq!(machine.wait(pid), ExitStatus::Exited(0), "{tier:?}");
@@ -2052,7 +2052,7 @@ fn low_ports_bind_the_real_port_or_elsewhere() {
 
 #[test]
 fn one_machine_runs_several_terminal_sessions() {
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -2101,7 +2101,7 @@ fn one_machine_runs_several_terminal_sessions() {
         );
         assert_eq!(
             machine.read_console(id, &mut [0; 8]),
-            Err(appine_kernel::errno::Errno::ENOENT)
+            Err(kazeterm_kernel::errno::Errno::ENOENT)
         );
     }
 }
@@ -2143,7 +2143,7 @@ fn sysctls_written_at_alpine_boot() {
 /// /etc/inittab in the store.
 #[test]
 fn init_runs_the_inittab() {
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Power, Stdio, Tier};
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Power, Stdio, Tier};
     let Some(store) = store() else {
         return;
     };
@@ -2170,7 +2170,7 @@ tty1::respawn:/sbin/getty 38400 tty1
             .unwrap();
         assert_ok(tier, &out);
         let init = |script: &str| {
-            Command::new(env!("CARGO_BIN_EXE_appine-run"))
+            Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
                 .args(["--tier", tier, "--init", "--env", PATH, "--rootfs"])
                 .arg(store)
                 .args(["--", "/bin/sh", "-c", script])
@@ -2250,7 +2250,7 @@ tty1::respawn:/sbin/getty 38400 tty1
             .output()
             .unwrap(),
     );
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
         .args(["--tier", "1", "--init", "--env", PATH, "--rootfs"])
         .arg(store)
         .args([
@@ -2275,13 +2275,13 @@ tty1::respawn:/sbin/getty 38400 tty1
 #[test]
 fn files_app_changes_reach_inotify_watchers() {
     // Changes made by the Files app (the host opening the store separately,
-    // appine_kernel::browse_changing) are handed to the running kernel, and programs watching in
+    // kazeterm_kernel::browse_changing) are handed to the running kernel, and programs watching in
     // the guest receive events all the same: create, open for writing (truncate), write on close,
     // rename, delete. busybox's inotifyd prints events as "letters\tdirectory\tname", the letters
     // in event-bit order being acew0rmynd: c is IN_MODIFY, r IN_OPEN, w IN_CLOSE_WRITE, m and y
     // moved out and moved in
-    use appine_kernel::vfs::browse;
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
+    use kazeterm_kernel::vfs::browse;
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio, Tier};
     use std::io::Write;
     let Some(store) = store() else {
         return;
@@ -2309,22 +2309,22 @@ fn files_app_changes_reach_inotify_watchers() {
             std::thread::sleep(std::time::Duration::from_secs(2));
             let top = b"/root".as_slice();
             let s = store.as_path();
-            let ok = |r: Result<(), appine_kernel::errno::Errno>| r.unwrap();
-            ok(appine_kernel::browse_changing(s, |s, c| {
+            let ok = |r: Result<(), kazeterm_kernel::errno::Errno>| r.unwrap();
+            ok(kazeterm_kernel::browse_changing(s, |s, c| {
                 browse::create(s, top, b"/root/fw", b"a.txt", false, (0, 0), c).map(drop)
             }));
-            ok(appine_kernel::browse_changing(s, |s, c| {
+            ok(kazeterm_kernel::browse_changing(s, |s, c| {
                 browse::open_write(s, top, b"/root/fw/a.txt", true, false, c)?
                     .write_all(b"edited\n")
-                    .map_err(|_| appine_kernel::errno::Errno::EIO)
+                    .map_err(|_| kazeterm_kernel::errno::Errno::EIO)
             }));
-            ok(appine_kernel::browse_changing(s, |s, c| {
+            ok(kazeterm_kernel::browse_changing(s, |s, c| {
                 browse::written(s, top, b"/root/fw/a.txt", c)
             }));
-            ok(appine_kernel::browse_changing(s, |s, c| {
+            ok(kazeterm_kernel::browse_changing(s, |s, c| {
                 browse::rename(s, top, b"/root/fw/a.txt", b"b.txt", c)
             }));
-            ok(appine_kernel::browse_changing(s, |s, c| {
+            ok(kazeterm_kernel::browse_changing(s, |s, c| {
                 browse::remove(s, top, b"/root/fw/b.txt", c)
             }));
         })
@@ -2355,13 +2355,13 @@ fn files_app_changes_reach_inotify_watchers() {
 
 #[test]
 fn files_app_writes_stay_out_of_clones() {
-    // The Files app writes a file's host object itself (appine_kernel::browse_changing hands out
+    // The Files app writes a file's host object itself (kazeterm_kernel::browse_changing hands out
     // the fd): a clone the guest makes while the app has the file open copies it rather than
     // sharing its object, so the app's later writes stay out of the clone; and when the app opens
     // a file that shares its object for writing, the guest's descriptions of the file move to the
     // file's new object with it and read what the app wrote (tests/guest/hostclone.c)
-    use appine_kernel::vfs::browse;
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio as Io, Tier};
+    use kazeterm_kernel::vfs::browse;
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio as Io, Tier};
     use std::os::unix::fs::FileExt;
     let (Some(store), Some(program)) = (store(), build_static("hostclone")) else {
         return;
@@ -2394,10 +2394,10 @@ fn files_app_writes_stay_out_of_clones() {
         out
     };
     let top = b"/root".as_slice();
-    let errno = |_| appine_kernel::errno::Errno::EIO;
+    let errno = |_| kazeterm_kernel::errno::Errno::EIO;
     // The app opens src for writing and keeps it open while the guest clones it
     let mut writer = None;
-    appine_kernel::browse_changing(store, |s, c| {
+    kazeterm_kernel::browse_changing(store, |s, c| {
         writer = Some(browse::open_write(
             s,
             top,
@@ -2414,7 +2414,7 @@ fn files_app_writes_stay_out_of_clones() {
         "cloned\n"
     );
     writer.take().unwrap().write_all_at(b"BBBB\n", 0).unwrap();
-    appine_kernel::browse_changing(store, |s, c| browse::written(s, top, b"/root/hc/src", c))
+    kazeterm_kernel::browse_changing(store, |s, c| browse::written(s, top, b"/root/hc/src", c))
         .unwrap();
     assert_eq!(run("cat /root/hc/src /root/hc/dst"), "BBBB\nAAAA\n");
     // A clone made after the app closed the file shares it again; the app then writes the clone
@@ -2427,12 +2427,12 @@ fn files_app_writes_stay_out_of_clones() {
         let store = store.to_path_buf();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_secs(1));
-            appine_kernel::browse_changing(&store, |s, c| {
+            kazeterm_kernel::browse_changing(&store, |s, c| {
                 let f = browse::open_write(s, top, b"/root/hc/dst2", false, false, c)?;
                 f.write_all_at(b"CCCC\n", 0).map_err(errno)
             })
             .unwrap();
-            appine_kernel::browse_changing(&store, |s, c| {
+            kazeterm_kernel::browse_changing(&store, |s, c| {
                 browse::written(s, top, b"/root/hc/dst2", c)
             })
             .unwrap();
@@ -2462,14 +2462,14 @@ fn store() -> Option<&'static Path> {
         .get_or_init(|| {
             let Some(tarball) = find_tarball() else {
                 assert!(
-                    std::env::var_os("APPINE_REQUIRE_ROOTFS").is_none_or(|v| v != "1"),
+                    std::env::var_os("KAZETERM_REQUIRE_ROOTFS").is_none_or(|v| v != "1"),
                     "rootfs tarball not found; run scripts/fetch-rootfs"
                 );
                 return None;
             };
             let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rootfs-store");
             let _ = std::fs::remove_dir_all(&dir);
-            let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+            let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
                 .arg("--rootfs")
                 .arg(&dir)
                 .arg("--import")
@@ -2488,7 +2488,7 @@ fn store() -> Option<&'static Path> {
 }
 
 fn find_tarball() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("APPINE_ROOTFS_TARBALL") {
+    if let Some(p) = std::env::var_os("KAZETERM_ROOTFS_TARBALL") {
         return Some(PathBuf::from(p));
     }
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/rootfs");
@@ -2539,7 +2539,7 @@ fn build_static(name: &str) -> Option<PathBuf> {
         .status();
     let Ok(status) = status else {
         assert!(
-            std::env::var_os("APPINE_REQUIRE_MUSL").is_none_or(|v| v != "1"),
+            std::env::var_os("KAZETERM_REQUIRE_MUSL").is_none_or(|v| v != "1"),
             "musl-gcc not found; install musl-tools"
         );
         eprintln!("skipping {name}: musl-gcc not found");
@@ -2550,7 +2550,7 @@ fn build_static(name: &str) -> Option<PathBuf> {
 }
 
 fn command(store: &Path, tier: &str, args: &[&str]) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_appine-run"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"));
     cmd.args(["--tier", tier, "--env", PATH, "--rootfs"])
         .arg(store)
         .arg("--")
@@ -2559,7 +2559,7 @@ fn command(store: &Path, tier: &str, args: &[&str]) -> Command {
 }
 
 /// Reads the console until the session ends (the way the Android terminal tabs use Machine).
-fn read_console(machine: &appine_kernel::Machine, id: u32) -> String {
+fn read_console(machine: &kazeterm_kernel::Machine, id: u32) -> String {
     let mut out = Vec::new();
     let mut buf = [0u8; 4096];
     loop {

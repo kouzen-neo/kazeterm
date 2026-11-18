@@ -1,10 +1,10 @@
 # docker-run-options: --device /dev/kmsg --cap-add SYSLOG
 # The kernel log's /dev/kmsg and syslog(2)'s read-all (kernel/printk/printk.c of Linux 6.1). The
 # native side passes the host's /dev/kmsg to the container and adds CAP_SYSLOG (like root in
-# Appine). The host's log has other messages, so only the records written this time are looked
+# KazeTerm). The host's log has other messages, so only the records written this time are looked
 # at: each carries a random token, replaced with TOKEN when printed; sequence numbers and
 # timestamps differ between the two sides and are not printed. Every write opens a new fd:
-# Appine's default printk_devkmsg is ratelimit, at most 10 records per open file within 5
+# KazeTerm's default printk_devkmsg is ratelimit, at most 10 records per open file within 5
 # seconds, and the native host's may be on. The buffer size and dmesg_restrict may also differ
 # between the two sides, so only whether the results they determine agree is compared
 set -e

@@ -5,7 +5,7 @@
 //! `respawn` and `askfirst` (getty) never run: login shells are the app's tabs.
 //!
 //! Each entry is run by `/bin/sh -c` (as busybox init also does when it meets shell special
-//! characters), with stdin `/dev/null` and stdout and stderr written to [`LOG`]: Appine has no
+//! characters), with stdin `/dev/null` and stdout and stderr written to [`LOG`]: KazeTerm has no
 //! console.
 
 /// Output of the inittab commands at boot and shutdown. Truncated at every boot.

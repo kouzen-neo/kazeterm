@@ -45,7 +45,7 @@
     <string name="reset_terminal">ターミナルをリセット</string>
     <string name="keep_screen_on">画面をオンに保つ</string>
     <string name="modifier_locked">%1$sをロックしました</string>
-    <string name="tmux_control_detached">tmuxコントロールモード（tmux -CC）はここでは表示できないため、Appineがデタッチしました。セッションは継続しています。tmux attachで再接続できます。</string>
+    <string name="tmux_control_detached">tmuxコントロールモード（tmux -CC）はここでは表示できないため、KazeTermがデタッチしました。セッションは継続しています。tmux attachで再接続できます。</string>
 
     <string name="tab_number">タブ%1$d</string>
     <string name="tab_description">タブ%1$d：%2$s</string>
@@ -76,7 +76,7 @@
     <!-- Links -->
     <string name="open_link">リンクを開く</string>
     <string name="link_no_app">このリンクを開けるアプリがありません</string>
-    <string name="link_remote_file">このファイルは%1$sにあり、Appine内にはありません</string>
+    <string name="link_remote_file">このファイルは%1$sにあり、KazeTerm内にはありません</string>
     <string name="link_hidden_file">ファイルへのアクセスは無効です。設定で「他のアプリによるファイルへのアクセスを許可」を有効にしてください</string>
     <string name="link_missing_file">ファイルが見つかりません</string>
 
@@ -151,16 +151,16 @@
     <!-- Privacy mode -->
     <string name="settings_privacy">プライバシーモード</string>
     <string name="privacy_summary">戻ったときにロック解除が必要</string>
-    <string name="privacy_enable_message">Appineを開く際に、生体認証または画面ロックによる認証が必要になります。スクリーンショットは禁止され、通知の詳細は非表示になり、他のアプリからファイルにアクセスできなくなります。バックグラウンドのプログラムは引き続き実行されます。</string>
+    <string name="privacy_enable_message">KazeTermを開く際に、生体認証または画面ロックによる認証が必要になります。スクリーンショットは禁止され、通知の詳細は非表示になり、他のアプリからファイルにアクセスできなくなります。バックグラウンドのプログラムは引き続き実行されます。</string>
     <string name="privacy_file_access">プライバシーモードでは利用できません</string>
 
-    <string name="privacy_locked">Appineはロックされています</string>
+    <string name="privacy_locked">KazeTermはロックされています</string>
     <string name="privacy_unlock">ロック解除</string>
-    <string name="privacy_leave">Appineを離れる</string>
+    <string name="privacy_leave">KazeTermを離れる</string>
     <string name="privacy_authenticate">生体認証または画面ロックで認証してください</string>
     <string name="privacy_unavailable">認証を利用できません。Androidの設定で画面ロックを設定するか、しばらくしてから再試行してください。</string>
 
-    <string name="privacy_notification">Appineのロックを解除してターミナルを表示</string>
+    <string name="privacy_notification">KazeTermのロックを解除してターミナルを表示</string>
 
     <!-- File access and document roots -->
     <string name="settings_file_access">他のアプリによるファイルへのアクセスを許可</string>
@@ -252,7 +252,7 @@
 
     <string name="channel_network">ネットワークサービス</string>
     <string name="listening_title">%1$sがポート%2$dで待ち受け中</string>
-    <string name="listening_mapped">他の端末はポート%1$dに接続してください。このスマートフォンのアプリはポート%2$dを使用できないため、Appineが接続先を変更しました。</string>
+    <string name="listening_mapped">他の端末はポート%1$dに接続してください。このスマートフォンのアプリはポート%2$dを使用できないため、KazeTermが接続先を変更しました。</string>
     <string name="listening_direct">同じネットワーク上の他の端末から接続できます</string>
 
     <string name="channel_problems">プロセスとサービス</string>
@@ -264,24 +264,24 @@
     <string name="ended_resources">バックグラウンドでのリソース使用量が多すぎたためAndroidがアプリを停止し、前回のセッションは終了しました</string>
     <string name="ended_user">アプリが強制停止されたため、前回のセッションは終了しました</string>
     <string name="ended_updated">アプリが更新されたため、前回のセッションは終了しました</string>
-    <string name="ended_crash">Appineの不具合によるクラッシュで、前回のセッションは終了しました</string>
-    <string name="ended_anr">Appineの不具合で応答がなくなり、前回のセッションは終了しました</string>
+    <string name="ended_crash">KazeTermの不具合によるクラッシュで、前回のセッションは終了しました</string>
+    <string name="ended_anr">KazeTermの不具合で応答がなくなり、前回のセッションは終了しました</string>
 
     <!-- Problem reports -->
-    <string name="crashed_title">Appineがクラッシュしました</string>
-    <string name="crashed_text">%1$sにAppineがクラッシュし、前回のセッションは終了しました。これはAppineの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
-    <string name="anr_title">Appineが応答していません</string>
-    <string name="anr_text">%1$sにAppineが応答しなくなり、前回のセッションは終了しました。これはAppineの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
+    <string name="crashed_title">KazeTermがクラッシュしました</string>
+    <string name="crashed_text">%1$sにKazeTermがクラッシュし、前回のセッションは終了しました。これはKazeTermの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
+    <string name="anr_title">KazeTermが応答していません</string>
+    <string name="anr_text">%1$sにKazeTermが応答しなくなり、前回のセッションは終了しました。これはKazeTermの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
 
     <string name="killed_title">%1$sが強制終了されました</string>
     <string name="killed_oom_app">%1$s（pid %2$d）が強制終了されました。アプリのメモリ使用量が上限に達し（使用量%3$s、上限%4$s）、OOM killerがこのプロセスを選びました。</string>
     <string name="killed_oom_cgroup">%1$s（pid %2$d）が強制終了されました。cgroup %3$sがmemory.maxに達しました（使用量%4$s、上限%5$s）。</string>
-    <string name="killed_bug">%1$s（pid %2$d）がAppineの内部エラーで終了しました。これはAppineの不具合です。通知からレポートをコピーするか、dmesgで確認できます。</string>
+    <string name="killed_bug">%1$s（pid %2$d）がKazeTermの内部エラーで終了しました。これはKazeTermの不具合です。通知からレポートをコピーするか、dmesgで確認できます。</string>
 
-    <string name="stall_title">Appineのカーネルが応答していません</string>
-    <string name="stall_text">Appineのカーネル内の処理が%1$d秒間続いており、すべてのプログラムが完了を待っています。これはAppineの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
-    <string name="stall_ended_title">Appineのカーネルが一時的に応答しなくなっていました</string>
-    <string name="stall_ended_text">Appineのカーネル内の処理に%1$d秒かかり、すべてのプログラムが完了を待っていました。これはAppineの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
+    <string name="stall_title">KazeTermのカーネルが応答していません</string>
+    <string name="stall_text">KazeTermのカーネル内の処理が%1$d秒間続いており、すべてのプログラムが完了を待っています。これはKazeTermの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
+    <string name="stall_ended_title">KazeTermのカーネルが一時的に応答しなくなっていました</string>
+    <string name="stall_ended_text">KazeTermのカーネル内の処理に%1$d秒かかり、すべてのプログラムが完了を待っていました。これはKazeTermの不具合です。フィードバックにはコピーしたレポートを添付してください。</string>
 
     <plurals name="boot_failed_title">
         <item quantity="other">%d個のサービスが起動しませんでした</item>

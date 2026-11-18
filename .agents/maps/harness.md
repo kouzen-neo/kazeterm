@@ -5,7 +5,7 @@
 >
 > Verified: 2026-11-10 (full mapping: 4 research concerns; 15 claims checked by 3 independent verifiers — 12 confirmed and 3 partial, corrected below; bugs and debts recorded)
 >
-> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: release.yml manual version trigger and automatic GitHub Release with CHANGELOG notes)
+> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: KazeTerm rebrand, release.yml manual version trigger and automatic GitHub Release)
 
 ## Responsibilities
 
@@ -21,7 +21,7 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
 
 ## Key types
 
-- `appine_bench::Program` (name, rounds, test rounds, workload); `PROGRAMS` (sha256, lz, sort,
+- `kazeterm_bench::Program` (name, rounds, test rounds, workload); `PROGRAMS` (sha256, lz, sort,
   crc32, vm), the shared freestanding `CFLAGS` and `build()` (with `$CC`).
 - LTP's `results.txt` lines `<name> <PASS|CONF|FAIL|TIMEOUT|BUG|SKIP> <code> <secs>` (`- -` for
   SKIP), `logs/<name>.log` (and `.prev.log`), `durations.txt`, and the store's `.ltp` stamp;
@@ -29,10 +29,10 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
 
 ## Public entry points
 
-- `appine-bench [--runs N] [--quick] [--skip-tier0] [--only NAME] [--stats]`.
+- `kazeterm-bench [--runs N] [--quick] [--skip-tier0] [--only NAME] [--stats]`.
 - `scripts/dev [command…]`; `scripts/build-ltp`; `scripts/ltp [-a] [-j n] [-t tier] [regex]`;
   `scripts/survey [-t tier] [-s store] [-n image] [names…]`;
-  `tests/crash/crash.sh <appine|native> <power|kill> [runs] [bin]` (as root in the VM).
+  `tests/crash/crash.sh <kazeterm|native> <power|kill> [runs] [bin]` (as root in the VM).
 - CI: quick checks on every push and pull request (`ci.yml`), the APK when its inputs change or on
   demand (`android.yml`), the slow suites nightly, on pushes to master and on demand (`full.yml`,
   `gh workflow run full.yml --ref <branch>`).
@@ -41,10 +41,10 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
 
 ### Benchmarks
 
-- `appine-bench` builds the benchmark programs, runs each natively and under Tier 1 (minimum of N
+- `kazeterm-bench` builds the benchmark programs, runs each natively and under Tier 1 (minimum of N
   runs, 5 by default) and under Tier 0 (once, unless skipped), fails if any output differs, and
   prints times, ratios and geometric means; `--quick` uses a twentieth of the rounds; it uses the
-  `appine-run` next to its own executable. `bench_programs` checks the outputs with small round
+  `kazeterm-run` next to its own executable. `bench_programs` checks the outputs with small round
   counts inside `cargo test`.
 
 ### LTP
@@ -53,52 +53,52 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
   there stops the build), then each `testcases/kernel/syscalls` directory with `make -k` (a
   directory that fails is reported and installed as far as it built), into
   `target/ltp/ltp-<ver>.tar`.
-- `ltp` (GNU tools, so inside `scripts/dev` on macOS) builds `appine-run` into
-  `target/linux-arm64` first (unless `APPINE_RUN` names one), and uses a store on the `appine-ltp`
+- `ltp` (GNU tools, so inside `scripts/dev` on macOS) builds `kazeterm-run` into
+  `target/linux-arm64` first (unless `KAZETERM_RUN` names one), and uses a store on the `kazeterm-ltp`
   volume when `/ltp` exists (inside `scripts/dev`), else `target/ltp/store` (`LTP_STORE`
   overrides), made again with LTP unpacked whenever the stamp of the LTP tarball and rootfs it
-  records (names, sizes, times) changes (not when `appine-run` changes); a kernel config listing
-  Appine's features (loop devices included) is rewritten on every run and passed as
+  records (names, sizes, times) changes (not when `kazeterm-run` changes); a kernel config listing
+  KazeTerm's features (loop devices included) is rewritten on every run and passed as
   `KCONFIG_PATH`.
-- Tests that need a device get one of Appine's loop devices over a file in their `/tmp` directory,
-  and `LTP_DEV_FS_TYPE=tmpfs` makes LTP skip mkfs and mount a tmpfs there instead (Appine has no
+- Tests that need a device get one of KazeTerm's loop devices over a file in their `/tmp` directory,
+  and `LTP_DEV_FS_TYPE=tmpfs` makes LTP skip mkfs and mount a tmpfs there instead (KazeTerm has no
   disk filesystems), as Starnix runs LTP; tests that need a particular disk filesystem report
   TCONF, and some (remounting the device to find files again, mounting a read-only device, mount
   errors of a block device) fail on Linux's tmpfs too.
 - Tests from `runtest/syscalls` matching the regex (minus `sigtimedwait01`, `sigwaitinfo01` unless
   `-a`) run `-j` at a time (8 by default; tier 1 by default), slowest first, all on the one store,
-  each in a fresh `appine-run` under `timeout 900` with `LTP_TIMEOUT_MUL=5`, `LTP_RUNTIME_MUL=0.1`;
-  exit 0 PASS, 32 CONF, 124 TIMEOUT, else FAIL, and any `appine: internal error` in the log makes
+  each in a fresh `kazeterm-run` under `timeout 900` with `LTP_TIMEOUT_MUL=5`, `LTP_RUNTIME_MUL=0.1`;
+  exit 0 PASS, 32 CONF, 124 TIMEOUT, else FAIL, and any `kazeterm: internal error` in the log makes
   it BUG.
 
 ### Survey and crash
 
 - `survey` keeps a store with 36 packages (network needed to build it; one whose creation did not
   finish, marked by `<store>.partial`, is made again; a store is never re-provisioned when the
-  package list changes) and uses a prebuilt `appine-run` (`APPINE_RUN`, else the
+  package list changes) and uses a prebuilt `kazeterm-run` (`KAZETERM_RUN`, else the
   `target/linux-arm64` or `target/release` one), going through `scripts/dev` off aarch64 Linux.
-  Each workload script runs under `APPINE_LOG=1` and a timeout (`SURVEY_TIMEOUT`, 1500 s), and
+  Each workload script runs under `KAZETERM_LOG=1` and a timeout (`SURVEY_TIMEOUT`, 1500 s), and
   one line reports exit code, time, the count of internal errors, the unimplemented syscalls seen
   (`ENOSYS:`) and the other unimplemented paths (`UNIMPLEMENTED:`: prctl, fcntl, ioctl, madvise and
   futex values, missing names under `/proc`, `/sys` and `/dev`, devices without a driver), read
-  from the kernel's first-hit lines (`appine: unimplemented …`, at most 128 distinct paths a run).
+  from the kernel's first-hit lines (`kazeterm: unimplemented …`, at most 128 distinct paths a run).
   `-n image` runs only the native side, in docker, reporting exit code and time. With no names only
   the top-level scripts run, the container-engine ones included, though those need a store of
   their own (`-s target/survey/docker` or `podman`); `glibc/`, `suites/` and `ai/` (a mock model
   API) run by name. Nothing is judged automatically.
-- `tests/crash` (root in the VM, dm-flakey, loop devices, the `appine-dev` image, Alpine 3.24.3
-  hard-coded) runs a write workload in `appine-run`, drops writes at a random moment (power loss)
+- `tests/crash` (root in the VM, dm-flakey, loop devices, the `kazeterm-dev` image, Alpine 3.24.3
+  hard-coded) runs a write workload in `kazeterm-run`, drops writes at a random moment (power loss)
   or kills it, remounts, and checks that each file is one complete version and every fsynced file
   is whole; `native` mode is the control. `fsbench.c` is a standalone benchmark.
 
 ### Development container and CI
 
-- `scripts/dev` rebuilds the image `appine-dev` (quietly, from `scripts/`) on every call and runs
+- `scripts/dev` rebuilds the image `kazeterm-dev` (quietly, from `scripts/`) on every call and runs
   a command in it (a shell without one): `rust:1.90.0-slim-trixie` plus rustfmt, clippy,
   rust-analyzer, llvm, clang and musl-tools, as root, with the repository at `/work`,
   `CARGO_TARGET_DIR=/work/target/linux-arm64`, volumes for the cargo registry and `/ltp`,
   `--ulimit nice=40:40`, the Docker daemon's proxy settings, `-it` only when stdin and stdout are
-  terminals, docker's default seccomp, and only `APPINE_DBT_REGS` forwarded (when set).
+  terminals, docker's default seccomp, and only `KAZETERM_DBT_REGS` forwarded (when set).
 - `ci.yml`, on every push and pull request that changes more than `docs/`, `.agents/`, Markdown
   or `android/`: Linux arm64 (`ubuntu-24.04-arm`) fmt, clippy (`-D warnings`), fetch the rootfs
   and `cargo test --workspace` with the require switches.
@@ -112,21 +112,21 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
   workflows cancel a run in progress when the same branch is pushed again.
 - `release.yml`, on `v*` tags or `workflow_dispatch` with a `version` input: the same toolchain and
   signing key, `-PversionName` (and optional `-PversionCode`) passed to Gradle, the APK renamed to
-  `Appine-arm64-v8a-v<version>.apk`, the R8 mapping copied, `sha256sums.txt` written, and a GitHub
+  `KazeTerm-arm64-v8a-v<version>.apk`, the R8 mapping copied, `sha256sums.txt` written, and a GitHub
   Release published with a body built by `scripts/release-notes` from `CHANGELOG.md`.
 - `full.yml`, nightly at 18:00 UTC on develop when its tip was committed in the last 25 hours, on
   pushes to master and on demand: the network test, a lockstep run of 200,000 iterations,
   `scripts/build-starnix-tests` (its tarball cached by the hash of the script and
   `tests/starnix/compat`) and `scripts/build-gvisor-tests` (cached by the hash of the script,
   `tests/gvisor` and its program list), both caches restored and saved in steps of their own so
-  that a build is saved even when a later step fails, a release build of `appine-run`,
+  that a build is saved even when a later step fails, a release build of `kazeterm-run`,
   `scripts/difftest -R` at Tier 1 with one lane (`ping_group_range` opened, `vmstat` sampling the
   runner every 10 s, `target/difftest` deleted before and after, so every run imports the store and
-  installs its packages again; every case's `.appine.err`, the failed cases' outputs and the
+  installs its packages again; every case's `.kazeterm.err`, the failed cases' outputs and the
   samples uploaded as the `difftest` artifact whatever the result), and the engine tests built
   with clang. No workflow sets a timeout, and `full.yml` has no concurrency group.
 - Not in CI: LTP, the survey, instrumentation tests (no KVM), Tier 0 difftest, parallel lanes,
-  the performance probe (`appine-bench`).
+  the performance probe (`kazeterm-bench`).
 
 ## Dependencies (inbound / outbound)
 
@@ -136,15 +136,15 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
 
 ### Outbound
 
-- `harness/cli` supplies `appine-run` and cargo integration tests; `harness/diff` supplies
+- `harness/cli` supplies `kazeterm-run` and cargo integration tests; `harness/diff` supplies
   differential cases and upstream-suite builders. CI builds the CLI before invoking difftest.
-- `appine-bench` also serves CLI integration tests as a dev-dependency.
+- `kazeterm-bench` also serves CLI integration tests as a dev-dependency.
 - Docker/colima, musl-tools, `android/setup`'s rootfs artifacts and package/LTP downloads.
 - GitHub Actions/runners and the SDK manager/ziglang.org for `android/build`.
 
 ## Invariants and gotchas
 
-- The bug detector everywhere is a line starting with `appine: internal error` on `appine-run`'s
+- The bug detector everywhere is a line starting with `kazeterm: internal error` on `kazeterm-run`'s
   stderr; release builds kill only the guest process, so the run continues and only the grep
   notices.
 - Survey and LTP stores persist across runs. `harness/diff` records its own persistent-store
@@ -155,11 +155,11 @@ Android builds `android/build`, rootfs fetching `android/setup`, kernel run/cons
   removed after each run, so it downloads it again every time. CI installs all listed components
   through `rustup toolchain install`.
 - A test that holds the BKL in one long syscall, or spins in one, cannot be stopped by the case's
-  guest `timeout`; only killing `appine-run` ends it.
+  guest `timeout`; only killing `kazeterm-run` ends it.
 - GitHub runs scheduled workflows only from the default branch (master): the nightly `full.yml`
   uses master's copy of the workflow while checking out develop.
-- `full.yml` must build release `appine-run` itself before the differential tests: no other step
-  there makes it (cargo test builds debug, lockstep builds only `appine-lockstep`), and difftest
+- `full.yml` must build release `kazeterm-run` itself before the differential tests: no other step
+  there makes it (cargo test builds debug, lockstep builds only `kazeterm-lockstep`), and difftest
   never builds one.
 - CI's clang step relies on the runner image's clang; CI installs only llvm and musl-tools.
 

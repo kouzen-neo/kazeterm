@@ -13,7 +13,7 @@
 entry points, error and panic handling, stderr to logcat, and the guest browser client.
 
 Root: `hosts/android/src/lib.rs`, `hosts/android/open-url.c`,
-`android/app/src/main/java/io/github/mthli/appine/Native.kt` and `MainApplication.kt`.
+`android/app/src/main/java/com/kazeterm/Native.kt` and `MainApplication.kt`.
 
 The build, manifests, assets and release packaging are `android/build`; instrumentation is
 `android/tests`. `Machine` lifecycle belongs to `kernel/boot`, process API to `kernel/process`
@@ -78,8 +78,8 @@ with view and rendering portions in `android/vtview` and `android/vtrender`.
 
 - All callers are JVM threads; the bridge attaches no native thread to the JVM, and guest and timer
   threads never call into Java. The main thread (`bklStall`, and `openConsole`/`spawn` from a tab's
-  start), `appine-start` (`start`), the service's worker (the poll's calls, `setRoutes`,
-  `consoleCwd`, `trimMemory`, `stop`, `shutdown`, the rules refresh's `spawn`), `appine-boot`
+  start), `kazeterm-start` (`start`), the service's worker (the poll's calls, `setRoutes`,
+  `consoleCwd`, `trimMemory`, `stop`, `shutdown`, the rules refresh's `spawn`), `kazeterm-boot`
   (`spawn`, `waitFor`, `boot`), each tab's `vt-writer` (`write`) and `vt-waiter` (`waitFor`), the
   provider's binder threads (browse functions, `readFile`), and each tab's `vt-pump`, which reads
   the console through `Machine::read_console` in `vt.rs` and calls back into Java from inside
@@ -88,10 +88,10 @@ with view and rendering portions in `android/vtview` and `android/vtrender`.
 ### stderr and panics
 
 - `init` redirects stderr once: fd 2 becomes a pipe read by a `stderr-log` thread that writes each
-  line to logcat (tag `appine`, priority INFO; lines containing NUL are dropped); a failing `pipe`
-  or `dup2` leaves stderr as it was. `verbose` sets `APPINE_LOG=1`.
+  line to logcat (tag `kazeterm`, priority INFO; lines containing NUL are dropped); a failing `pipe`
+  or `dup2` leaves stderr as it was. `verbose` sets `KAZETERM_LOG=1`.
 - Panics are contained at two layers. The kernel wraps most `Machine` methods in `host_call`,
-  which turns a panic into an error of the call when containment is on (`APPINE_ON_BUG=kill`, or
+  which turns a panic into an error of the call when containment is on (`KAZETERM_ON_BUG=kill`, or
   by default whenever debug assertions are off, which is always on Android) and aborts the process
   otherwise. Everything else is caught by `guarded!`: `Machine::wait`, `processes`, `cpu_time_ns`, `take_power`,
   `stall`, `sync_store`, the Tier 1 pool trim, the wait loops of console reads and writes, the
@@ -113,9 +113,9 @@ with view and rendering portions in `android/vtview` and `android/vtrender`.
 
 ### Guest browser client
 
-- `android/build` packages `hosts/android/open-url.c` as the static `appine-open-url` asset
+- `android/build` packages `hosts/android/open-url.c` as the static `kazeterm-open-url` asset
   for either distro; no guest package is needed.
-- The client rereads `/etc/appine/browser`, connects to IPv4 loopback, sends token and URL lines
+- The client rereads `/etc/kazeterm/browser`, connects to IPv4 loopback, sends token and URL lines
   and waits up to 5 s total for an `OK` reply. Invalid arguments/configuration, connection failures,
   refusal or a missing reply print an error and exit 1; URLs and tokens are never logged.
   Only HTTP(S) URLs up to 8192 bytes are accepted; the service performs strict UTF-8/URI checks.
@@ -131,14 +131,14 @@ with view and rendering portions in `android/vtview` and `android/vtrender`.
 
 ### Outbound
 
-- `appine_kernel` (`Machine`, `MachineOptions`, routes, store and browse functions), `jni` 0.21,
+- `kazeterm_kernel` (`Machine`, `MachineOptions`, routes, store and browse functions), `jni` 0.21,
   `libc` and Android `liblog`; terminal JNI also uses `libjnigraphics`.
 - `MainApplication` installs `android/privacy` and `android/service` diagnostic capture.
 - `android/service` receives the guest browser client's requests; `android/build` supplies its asset.
 
 ## Invariants and gotchas
 
-- JNI symbol names hard-code `io.github.mthli.appine.Native` (and `VtNative` for the libghostty-vt
+- JNI symbol names hard-code `com.kazeterm.Native` (and `VtNative` for the libghostty-vt
   terminal's functions); each `external fun` has exactly one `Java_…` function.
 - The crate is `#![cfg(target_os = "android")]`, so it is empty on other hosts, where `build.rs`
   only prints its rerun lines.

@@ -7,7 +7,7 @@
 # /proc/<tid> of a thread that is not the main one, FIONREAD on regular files
 set -e
 cd /tmp
-# raw ICMP sockets (Appine emulates them with ping sockets on the host): data received on IPv4
+# raw ICMP sockets (KazeTerm emulates them with ping sockets on the host): data received on IPv4
 # includes the IP header, an echo reply carries the id we sent, and the checksum is right;
 # ICMP_FILTER, ICMPV6_FILTER, IPV6_CHECKSUM, the control messages of IP_RECVTTL and IP_PKTINFO
 # (truncated when they do not fit), MSG_TRUNC. On loopback Linux's raw socket also receives the
@@ -483,7 +483,7 @@ int main(void)
 C
 gcc -O1 -o positional positional.c && ./positional
 
-# A raw ICMP socket receives all arriving ICMP (through the aggregation point in Appine): port
+# A raw ICMP socket receives all arriving ICMP (through the aggregation point in KazeTerm): port
 # unreachables caused by packets other UDP sockets send (quoting the original IP header, UDP
 # header and payload), replies to echoes other raw sockets send; an unconnected UDP socket sees
 # no error, a connected one sees only hard errors that match its connection (ECONNREFUSED); once
@@ -1183,7 +1183,7 @@ rm -f sl59 sl60
 # /proc/<pid>/exe points at the program file itself (Linux's mm->exe_file): after it is deleted or
 # replaced by rename, reading it gives " (deleted)", and following it (stat, open, execve) still
 # reaches the original file; one that was only renamed is also the original (the path read
-# follows the rename on Linux but not in Appine, so it is not compared)
+# follows the rename on Linux but not in KazeTerm, so it is not compared)
 cd /tmp
 cat > exelink.c <<'C'
 #define _GNU_SOURCE
@@ -1501,7 +1501,7 @@ gcc -O1 -march=armv8.4-a -pthread -o ditstate ditstate.c && ./ditstate
 # /proc/stat's btime is fixed while the clock is not set (Linux: realtime minus boottime in
 # nanoseconds, then whole seconds), so ps -o lstart (btime plus the start time in
 # /proc/<pid>/stat) does not change between reads; reads over more than a second sweep the
-# fraction of the uptime, which made Appine's value alternate between two seconds
+# fraction of the uptime, which made KazeTerm's value alternate between two seconds
 cat > btime.c <<'C'
 #include <stdio.h>
 #include <sys/wait.h>

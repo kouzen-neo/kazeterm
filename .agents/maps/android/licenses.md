@@ -13,7 +13,7 @@
 reader, resolves catalog IDs and local document links, and restores reading position.
 
 Root: `LicensesActivity.kt`, `LicenseActivity.kt` and `LicenseCatalog.kt` in
-`android/app/src/main/java/io/github/mthli/appine/`, and `layout/list_item.xml` and `values/ids.xml`
+`android/app/src/main/java/com/kazeterm/`, and `layout/list_item.xml` and `values/ids.xml`
 (the license list and reader IDs) under `android/app/src/main/res/`.
 
 Outside the module: the About entry is android/setup's; the shared strings, themes, `page.xml`
@@ -42,10 +42,10 @@ instrumentation tests belong to android/tests. This module consumes those assets
 ### Catalog, navigation and reading
 
 - Settings' About group has a separate localized Project website action (android/setup); the
-  license summary names GNU AGPL 3.0 or later, with copyright and warranty details in the Appine notice.
+  license summary names GNU AGPL 3.0 or later, with copyright and warranty details in the KazeTerm notice.
   Its final Version action is labeled "Version" / "版本号"; android/setup supplies the build
   version summary and Google Play navigation.
-- `notices/` is checked in (android/build): Appine, Fuchsia, libghostty-vt and its linked
+- `notices/` is checked in (android/build): KazeTerm, Fuchsia, libghostty-vt and its linked
   components, JetBrains Mono, Alpine and the bundled doas/bash/procps/bubblewrap packages with libcap2, Android
   libraries, Rust crates, SQLite and standalone license texts. Subtitles show the chosen
   license; Alpine shows a localized package count and "Multiple licenses", and SQLite "Public
@@ -79,7 +79,7 @@ instrumentation tests belong to android/tests. This module consumes those assets
 
 ### Outbound
 
-- android/terminal: shared `Theme.Appine`, localized strings, `page.xml`, `dp` and `themeColor`.
+- android/terminal: shared `Theme.KazeTerm`, localized strings, `page.xml`, `dp` and `themeColor`.
 - android/build: `assets/notices/index.json`, the selected HTML and shared CSS.
 - AndroidX WebKit's asset loader, WebView, Custom Tabs for external HTTP(S) links, AppCompat,
   Material Components, insets helpers and the system-selected browser.

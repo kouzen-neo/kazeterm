@@ -215,7 +215,7 @@ holding its node (`kernel/exec`).
     copied;
   - other namespaces' mounts on a removed or renamed overlay name are not detached;
   - a lower layer's `trusted.overlay.redirect` is not followed, though sysfs shows
-    `redirect_always_follow` as Y (nothing Appine runs writes one).
+    `redirect_always_follow` as Y (nothing KazeTerm runs writes one).
 - Leases taken before a copy-up are lost (`kernel/locks`).
 
 ## Open questions

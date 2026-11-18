@@ -4,7 +4,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use appine_engine::Cpu;
+use kazeterm_engine::Cpu;
 
 use super::{Flow, SysResult, put, read_path};
 use crate::cell::RefCell;
@@ -158,7 +158,7 @@ pub(super) fn clone3(cx: &mut Cx<'_>, cpu: &mut Cpu, uargs: u64, size: usize) ->
     if size < MIN {
         return Err(Errno::EINVAL);
     }
-    if size > appine_engine::PAGE_SIZE as usize {
+    if size > kazeterm_engine::PAGE_SIZE as usize {
         return Err(Errno::E2BIG);
     }
     let mut b = vec![0u8; size];

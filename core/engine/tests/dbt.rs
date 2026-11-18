@@ -5,7 +5,7 @@
 
 use std::ptr::NonNull;
 
-use appine_engine::{
+use kazeterm_engine::{
     Access, Cpu, Dbt, DbtRegs, DbtSource, DbtSpace, Exit, FaultKind, Mmu, PAGE_SIZE, WATCH_LOAD,
     WATCH_STORE, prot,
 };
@@ -185,7 +185,7 @@ fn pooled_instances_keep_translations_of_the_same_program() {
     drop((dbt, space));
     // Dropping the translations kept in the pool when host memory is tight: running again has to
     // translate again (or copy templates)
-    appine_engine::trim_dbt_pool();
+    kazeterm_engine::trim_dbt_pool();
     let space = DbtSpace::new(KEY, DbtRegs::Default).unwrap();
     let mut dbt = Dbt::attach(&space, 0).unwrap();
     assert_eq!(g.run(&mut dbt), 8);
@@ -215,7 +215,7 @@ fn fpcr_reads_use_the_guest_state_inside_translated_code() {
 #[test]
 fn unchanged_fpcr_writes_stay_in_the_block() {
     let mut g = Guest::new();
-    let fz16 = if appine_engine::guest_hwcap() & appine_engine::hwcap::FPHP != 0 {
+    let fz16 = if kazeterm_engine::guest_hwcap() & kazeterm_engine::hwcap::FPHP != 0 {
         1 << 19
     } else {
         0

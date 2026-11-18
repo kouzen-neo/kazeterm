@@ -136,7 +136,7 @@ goroutines
 exit
 D
 # exit asks whether to end the process, and answering n detaches explicitly. On EOF delve exits
-# without detaching, and the kernel detaches when the tracer exits (Appine used to deliver the
+# without detaching, and the kernel detaches when the tracer exits (KazeTerm used to deliver the
 # attach's SIGSTOP, leaving the process stopped, see round 95)
 echo n | dlv attach $p --init at.dlv --allow-non-terminal-interactive=true >a.log 2>&1; echo "exit $?"
 grep -E '^(true|false)$' a.log

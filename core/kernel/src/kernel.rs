@@ -33,8 +33,8 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
-use appine_engine::DbtStats;
-use appine_hal::Event;
+use kazeterm_engine::DbtStats;
+use kazeterm_hal::Event;
 
 use crate::cell::{Ref, RefCell, RefMut};
 use crate::errno::Errno;
@@ -231,7 +231,7 @@ pub(crate) struct Kernel {
     pub printk: [i32; 4],
     pub saved_console_loglevel: Option<i32>,
     pub dmesg_restrict: bool,
-    /// `/proc/sys/kernel/panic`: only recorded; Appine's kernel layer has no panic (a kernel bug
+    /// `/proc/sys/kernel/panic`: only recorded; KazeTerm's kernel layer has no panic (a kernel bug
     /// ends only the process that hits it).
     pub panic: i32,
     /// `/proc/sys/fs/protected_symlinks`, `protected_hardlinks` (Linux's `may_follow_link`,
@@ -323,7 +323,7 @@ pub(crate) struct Kernel {
     pub orig_dst: crate::origdst::Table,
     /// Main-table routes handed over by the host ([`crate::Machine::set_routes`], taken from
     /// `LinkProperties` on Android); when None, the host's are read ([`crate::route`]).
-    pub host_routes: Option<Vec<appine_hal::net::Route>>,
+    pub host_routes: Option<Vec<kazeterm_hal::net::Route>>,
     /// The events taken by AIO contexts (`/proc/sys/fs/aio-nr`) and the limit (`aio-max-nr`).
     pub aio_nr: u64,
     pub aio_max_nr: u64,
@@ -335,7 +335,7 @@ pub(crate) struct Kernel {
     pub sysctls: BTreeMap<&'static [u8], i64>,
     /// `/proc/sys/kernel/modprobe` (only recorded: there are no modules).
     pub modprobe: Vec<u8>,
-    /// `/proc/sys/kernel/tainted`: the taint flags written by privileged processes (Appine itself
+    /// `/proc/sys/kernel/tainted`: the taint flags written by privileged processes (KazeTerm itself
     /// taints nothing).
     pub tainted: u64,
     /// The ratelimit of unhandled-exception reports, kernel-wide as in arm64 Linux's
@@ -355,7 +355,7 @@ unsafe impl Send for Kernel {}
 impl Kernel {
     pub fn new(tier: Tier) -> Kernel {
         // Record the host's CPUs before any guest thread changes the host affinity
-        appine_hal::host_cpus();
+        kazeterm_hal::host_cpus();
         let init_ns = crate::nsproxy::NsProxy::init();
         Kernel {
             tasks: BTreeMap::new(),
@@ -371,7 +371,7 @@ impl Kernel {
             forks: 0,
             boot_id: {
                 let mut id = [0u8; 16];
-                let _ = appine_hal::fill_random(&mut id);
+                let _ = kazeterm_hal::fill_random(&mut id);
                 id[6] = (id[6] & 0x0f) | 0x40;
                 id[8] = (id[8] & 0x3f) | 0x80;
                 id
@@ -950,7 +950,7 @@ impl Drop for Bkl<'_> {
 /// would take the holder's core instead.
 fn max_spinners() -> u32 {
     static N: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
-    *N.get_or_init(|| (appine_hal::host_cpus().len() / 2).clamp(1, 4) as u32)
+    *N.get_or_init(|| (kazeterm_hal::host_cpus().len() / 2).clamp(1, 4) as u32)
 }
 
 /// Whether some thread holds the BKL, and which, for the watchdog ([`crate::watchdog`]) that reads
@@ -994,7 +994,7 @@ impl Hold {
     fn record(&self) {
         let host_tid = match HOST_TID.get() {
             0 => {
-                let tid = appine_hal::gettid();
+                let tid = kazeterm_hal::gettid();
                 HOST_TID.set(tid);
                 tid
             }
@@ -1254,7 +1254,7 @@ impl<'a> Cx<'a> {
         let mut done = 0;
         while done < data.len() {
             let at = addr.wrapping_add(done as u64);
-            let n = ((appine_engine::PAGE_SIZE - at % appine_engine::PAGE_SIZE) as usize)
+            let n = ((kazeterm_engine::PAGE_SIZE - at % kazeterm_engine::PAGE_SIZE) as usize)
                 .min(data.len() - done);
             if mm
                 .write(UserSlice::new(at, n), &data[done..done + n])
@@ -1584,7 +1584,7 @@ pub(crate) fn block_for<'a>(
     let timeout = deadline.map(|d| d.saturating_duration_since(Instant::now()));
     let mut fds: Vec<(i32, i16, i16)> = host.iter().map(|&(fd, ev, _)| (fd, ev, 0)).collect();
     fds.push((event.fd(), POLLIN, 0));
-    let r = appine_hal::poll(&mut fds, timeout);
+    let r = kazeterm_hal::poll(&mut fds, timeout);
     let mut k = shared.lock();
     event.clear();
     if listed {

@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use appine_engine::{Cpu, Exit, Mmu, hwcap, hwcap2};
+use kazeterm_engine::{Cpu, Exit, Mmu, hwcap, hwcap2};
 
 use crate::rng::Rng;
 
@@ -101,9 +101,9 @@ pub struct SpaceReport {
     pub available: bool,
 }
 
-/// Finds a usable llvm-mc: the environment variable `APPINE_LLVM_MC`, otherwise from PATH.
+/// Finds a usable llvm-mc: the environment variable `KAZETERM_LLVM_MC`, otherwise from PATH.
 pub fn find_llvm_mc() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("APPINE_LLVM_MC") {
+    if let Some(p) = std::env::var_os("KAZETERM_LLVM_MC") {
         return Some(PathBuf::from(p));
     }
     let names = [
@@ -129,8 +129,8 @@ pub fn check(
     seed: u64,
     limit: usize,
 ) -> (Vec<SpaceReport>, Vec<Disagreement>) {
-    let caps = appine_engine::guest_hwcap();
-    let caps2 = appine_engine::guest_hwcap2();
+    let caps = kazeterm_engine::guest_hwcap();
+    let caps2 = kazeterm_engine::guest_hwcap2();
     let dir = std::env::temp_dir();
     let mmu = Mmu::new();
     // SAFETY: mmu is declared before cpu and dropped after it

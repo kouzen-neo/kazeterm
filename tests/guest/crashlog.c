@@ -7,7 +7,7 @@
  * each way the kernel layer reports, and each report read back from /dev/kmsg must be the line
  * Linux 6.1 writes (comm[pid], exception class and ESR, what happened, the file mapped at or above
  * the pc) followed by the registers. Children with a handler or a tracer are not reported, and
- * after 10 reports within 5 seconds the next is dropped. The ESRs are those Appine synthesizes:
+ * after 10 reports within 5 seconds the next is dropped. The ESRs are those KazeTerm synthesizes:
  * Linux reports the translation-table level the walk stopped at (often 2 for an address with no
  * page tables), and a never-touched page as a translation fault even when its mapping forbids
  * the access.
@@ -225,7 +225,7 @@ static void reported(const char *name, enum crash what, int signal, const char *
         CHECK(*rest == 0, "%s: %s", name, r[i].text);
 
     int cpu, line_pid, used = 0;
-    CHECK(sscanf(r[i + 1].text, "CPU: %d PID: %d Comm: crashlog Not tainted 6.1.0-appine #1%n",
+    CHECK(sscanf(r[i + 1].text, "CPU: %d PID: %d Comm: crashlog Not tainted 6.1.0-kazeterm #1%n",
                  &cpu, &line_pid, &used) == 2 &&
               line_pid == pid && r[i + 1].text[used] == 0,
           "%s: %s", name, r[i + 1].text);
@@ -280,7 +280,7 @@ int main(void)
              "DABT (lower EL), ESR 0x0000000092000047, level 3 translation fault", 1, 0);
     reported("sp-alignment", SP_ALIGNMENT, SIGBUS,
              "SP Alignment, ESR 0x000000009a000000, SP/PC alignment exception", 1, 0);
-    /* Appine checks the frame before restoring anything, so the registers are the caller's */
+    /* KazeTerm checks the frame before restoring anything, so the registers are the caller's */
     reported("bad-sigreturn", BAD_SIGRETURN, SIGSEGV, "illegal memory access", 1, 0);
     unreported("handled", HANDLED, 0);
     unreported("traced", TRACED, SIGSEGV);

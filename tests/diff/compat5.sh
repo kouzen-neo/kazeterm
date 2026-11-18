@@ -90,7 +90,7 @@ static pid_t target(int uid) {
     return t;
 }
 
-// The pipe stays open a while: Linux signals at the write, Appine shortly after
+// The pipe stays open a while: Linux signals at the write, KazeTerm shortly after
 static void signal_from(pid_t t, int uid) {
     pid_t p = fork();
     if (p == 0) {

@@ -5,7 +5,7 @@
 # files, paths in a cgroup namespace, clone3's CLONE_INTO_CGROUP. The native side is a privileged
 # container (cgroups writable). The container's root cgroup is the root of the cgroup namespace:
 # it has processes, controllers cannot be enabled there, and writing most of its files is EPERM;
-# Appine's root is the real root, so only the t created below it is compared. The full list of
+# KazeTerm's root is the real root, so only the t created below it is compared. The full list of
 # files (newer kernels have PSI and cpu.stat.local) and the sizes are not compared
 cd /sys/fs/cgroup
 rmdir t/a/x t/a t/b t 2>/dev/null
@@ -35,7 +35,7 @@ echo "t: $(tr '\n' ' ' < t/cgroup.events)/ t/a: $(tr '\n' ' ' < t/a/cgroup.event
 rmdir t/a 2>&1
 rmdir t 2>&1
 echo $pid > t/b/cgroup.procs && cat /proc/$pid/cgroup
-# On the namespace root (natively the container's root, in Appine the real root) only
+# On the namespace root (natively the container's root, in KazeTerm the real root) only
 # cgroup.procs, cgroup.threads and cgroup.subtree_control can be written
 echo 1 > cgroup.max.depth
 echo max > memory.max
@@ -45,7 +45,7 @@ echo $pid > t/a/cgroup.threads
 echo abc > t/a/cgroup.procs
 echo 999999 > t/a/cgroup.procs
 echo -5 > t/a/cgroup.procs
-# A token starting with a multi-byte character (Appine's parser once panicked on it)
+# A token starting with a multi-byte character (KazeTerm's parser once panicked on it)
 for v in "+bogus" "memory" "+memory" "-memory" "" "émemory" "+émemory"; do
     echo "$v" > t/cgroup.subtree_control && echo "subtree_control '$v' ok"
 done

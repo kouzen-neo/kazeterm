@@ -2,7 +2,7 @@
 # directories; FICLONE
 python3 - <<'PY'
 import base64, decimal, fractions, hashlib, json, math, re, sqlite3, struct, threading, unicodedata, zlib
-print(hashlib.sha256(b"x" * 10**6).hexdigest(), hashlib.md5(b"appine").hexdigest())
+print(hashlib.sha256(b"x" * 10**6).hexdigest(), hashlib.md5(b"kazeterm").hexdigest())
 print([round(math.sin(i), 12) for i in range(8)])
 print(repr(2 ** 0.5), 1e300 * 1e10, -0.0, math.fsum([0.1] * 10), 0.1 + 0.2)
 print(struct.pack("<d", 0.1).hex(), float.fromhex("0x1.fffffffffffffp+1023"), math.ldexp(1, -1074))
@@ -79,7 +79,7 @@ print("import", one.x, two.x)
 PY
 
 # FICLONE: the order of the checks and the error codes; a clone has the source's data where the
-# filesystem has reflink (Appine's store) and is EOPNOTSUPP where it has none (ext4 natively), and
+# filesystem has reflink (KazeTerm's store) and is EOPNOTSUPP where it has none (ext4 natively), and
 # then Path.copy falls back to an ordinary copy
 python3 - <<'PY'
 import errno, fcntl, os, pathlib, struct

@@ -8,7 +8,7 @@
  * atomic.c. Every other encoding is reported as an undefined instruction, following the
  * whitelist principle in the engine map: what is not implemented is not executed.
  *
- * Convention: an execution function returns APPINE_EXIT_NONE to continue; on error, pc stays
+ * Convention: an execution function returns KAZETERM_EXIT_NONE to continue; on error, pc stays
  * unchanged and no register is written back.
  */
 #include "internal.h"
@@ -47,7 +47,7 @@
 /* Cumulative exception bits in FPSR: QC, IDC, IXC, UFC, OFC, DZC, IOC */
 #define FPSR_MASK UINT64_C(0x0800009f)
 
-typedef struct appine_cpu cpu_t;
+typedef struct kazeterm_cpu cpu_t;
 
 /* ---- General helpers ---- */
 
@@ -92,23 +92,23 @@ static inline void wx_sp(cpu_t *c, unsigned r, uint64_t v)
         c->x[r] = v;
 }
 
-static inline enum appine_exit next(cpu_t *c)
+static inline enum kazeterm_exit next(cpu_t *c)
 {
     c->pc += 4;
-    return APPINE_EXIT_NONE;
+    return KAZETERM_EXIT_NONE;
 }
 
-static inline enum appine_exit undef(cpu_t *c, uint32_t insn)
+static inline enum kazeterm_exit undef(cpu_t *c, uint32_t insn)
 {
     c->exit_info = insn;
-    return APPINE_EXIT_UNDEF;
+    return KAZETERM_EXIT_UNDEF;
 }
 
 /* SP-based accesses require SP to be 16-byte aligned (Linux enables SCTLR_EL1.SA0) */
 static inline bool sp_aligned(cpu_t *c, unsigned rn, uint32_t access)
 {
     if (rn == 31 && (c->sp & 15))
-        return raise_fault(c, c->sp, access, APPINE_FAULT_SP_ALIGN);
+        return raise_fault(c, c->sp, access, KAZETERM_FAULT_SP_ALIGN);
     return true;
 }
 
@@ -230,7 +230,7 @@ static uint64_t rbit64(uint64_t v)
 
 /* ---- Data processing: immediate ---- */
 
-static enum appine_exit dp_imm(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit dp_imm(cpu_t *c, uint32_t insn)
 {
     bool sf = BIT(insn, 31);
     unsigned rd = insn & 31, rn = FIELD(insn, 9, 5);
@@ -334,13 +334,13 @@ static enum appine_exit dp_imm(cpu_t *c, uint32_t insn)
 /* ---- Data processing: register ---- */
 
 /* The CRC32 family runs as native stubs */
-static enum appine_exit crc32(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit crc32(cpu_t *c, uint32_t insn)
 {
     struct native_desc d = {.addr_pos = NATIVE_NO_ADDR, .n = 3};
     d.gpr[0] = (struct native_operand){.pos = 0, .store = 1};
     d.gpr[1] = (struct native_operand){.pos = 5, .load = 1};
     d.gpr[2] = (struct native_operand){.pos = 16, .load = 1};
-    if (!appine_native_exec(insn, &d, c, NULL))
+    if (!kazeterm_native_exec(insn, &d, c, NULL))
         return undef(c, insn);
     return next(c);
 }
@@ -354,9 +354,9 @@ static enum appine_exit crc32(cpu_t *c, uint32_t insn)
  *   XOR bit 7 (15), and C is unchanged (turning the result of a signed 8- or 16-bit operation
  *   into flags).
  */
-static enum appine_exit flags_from_reg(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit flags_from_reg(cpu_t *c, uint32_t insn)
 {
-    if (!appine_has(APPINE_HWCAP_FLAGM))
+    if (!kazeterm_has(KAZETERM_HWCAP_FLAGM))
         return undef(c, insn);
     uint64_t n = rx(c, FIELD(insn, 9, 5));
     if ((insn & 0xffe07c10) == 0xba000400) { /* RMIF */
@@ -376,7 +376,7 @@ static enum appine_exit flags_from_reg(cpu_t *c, uint32_t insn)
     return undef(c, insn);
 }
 
-static enum appine_exit dp_reg(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit dp_reg(cpu_t *c, uint32_t insn)
 {
     bool sf = BIT(insn, 31);
     unsigned rd = insn & 31, rn = FIELD(insn, 9, 5), rm = FIELD(insn, 20, 16);
@@ -515,7 +515,7 @@ static enum appine_exit dp_reg(cpu_t *c, uint32_t insn)
             case 0x15:
             case 0x16:
             case 0x17: /* CRC32B/H/W/X, CRC32CB/H/W/X: the X forms require sf = 1 */
-                if (!appine_has(APPINE_HWCAP_CRC32) || sf != ((opcode & 3) == 3))
+                if (!kazeterm_has(KAZETERM_HWCAP_CRC32) || sf != ((opcode & 3) == 3))
                     return undef(c, insn);
                 return crc32(c, insn);
             default: /* PACGA, MTE, CSSC: not in the whitelist */
@@ -606,7 +606,7 @@ static enum appine_exit dp_reg(cpu_t *c, uint32_t insn)
 
 /* ---- Branches, exception generation and system instructions ---- */
 
-static enum appine_exit sysreg_move(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit sysreg_move(cpu_t *c, uint32_t insn)
 {
     bool read = BIT(insn, 21);
     unsigned rt = insn & 31;
@@ -631,13 +631,13 @@ static enum appine_exit sysreg_move(cpu_t *c, uint32_t insn)
             c->tpidr_el0 = v;
         return next(c);
     case SYSREG_DIT: /* only bit 24 */
-        if (!appine_has(APPINE_HWCAP_DIT))
+        if (!kazeterm_has(KAZETERM_HWCAP_DIT))
             return undef(c, insn);
         if (read) {
             wx(c, rt, (uint64_t)c->dit << 24);
         } else {
             c->dit = (v >> 24) & 1;
-            appine_sync_dit(c);
+            kazeterm_sync_dit(c);
         }
         return next(c);
     case SYSREG_TPIDRRO_EL0: /* Linux user mode always reads 0, and EL0 cannot write it */
@@ -671,7 +671,7 @@ static enum appine_exit sysreg_move(cpu_t *c, uint32_t insn)
         wx(c, rt, v);
         return next(c);
     case SYSREG_CNTVCTSS_EL0: /* ECV: the same counter, self-synchronized (no isb needed) */
-        if (!read || !appine_has2(APPINE_HWCAP2_ECV))
+        if (!read || !kazeterm_has2(KAZETERM_HWCAP2_ECV))
             return undef(c, insn);
         __asm__ volatile("mrs %0, s3_3_c14_c0_6" : "=r"(v)::"memory");
         wx(c, rt, v);
@@ -679,7 +679,7 @@ static enum appine_exit sysreg_move(cpu_t *c, uint32_t insn)
 #endif
     default: {
         uint64_t id; /* the ID register space, consistent with HWCAP (the engine map) */
-        if (read && appine_has(APPINE_HWCAP_CPUID) && appine_id_register(FIELD(insn, 20, 5), &id)) {
+        if (read && kazeterm_has(KAZETERM_HWCAP_CPUID) && kazeterm_id_register(FIELD(insn, 20, 5), &id)) {
             wx(c, rt, id);
             return next(c);
         }
@@ -695,22 +695,22 @@ static enum appine_exit sysreg_move(cpu_t *c, uint32_t insn)
  *   XAFLAG (FlagM2): converts the "external format" of a floating-point compare into Arm's NZCV;
  *   AXFLAG (FlagM2): the reverse: merges unordered (V) into Z, clears C, and zeroes N and V.
  */
-static enum appine_exit flags_convert(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit flags_convert(cpu_t *c, uint32_t insn)
 {
     unsigned z = BIT(c->nzcv, 30), cf = BIT(c->nzcv, 29), v = BIT(c->nzcv, 28);
     switch (FIELD(insn, 7, 5)) {
     case 0:
-        if (!appine_has(APPINE_HWCAP_FLAGM))
+        if (!kazeterm_has(KAZETERM_HWCAP_FLAGM))
             return undef(c, insn);
         c->nzcv ^= NZCV(0, 0, 1, 0);
         return next(c);
     case 1:
-        if (!appine_has2(APPINE_HWCAP2_FLAGM2))
+        if (!kazeterm_has2(KAZETERM_HWCAP2_FLAGM2))
             return undef(c, insn);
         c->nzcv = NZCV(!cf && !z, z && cf, cf || z, !cf && z);
         return next(c);
     case 2:
-        if (!appine_has2(APPINE_HWCAP2_FLAGM2))
+        if (!kazeterm_has2(KAZETERM_HWCAP2_FLAGM2))
             return undef(c, insn);
         c->nzcv = NZCV(0, z || v, cf && !v, 0);
         return next(c);
@@ -719,31 +719,31 @@ static enum appine_exit flags_convert(cpu_t *c, uint32_t insn)
     }
 }
 
-static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit branch_sys(cpu_t *c, uint32_t insn)
 {
     if ((insn & 0x7c000000) == 0x14000000) { /* B / BL */
         if (BIT(insn, 31))
             c->x[30] = c->pc + 4;
         c->pc += (uint64_t)(sext(FIELD(insn, 25, 0), 26) * 4);
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
     if ((insn & 0x7e000000) == 0x34000000) { /* CBZ / CBNZ */
         uint64_t t = narrow(rx(c, insn & 31), BIT(insn, 31));
         bool take = BIT(insn, 24) ? t != 0 : t == 0;
         c->pc += take ? (uint64_t)(sext(FIELD(insn, 23, 5), 19) * 4) : 4;
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
     if ((insn & 0x7e000000) == 0x36000000) { /* TBZ / TBNZ */
         unsigned bit = (BIT(insn, 31) << 5) | FIELD(insn, 23, 19);
         bool set = (rx(c, insn & 31) >> bit) & 1;
         bool take = BIT(insn, 24) ? set : !set;
         c->pc += take ? (uint64_t)(sext(FIELD(insn, 18, 5), 14) * 4) : 4;
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
     if ((insn & 0xff000010) == 0x54000000) { /* B.cond */
         bool take = cond_holds(c->nzcv, insn & 15);
         c->pc += take ? (uint64_t)(sext(FIELD(insn, 23, 5), 19) * 4) : 4;
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
     /* Decimal parsers read FPCR for each conversion. */
     if ((insn & 0xffdfffe0) == (0xd5000000u | SYSREG_FPCR << 5)) {
@@ -758,11 +758,11 @@ static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
         c->exit_info = FIELD(insn, 20, 5);
         c->excl_size = 0;
         c->pc += 4;
-        return APPINE_EXIT_SVC;
+        return KAZETERM_EXIT_SVC;
     }
     if ((insn & 0xffe0001f) == 0xd4200000) { /* BRK */
         c->exit_info = FIELD(insn, 20, 5);
-        return APPINE_EXIT_BRK;
+        return KAZETERM_EXIT_BRK;
     }
     /* HINT: NOP, YIELD and the PAC/BTI family are all treated as NOP (the engine map) */
     if ((insn & 0xfffff01f) == 0xd503201f)
@@ -779,7 +779,7 @@ static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
             __atomic_thread_fence(__ATOMIC_SEQ_CST);
             return next(c);
         case 7: /* SB: a speculation barrier; under interpretation there is nothing to hold back */
-            if (FIELD(insn, 11, 8) || !appine_has(APPINE_HWCAP_SB))
+            if (FIELD(insn, 11, 8) || !kazeterm_has(KAZETERM_HWCAP_SB))
                 return undef(c, insn);
             return next(c);
         default: /* DSB nXS and others are not in the whitelist */
@@ -791,10 +791,10 @@ static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
         return flags_convert(c, insn);
     /* MSR DIT, #imm: takes the lowest bit of CRm, as the hardware does */
     if ((insn & 0xfffff0ff) == 0xd503405f) {
-        if (!appine_has(APPINE_HWCAP_DIT))
+        if (!kazeterm_has(KAZETERM_HWCAP_DIT))
             return undef(c, insn);
         c->dit = BIT(insn, 8);
-        appine_sync_dit(c);
+        kazeterm_sync_dit(c);
         return next(c);
     }
     if ((insn & 0xffd00000) == 0xd5100000) /* MRS / MSR (register) */
@@ -802,14 +802,14 @@ static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
     /* DC ZVA: zeroes the whole block containing the address; a block is always within one page */
     if ((insn & 0xffffffe0) == 0xd50b7420) {
         uint64_t va = untag(rx(c, insn & 31)) & ~(uint64_t)(DCZ_BLOCK - 1);
-        void *p = tlb_lookup(c, va, APPINE_ACCESS_WRITE);
+        void *p = tlb_lookup(c, va, KAZETERM_ACCESS_WRITE);
         if (!p) {
-            raise_fault(c, va, APPINE_ACCESS_WRITE, APPINE_FAULT_PAGE);
-            return APPINE_EXIT_FAULT;
+            raise_fault(c, va, KAZETERM_ACCESS_WRITE, KAZETERM_FAULT_PAGE);
+            return KAZETERM_EXIT_FAULT;
         }
-        if (UNLIKELY(watch_hit(c, va, DCZ_BLOCK, APPINE_WATCH_STORE))) {
-            raise_fault(c, va, APPINE_ACCESS_WRITE, APPINE_FAULT_WATCH);
-            return APPINE_EXIT_FAULT;
+        if (UNLIKELY(watch_hit(c, va, DCZ_BLOCK, KAZETERM_WATCH_STORE))) {
+            raise_fault(c, va, KAZETERM_ACCESS_WRITE, KAZETERM_FAULT_WATCH);
+            return KAZETERM_EXIT_FAULT;
         }
         memset(p, 0, DCZ_BLOCK);
         return next(c);
@@ -821,21 +821,21 @@ static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
      * here, and is handed to the caller to invalidate translations.
      */
     uint32_t cmo = insn & 0xffffffe0;
-    if ((cmo == 0xd50b7c20 && !appine_has(APPINE_HWCAP_DCPOP)) ||
-        (cmo == 0xd50b7d20 && !appine_has2(APPINE_HWCAP2_DCPODP)))
+    if ((cmo == 0xd50b7c20 && !kazeterm_has(KAZETERM_HWCAP_DCPOP)) ||
+        (cmo == 0xd50b7d20 && !kazeterm_has2(KAZETERM_HWCAP2_DCPODP)))
         return undef(c, insn);
     if (cmo == 0xd50b7a20 || cmo == 0xd50b7b20 || cmo == 0xd50b7e20 || cmo == 0xd50b7520 ||
         cmo == 0xd50b7c20 || cmo == 0xd50b7d20) {
         uint64_t va = untag(rx(c, insn & 31));
-        if (!tlb_lookup(c, va, APPINE_ACCESS_READ)) {
-            raise_fault(c, va, APPINE_ACCESS_READ, APPINE_FAULT_PAGE);
-            return APPINE_EXIT_FAULT;
+        if (!tlb_lookup(c, va, KAZETERM_ACCESS_READ)) {
+            raise_fault(c, va, KAZETERM_ACCESS_READ, KAZETERM_FAULT_PAGE);
+            return KAZETERM_EXIT_FAULT;
         }
         if (cmo != 0xd50b7520)
             return next(c);
         c->fault_addr = va;
         c->pc += 4;
-        return APPINE_EXIT_CODE;
+        return KAZETERM_EXIT_CODE;
     }
 
     uint32_t reg_branch = insn & 0xfffffc1f;
@@ -844,7 +844,7 @@ static enum appine_exit branch_sys(cpu_t *c, uint32_t insn)
         if (reg_branch == 0xd63f0000)
             c->x[30] = c->pc + 4;
         c->pc = target;
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
     return undef(c, insn);
 }
@@ -917,9 +917,9 @@ static __attribute__((noinline)) bool ldst_slow(cpu_t *c, enum ldst_kind kind, u
 static bool ldst_access(cpu_t *c, enum ldst_kind kind, unsigned size, uint64_t addr, unsigned rt)
 {
     uint64_t va = untag(addr);
-    unsigned access = kind == K_STORE ? APPINE_ACCESS_WRITE : APPINE_ACCESS_READ;
+    unsigned access = kind == K_STORE ? KAZETERM_ACCESS_WRITE : KAZETERM_ACCESS_READ;
     void *host;
-    if (UNLIKELY(c->nwatch || (va & PAGE_MASK) + (1u << size) > APPINE_PAGE_SIZE ||
+    if (UNLIKELY(c->nwatch || (va & PAGE_MASK) + (1u << size) > KAZETERM_PAGE_SIZE ||
                  !tlb_probe(c, va, access, &host)))
         return ldst_slow(c, kind, size, va, rt);
 
@@ -930,13 +930,13 @@ static bool ldst_access(cpu_t *c, enum ldst_kind kind, unsigned size, uint64_t a
     return true;
 }
 
-static enum appine_exit ldst(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit ldst(cpu_t *c, uint32_t insn)
 {
     unsigned size = FIELD(insn, 31, 30), opc = FIELD(insn, 23, 22);
     unsigned rt = insn & 31, rn = FIELD(insn, 9, 5);
 
     if (BIT(insn, 26))
-        return appine_simd_ldst(c, insn);
+        return kazeterm_simd_ldst(c, insn);
 
     if ((insn & 0x3b000000) == 0x39000000) { /* unsigned offset */
         enum ldst_kind kind = ldst_kind(size, opc);
@@ -944,11 +944,11 @@ static enum appine_exit ldst(cpu_t *c, uint32_t insn)
             return undef(c, insn);
         if (kind == K_PRFM)
             return next(c); /* prefetch is only a hint: no memory access, no alignment check */
-        if (!sp_aligned(c, rn, kind == K_STORE ? APPINE_ACCESS_WRITE : APPINE_ACCESS_READ))
-            return APPINE_EXIT_FAULT;
+        if (!sp_aligned(c, rn, kind == K_STORE ? KAZETERM_ACCESS_WRITE : KAZETERM_ACCESS_READ))
+            return KAZETERM_EXIT_FAULT;
         uint64_t addr = rx_sp(c, rn) + ((uint64_t)FIELD(insn, 21, 10) << size);
         if (!ldst_access(c, kind, size, addr, rt))
-            return APPINE_EXIT_FAULT;
+            return KAZETERM_EXIT_FAULT;
         return next(c);
     }
     /* 9-bit immediate: unscaled, post-index, unprivileged, pre-index */
@@ -959,13 +959,13 @@ static enum appine_exit ldst(cpu_t *c, uint32_t insn)
             return undef(c, insn);
         if (kind == K_PRFM)
             return next(c); /* prefetch is only a hint: no memory access, no alignment check */
-        if (!sp_aligned(c, rn, kind == K_STORE ? APPINE_ACCESS_WRITE : APPINE_ACCESS_READ))
-            return APPINE_EXIT_FAULT;
+        if (!sp_aligned(c, rn, kind == K_STORE ? KAZETERM_ACCESS_WRITE : KAZETERM_ACCESS_READ))
+            return KAZETERM_EXIT_FAULT;
         uint64_t base = rx_sp(c, rn);
         uint64_t off = (uint64_t)sext(FIELD(insn, 20, 12), 9);
         uint64_t addr = op == 1 ? base : base + off;
         if (!ldst_access(c, kind, size, addr, rt))
-            return APPINE_EXIT_FAULT;
+            return KAZETERM_EXIT_FAULT;
         if (op == 1 || op == 3)
             wx_sp(c, rn, base + off);
         return next(c);
@@ -977,11 +977,11 @@ static enum appine_exit ldst(cpu_t *c, uint32_t insn)
             return undef(c, insn);
         if (kind == K_PRFM)
             return next(c); /* prefetch is only a hint: no memory access, no alignment check */
-        if (!sp_aligned(c, rn, kind == K_STORE ? APPINE_ACCESS_WRITE : APPINE_ACCESS_READ))
-            return APPINE_EXIT_FAULT;
+        if (!sp_aligned(c, rn, kind == K_STORE ? KAZETERM_ACCESS_WRITE : KAZETERM_ACCESS_READ))
+            return KAZETERM_EXIT_FAULT;
         uint64_t off = extend_reg(rx(c, FIELD(insn, 20, 16)), option, BIT(insn, 12) ? size : 0, true);
         if (!ldst_access(c, kind, size, rx_sp(c, rn) + off, rt))
-            return APPINE_EXIT_FAULT;
+            return KAZETERM_EXIT_FAULT;
         return next(c);
     }
     if ((insn & 0x3b000000) == 0x18000000) { /* LDR (literal) */
@@ -994,7 +994,7 @@ static enum appine_exit ldst(cpu_t *c, uint32_t insn)
         default: ok = true; break; /* PRFM (literal) */
         }
         if (!ok)
-            return APPINE_EXIT_FAULT;
+            return KAZETERM_EXIT_FAULT;
         return next(c);
     }
     if ((insn & 0x3a000000) == 0x28000000) { /* LDP/STP/LDPSW, including LDNP/STNP */
@@ -1005,15 +1005,15 @@ static enum appine_exit ldst(cpu_t *c, uint32_t insn)
         if (pair_opc == 3 || (pair_opc == 1 && (!load || idx == 0)))
             return undef(c, insn);
         unsigned scale = pair_opc == 2 ? 3 : 2, n = 1u << scale;
-        if (!sp_aligned(c, rn, load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE))
-            return APPINE_EXIT_FAULT;
+        if (!sp_aligned(c, rn, load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE))
+            return KAZETERM_EXIT_FAULT;
         uint64_t base = rx_sp(c, rn);
         uint64_t off = (uint64_t)sext(FIELD(insn, 21, 15), 7) * n;
         uint64_t addr = idx == 1 ? base : base + off;
         uint8_t buf[16];
         if (load) {
             if (!mem_read(c, addr, buf, 2 * n))
-                return APPINE_EXIT_FAULT;
+                return KAZETERM_EXIT_FAULT;
             uint64_t v1 = 0, v2 = 0;
             memcpy(&v1, buf, n);
             memcpy(&v2, buf + n, n);
@@ -1028,30 +1028,30 @@ static enum appine_exit ldst(cpu_t *c, uint32_t insn)
             memcpy(buf, &v1, n);
             memcpy(buf + n, &v2, n);
             if (!mem_write(c, addr, buf, 2 * n))
-                return APPINE_EXIT_FAULT;
+                return KAZETERM_EXIT_FAULT;
         }
         if (idx == 1 || idx == 3)
             wx_sp(c, rn, base + off);
         return next(c);
     }
-    return appine_atomic_exec(c, insn); /* exclusives, acquire/release, LSE atomics */
+    return kazeterm_atomic_exec(c, insn); /* exclusives, acquire/release, LSE atomics */
 }
 
 /* ---- SIMD&FP data processing: handed to native stubs after the whitelist decision ---- */
 
-static enum appine_exit simd_dp(cpu_t *c, uint32_t insn)
+static enum kazeterm_exit simd_dp(cpu_t *c, uint32_t insn)
 {
     struct native_desc d;
-    if (!appine_has(APPINE_HWCAP_FP | APPINE_HWCAP_ASIMD) || !appine_simd_dp_decode(insn, &d))
+    if (!kazeterm_has(KAZETERM_HWCAP_FP | KAZETERM_HWCAP_ASIMD) || !kazeterm_simd_dp_decode(insn, &d))
         return undef(c, insn);
-    if (!appine_native_exec(insn, &d, c, NULL))
+    if (!kazeterm_native_exec(insn, &d, c, NULL))
         return undef(c, insn);
     return next(c);
 }
 
 /* ---- Top-level decode ---- */
 
-enum appine_exit appine_interp_exec(cpu_t *c, uint32_t insn)
+enum kazeterm_exit kazeterm_interp_exec(cpu_t *c, uint32_t insn)
 {
     switch (FIELD(insn, 28, 25)) {
     case 0x8:

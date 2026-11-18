@@ -38,7 +38,7 @@
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
 
-use appine_hal::Watch;
+use kazeterm_hal::Watch;
 
 use crate::cell::RefCell;
 use crate::errno::Errno;
@@ -532,7 +532,7 @@ pub(crate) fn before_io(k: &Kernel, sock: &Rc<RefCell<Socket>>) -> Option<Rc<Ref
     };
     let tap = find_tap(k, &net).filter(|t| t.borrow_mut().has_receivers(family))?;
     let (level, name) = recverr_option(family);
-    appine_hal::net::setsockopt(fd, level, name, &1i32.to_le_bytes()).ok()?;
+    kazeterm_hal::net::setsockopt(fd, level, name, &1i32.to_le_bytes()).ok()?;
     tap.borrow_mut().add_source(sock, fd, family, true);
     if let Socket::Inet(s) = &mut *sock.borrow_mut() {
         s.udp_tap = Some(tap.clone());
@@ -554,7 +554,7 @@ pub(crate) fn untap(sock: &Rc<RefCell<Socket>>) {
     let _ = dispatch(&tap, Some(fd));
     tap.borrow_mut().remove_source(fd);
     let (level, name) = recverr_option(family);
-    let _ = appine_hal::net::setsockopt(fd, level, name, &i32::from(guest).to_le_bytes());
+    let _ = kazeterm_hal::net::setsockopt(fd, level, name, &i32::from(guest).to_le_bytes());
     if let Socket::Inet(s) = &mut *sock.borrow_mut() {
         s.udp_tap = None;
     }
@@ -734,7 +734,7 @@ pub(crate) fn dispatch(tap: &Rc<RefCell<Tap>>, only: Option<i32>) -> Vec<Arrival
         };
         let net = tap.borrow().net.clone();
         let flags = MSG_ERRQUEUE | MSG_DONTWAIT;
-        while let Ok(r) = appine_hal::net::recvmsg(fd, &mut buf, CONTROL_ROOM, flags) {
+        while let Ok(r) = kazeterm_hal::net::recvmsg(fd, &mut buf, CONTROL_ROOM, flags) {
             let data = &buf[..r.len.min(buf.len())];
             let it = match family {
                 AF_INET => error_v4(fd, udp, &ids, key, data, &r),
@@ -781,7 +781,7 @@ pub(crate) fn dispatch(tap: &Rc<RefCell<Tap>>, only: Option<i32>) -> Vec<Arrival
         if udp {
             continue;
         }
-        while let Ok(r) = appine_hal::net::recvmsg(fd, &mut buf, CONTROL_ROOM, MSG_DONTWAIT) {
+        while let Ok(r) = kazeterm_hal::net::recvmsg(fd, &mut buf, CONTROL_ROOM, MSG_DONTWAIT) {
             let mut icmp = buf[..r.len.min(buf.len())].to_vec();
             if icmp.first() == Some(&echo_types(family).1) {
                 restore_id(&mut icmp, &ids);
@@ -822,7 +822,7 @@ fn guest_ids(tap: &Rc<RefCell<Tap>>) -> Vec<([u8; 2], [u8; 2])> {
                 return None;
             };
             let guest = r.id?;
-            let name = appine_hal::net::sockname(*fd, false).ok()?;
+            let name = kazeterm_hal::net::sockname(*fd, false).ok()?;
             Some((name.get(2..4)?.try_into().ok()?, guest))
         })
         .collect()
@@ -839,7 +839,7 @@ fn error_v4(
     ids: &[([u8; 2], [u8; 2])],
     key: usize,
     data: &[u8],
-    r: &appine_hal::net::Received,
+    r: &kazeterm_hal::net::Received,
 ) -> Option<(Item, i32, Vec<u8>)> {
     let (ee, offender) = extended_err(&r.control, SOL_IP, IP_RECVERR, SO_EE_ORIGIN_ICMP)?;
     let (ty, code) = (ee[5], ee[6]);
@@ -852,7 +852,7 @@ fn error_v4(
         key,
     );
     it.other.clear();
-    let local = appine_hal::net::sockname(fd, false).unwrap_or_default();
+    let local = kazeterm_hal::net::sockname(fd, false).unwrap_or_default();
     // The source address of the original message: the destination address of the error message
     // (IP_PKTINFO), or the local address; when the local end is a wildcard address (an unconnected
     // UDP socket) it is taken from routing
@@ -861,7 +861,7 @@ fn error_v4(
         None => local.get(4..8).map_or([0; 4], |a| a.try_into().unwrap()),
     };
     let ours = match (ours, r.addr.get(4..8)) {
-        ([0, 0, 0, 0], Some(dst)) => appine_hal::net::source_for(dst)
+        ([0, 0, 0, 0], Some(dst)) => kazeterm_hal::net::source_for(dst)
             .ok()
             .and_then(|a| a.try_into().ok())
             .unwrap_or(ours),
@@ -911,19 +911,19 @@ fn error_v6(
     ids: &[([u8; 2], [u8; 2])],
     key: usize,
     data: &[u8],
-    r: &appine_hal::net::Received,
+    r: &kazeterm_hal::net::Received,
 ) -> Option<(Item, i32, Vec<u8>)> {
     let (ee, offender) = extended_err(&r.control, SOL_IPV6, IPV6_RECVERR, SO_EE_ORIGIN_ICMP6)?;
     let (ty, code) = (ee[5], ee[6]);
     let info = u32::from_le_bytes(ee[8..12].try_into().unwrap());
     let offender = offender.get(..28)?.to_vec();
-    let local = appine_hal::net::sockname(fd, false).unwrap_or_default();
+    let local = kazeterm_hal::net::sockname(fd, false).unwrap_or_default();
     let mut ours: [u8; 16] = local.get(8..24).map_or([0; 16], |a| a.try_into().unwrap());
     if ours == [0; 16]
         && let Some(src) = r
             .addr
             .get(8..24)
-            .and_then(|d| appine_hal::net::source_for(d).ok())
+            .and_then(|d| kazeterm_hal::net::source_for(d).ok())
         && let Ok(a) = src.try_into()
     {
         ours = a;
@@ -1198,8 +1198,8 @@ fn cmsgs(control: &[u8]) -> impl Iterator<Item = (i32, i32, &[u8], &[u8])> {
 mod tests {
     use super::*;
 
-    fn received(addr: Vec<u8>, control: Vec<u8>) -> appine_hal::net::Received {
-        appine_hal::net::Received {
+    fn received(addr: Vec<u8>, control: Vec<u8>) -> kazeterm_hal::net::Received {
+        kazeterm_hal::net::Received {
             len: 0,
             addr,
             control,

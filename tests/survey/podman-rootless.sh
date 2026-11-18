@@ -3,7 +3,7 @@
 # no systemd (cgroupfs, file events), pasta and slirp4netns networking (which need a TUN device:
 # the default is the host network the Android app configures). Uses the podman store:
 # scripts/survey -s target/survey/podman podman-rootless. Native comparison:
-# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n appine-podman-native podman-rootless
+# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n kazeterm-podman-native podman-rootless
 exec 2>&1
 for p in podman crun shadow-uidmap passt slirp4netns libcap-utils; do
     apk info -e $p >/dev/null || apk add -q $p
@@ -17,8 +17,8 @@ mkdir -p /run/user/1000 && chown rl:rl /run/user/1000 && chmod 700 /run/user/100
 # podman's storage driver is vfs (written when missing, an overlay driver changed); the user has no
 # storage.conf of its own and takes the system's driver
 mkdir -p /etc/containers/containers.rootless.conf.d
-[ -e /etc/containers/containers.rootless.conf.d/appine.conf ] ||
-    printf '[containers]\nnetns = "host"\n' >/etc/containers/containers.rootless.conf.d/appine.conf
+[ -e /etc/containers/containers.rootless.conf.d/kazeterm.conf ] ||
+    printf '[containers]\nnetns = "host"\n' >/etc/containers/containers.rootless.conf.d/kazeterm.conf
 if [ -e /etc/containers/storage.conf ]; then
     sed -i 's/^driver = "overlay"/driver = "vfs"/' /etc/containers/storage.conf
 else

@@ -1,5 +1,5 @@
 /*
- * The end of file the host console sends when its input ends (appine-run --pty with stdin a pipe,
+ * The end of file the host console sends when its input ends (kazeterm-run --pty with stdin a pipe,
  * as util-linux's script does) must still be an end of file for a program that leaves canonical
  * mode before reading it, as a shell does when it returns to its line editor: the program reads
  * the VEOF character there, not the NUL Linux leaves for a VEOF typed in canonical mode. Reads the

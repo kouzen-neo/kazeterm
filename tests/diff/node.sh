@@ -41,11 +41,11 @@ for (const addr of [65533, 65536, 1 << 30, -4]) {
   }
 }
 
-console.log('sha256', crypto.createHash('sha256').update('appine').digest('hex'));
+console.log('sha256', crypto.createHash('sha256').update('kazeterm').digest('hex'));
 const key = Buffer.alloc(32, 7), iv = Buffer.alloc(16, 9);
 const c = crypto.createCipheriv('aes-256-cbc', key, iv);
 console.log('aes', Buffer.concat([c.update('hello world'), c.final()]).toString('hex'));
-const big = Buffer.from('appine '.repeat(10000));
+const big = Buffer.from('kazeterm '.repeat(10000));
 assert.deepStrictEqual(zlib.gunzipSync(zlib.gzipSync(big)), big);
 console.log('zlib', zlib.deflateSync(big, { level: 9 }).length);
 console.log('child', execFileSync('/bin/echo', ['from', 'a', 'child']).toString().trim());

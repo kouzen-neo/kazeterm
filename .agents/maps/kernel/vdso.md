@@ -44,7 +44,7 @@ validation stay `kernel/signal`.
   real data is then on the second).
 - The copy is used only if musl's lookup finds the four symbols with version `LINUX_2.6.39`,
   `__kernel_rt_sigreturn` is exactly `mov x8, #139; svc #0`, and each clock function is at least
-  12 bytes long. It is changed only where Appine's contract needs it: every other defined symbol is
+  12 bytes long. It is changed only where KazeTerm's contract needs it: every other defined symbol is
   made undefined (newer kernels' `__kernel_getrandom` reads vvar pages the guest does not get), and
   the `Linux` version note says 6.1.0. Its clock functions then run once in the interpreter, in a
   private address space with the vvar data mapped as in a guest, and every result must lie between
@@ -55,7 +55,7 @@ validation stay `kernel/signal`.
   one-page minimal real ELF shared object (`ET_DYN`, a loadable segment and a dynamic segment,
   `DT_HASH`, symbol versions with `LINUX_2.6.39`, soname `linux-vdso.so.1`), with
   `__kernel_rt_sigreturn` preceded by a `nop` and the clock functions as `mov x8, #nr; svc #0; ret`
-  stubs. With `APPINE_LOG=1` the reason the host's was not used is logged.
+  stubs. With `KAZETERM_LOG=1` the reason the host's was not used is logged.
 - Either is passed through `AT_SYSINFO_EHDR`. Each process maps a private anonymous copy (debuggers
   can set breakpoints in it); `MADV_DONTNEED` over it brings back the image (`kernel/mm`), as
   Linux's special mapping faults its pages back.

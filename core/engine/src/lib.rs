@@ -1,4 +1,4 @@
-//! Rust bindings for the Appine engine (implemented in C).
+//! Rust bindings for the KazeTerm engine (implemented in C).
 //!
 //! The engine executes guest instructions and the soft-MMU fast path (the engine and kernel/mmu
 //! maps). The kernel layer drives execution with [`Cpu::run`] and then handles syscalls,
@@ -50,13 +50,13 @@ struct ItlbEntry {
     addend: u64,
 }
 
-/// Maximum number of hardware breakpoints, and of watchpoints (C's `APPINE_HW_SLOTS`).
+/// Maximum number of hardware breakpoints, and of watchpoints (C's `KAZETERM_HW_SLOTS`).
 pub const HW_SLOTS: usize = 16;
 /// Watchpoint kinds: read and write (can be combined).
 pub const WATCH_LOAD: u32 = 1;
 pub const WATCH_STORE: u32 = 2;
 
-/// C's `struct appine_watch`.
+/// C's `struct kazeterm_watch`.
 #[repr(C)]
 #[derive(Clone, Copy, Default, PartialEq)]
 struct WatchSlot {
@@ -66,7 +66,7 @@ struct WatchSlot {
     reserved: u32,
 }
 
-/// Guest CPU state, mirroring C's `struct appine_cpu` field by field.
+/// Guest CPU state, mirroring C's `struct kazeterm_cpu` field by field.
 #[repr(C)]
 pub struct CpuState {
     /// General registers X0–X30.
@@ -144,7 +144,7 @@ impl CpuState {
         let n = self.nwatch as usize;
         // The tracer sets them again every time it resumes the thread; do not flush when unchanged
         if before.0 != self.nwatch || before.1[..n] != self.watch[..n] {
-            unsafe { appine_cpu_tlb_flush(self) }
+            unsafe { kazeterm_cpu_tlb_flush(self) }
         }
     }
 
@@ -156,26 +156,26 @@ impl CpuState {
 }
 
 unsafe extern "C" {
-    fn appine_mmu_new() -> *mut RawMmu;
-    fn appine_mmu_free(mmu: *mut RawMmu);
-    fn appine_mmu_map(mmu: *mut RawMmu, gva: u64, host: *mut c_void, len: u64, prot: u32) -> c_int;
-    fn appine_mmu_unmap(mmu: *mut RawMmu, gva: u64, len: u64) -> c_int;
-    fn appine_mmu_protect(mmu: *mut RawMmu, gva: u64, len: u64, prot: u32) -> c_int;
-    fn appine_mmu_fill(mmu: *mut RawMmu, gva: u64, host: *mut c_void, len: u64, prot: u32)
+    fn kazeterm_mmu_new() -> *mut RawMmu;
+    fn kazeterm_mmu_free(mmu: *mut RawMmu);
+    fn kazeterm_mmu_map(mmu: *mut RawMmu, gva: u64, host: *mut c_void, len: u64, prot: u32) -> c_int;
+    fn kazeterm_mmu_unmap(mmu: *mut RawMmu, gva: u64, len: u64) -> c_int;
+    fn kazeterm_mmu_protect(mmu: *mut RawMmu, gva: u64, len: u64, prot: u32) -> c_int;
+    fn kazeterm_mmu_fill(mmu: *mut RawMmu, gva: u64, host: *mut c_void, len: u64, prot: u32)
     -> c_int;
-    fn appine_mmu_move(mmu: *mut RawMmu, from: u64, to: u64, len: u64) -> c_int;
-    fn appine_mmu_next_present(mmu: *const RawMmu, gva: u64, end: u64) -> u64;
-    fn appine_mmu_translate(mmu: *const RawMmu, gva: u64, required_prot: u32) -> *mut c_void;
+    fn kazeterm_mmu_move(mmu: *mut RawMmu, from: u64, to: u64, len: u64) -> c_int;
+    fn kazeterm_mmu_next_present(mmu: *const RawMmu, gva: u64, end: u64) -> u64;
+    fn kazeterm_mmu_translate(mmu: *const RawMmu, gva: u64, required_prot: u32) -> *mut c_void;
 
-    fn appine_cpu_new(mmu: *mut RawMmu) -> *mut CpuState;
-    fn appine_cpu_free(cpu: *mut CpuState);
-    fn appine_cpu_init(cpu: *mut CpuState, mmu: *mut RawMmu);
-    fn appine_cpu_tlb_flush(cpu: *mut CpuState);
-    fn appine_cpu_run(cpu: *mut CpuState) -> c_int;
-    fn appine_cpu_exec_insn(cpu: *mut CpuState, insn: u32) -> c_int;
-    fn appine_cpu_step(cpu: *mut CpuState) -> c_int;
-    fn appine_cpu_kick(cpu: *mut CpuState);
-    fn appine_cpu_layout_check(
+    fn kazeterm_cpu_new(mmu: *mut RawMmu) -> *mut CpuState;
+    fn kazeterm_cpu_free(cpu: *mut CpuState);
+    fn kazeterm_cpu_init(cpu: *mut CpuState, mmu: *mut RawMmu);
+    fn kazeterm_cpu_tlb_flush(cpu: *mut CpuState);
+    fn kazeterm_cpu_run(cpu: *mut CpuState) -> c_int;
+    fn kazeterm_cpu_exec_insn(cpu: *mut CpuState, insn: u32) -> c_int;
+    fn kazeterm_cpu_step(cpu: *mut CpuState) -> c_int;
+    fn kazeterm_cpu_kick(cpu: *mut CpuState);
+    fn kazeterm_cpu_layout_check(
         size: usize,
         off_x: usize,
         off_pc: usize,
@@ -187,30 +187,30 @@ unsafe extern "C" {
         off_v: usize,
     ) -> c_int;
 
-    fn appine_fault_guard_install();
-    fn appine_host_fault_last(out: *mut RawHostFault);
+    fn kazeterm_fault_guard_install();
+    fn kazeterm_host_fault_last(out: *mut RawHostFault);
 
-    fn appine_guest_hwcap() -> u64;
-    fn appine_guest_hwcap2() -> u64;
-    fn appine_guest_midr() -> u64;
+    fn kazeterm_guest_hwcap() -> u64;
+    fn kazeterm_guest_hwcap2() -> u64;
+    fn kazeterm_guest_midr() -> u64;
 
-    fn appine_dbt_new(key: u64, regs: DbtRegs) -> *mut RawDbt;
-    fn appine_dbt_trim();
-    fn appine_dbt_unmap_written();
-    fn appine_dbt_written_bytes() -> u64;
-    fn appine_dbt_free(dbt: *mut RawDbt, key: u64);
-    fn appine_dbt_set_sources(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
-    fn appine_dbt_trust(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
-    fn appine_dbt_retire_outside(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
-    fn appine_dbt_share(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
-    fn appine_dbt_new_tag(dbt: *mut RawDbt) -> c_uint;
-    fn appine_dbt_attach(dbt: *mut RawDbt, tag: c_uint) -> *mut RawDbtThread;
-    fn appine_dbt_detach(t: *mut RawDbtThread);
-    fn appine_dbt_flush(t: *mut RawDbtThread);
-    fn appine_dbt_recheck(t: *mut RawDbtThread);
-    fn appine_dbt_invalidate(t: *mut RawDbtThread, cpu: *const CpuState, start: u64, len: u64);
-    fn appine_dbt_run(t: *mut RawDbtThread, cpu: *mut CpuState) -> c_int;
-    fn appine_dbt_get_stats(t: *const RawDbtThread, out: *mut DbtStats);
+    fn kazeterm_dbt_new(key: u64, regs: DbtRegs) -> *mut RawDbt;
+    fn kazeterm_dbt_trim();
+    fn kazeterm_dbt_unmap_written();
+    fn kazeterm_dbt_written_bytes() -> u64;
+    fn kazeterm_dbt_free(dbt: *mut RawDbt, key: u64);
+    fn kazeterm_dbt_set_sources(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
+    fn kazeterm_dbt_trust(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
+    fn kazeterm_dbt_retire_outside(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
+    fn kazeterm_dbt_share(dbt: *mut RawDbt, s: *const DbtSource, n: usize);
+    fn kazeterm_dbt_new_tag(dbt: *mut RawDbt) -> c_uint;
+    fn kazeterm_dbt_attach(dbt: *mut RawDbt, tag: c_uint) -> *mut RawDbtThread;
+    fn kazeterm_dbt_detach(t: *mut RawDbtThread);
+    fn kazeterm_dbt_flush(t: *mut RawDbtThread);
+    fn kazeterm_dbt_recheck(t: *mut RawDbtThread);
+    fn kazeterm_dbt_invalidate(t: *mut RawDbtThread, cpu: *const CpuState, start: u64, len: u64);
+    fn kazeterm_dbt_run(t: *mut RawDbtThread, cpu: *mut CpuState) -> c_int;
+    fn kazeterm_dbt_get_stats(t: *const RawDbtThread, out: *mut DbtStats);
 }
 
 #[repr(C)]
@@ -263,9 +263,9 @@ pub struct Mmu {
 impl Mmu {
     /// Creates an empty page table.
     pub fn new() -> Self {
-        let raw = unsafe { appine_mmu_new() };
+        let raw = unsafe { kazeterm_mmu_new() };
         Mmu {
-            raw: NonNull::new(raw).expect("appine_mmu_new: out of memory"),
+            raw: NonNull::new(raw).expect("kazeterm_mmu_new: out of memory"),
         }
     }
 
@@ -283,25 +283,25 @@ impl Mmu {
         prot: u32,
     ) -> Result<(), MapError> {
         map_result(unsafe {
-            appine_mmu_map(self.raw.as_ptr(), gva, host.as_ptr().cast(), len, prot)
+            kazeterm_mmu_map(self.raw.as_ptr(), gva, host.as_ptr().cast(), len, prot)
         })
     }
 
     /// Unmaps `[gva, gva + len)`.
     pub fn unmap(&mut self, gva: u64, len: u64) -> Result<(), MapError> {
-        map_result(unsafe { appine_mmu_unmap(self.raw.as_ptr(), gva, len) })
+        map_result(unsafe { kazeterm_mmu_unmap(self.raw.as_ptr(), gva, len) })
     }
 
     /// Changes the permissions of existing entries, possibly to 0 (the host page is kept but
     /// cannot be accessed); pages without entries are unchanged.
     pub fn protect(&mut self, gva: u64, len: u64, prot: u32) -> Result<(), MapError> {
-        map_result(unsafe { appine_mmu_protect(self.raw.as_ptr(), gva, len, prot) })
+        map_result(unsafe { kazeterm_mmu_protect(self.raw.as_ptr(), gva, len, prot) })
     }
 
     /// Moves the existing entries in `[from, from + len)` unchanged to the same positions starting
     /// at `to`, clearing the originals; the two ranges must not overlap.
     pub fn move_entries(&mut self, from: u64, to: u64, len: u64) -> Result<(), MapError> {
-        map_result(unsafe { appine_mmu_move(self.raw.as_ptr(), from, to, len) })
+        map_result(unsafe { kazeterm_mmu_move(self.raw.as_ptr(), from, to, len) })
     }
 
     /// Same as [`Mmu::map_shared`], but pages with existing entries (including ones with
@@ -319,7 +319,7 @@ impl Mmu {
         prot: u32,
     ) -> Result<(), MapError> {
         map_result(unsafe {
-            appine_mmu_fill(self.raw.as_ptr(), gva, host.as_ptr().cast(), len, prot)
+            kazeterm_mmu_fill(self.raw.as_ptr(), gva, host.as_ptr().cast(), len, prot)
         })
     }
 
@@ -327,7 +327,7 @@ impl Mmu {
     /// there is none. Spans without tables are skipped whole, so it is fast even when only a few
     /// pages of a multi-TB mapping were touched.
     pub fn next_present(&self, gva: u64, end: u64) -> u64 {
-        unsafe { appine_mmu_next_present(self.raw.as_ptr(), gva, end) }
+        unsafe { kazeterm_mmu_next_present(self.raw.as_ptr(), gva, end) }
     }
 
     /// Same as [`Mmu::map`], but needs only `&self`: during copy-on-write the kernel layer modifies
@@ -346,20 +346,20 @@ impl Mmu {
         prot: u32,
     ) -> Result<(), MapError> {
         map_result(unsafe {
-            appine_mmu_map(self.raw.as_ptr(), gva, host.as_ptr().cast(), len, prot)
+            kazeterm_mmu_map(self.raw.as_ptr(), gva, host.as_ptr().cast(), len, prot)
         })
     }
 
     /// Same as [`Mmu::protect`], but needs only `&self` (see [`Mmu::map_shared`]).
     pub fn protect_shared(&self, gva: u64, len: u64, prot: u32) -> Result<(), MapError> {
-        map_result(unsafe { appine_mmu_protect(self.raw.as_ptr(), gva, len, prot) })
+        map_result(unsafe { kazeterm_mmu_protect(self.raw.as_ptr(), gva, len, prot) })
     }
 
     /// Looks up the host pointer for a guest address; every permission in `required_prot` must be
     /// present, and passing 0 only requires an accessible entry (ones with permission 0 do not
     /// count).
     pub fn translate(&self, gva: u64, required_prot: u32) -> Option<NonNull<u8>> {
-        NonNull::new(unsafe { appine_mmu_translate(self.raw.as_ptr(), gva, required_prot) }.cast())
+        NonNull::new(unsafe { kazeterm_mmu_translate(self.raw.as_ptr(), gva, required_prot) }.cast())
     }
 }
 
@@ -371,7 +371,7 @@ impl Default for Mmu {
 
 impl Drop for Mmu {
     fn drop(&mut self) {
-        unsafe { appine_mmu_free(self.raw.as_ptr()) }
+        unsafe { kazeterm_mmu_free(self.raw.as_ptr()) }
     }
 }
 
@@ -471,7 +471,7 @@ pub enum Exit {
 /// `Mmu` outlives the `Cpu`; after changing the `Mmu`'s mappings, [`Cpu::tlb_flush`] must be
 /// called.
 pub struct Cpu {
-    /// Allocated (mmap) by `appine_cpu_new`, released on `Drop`.
+    /// Allocated (mmap) by `kazeterm_cpu_new`, released on `Drop`.
     state: NonNull<CpuState>,
 }
 
@@ -488,7 +488,7 @@ impl Cpu {
     /// `mmu` must outlive the returned `Cpu`.
     pub unsafe fn new(mmu: &Mmu) -> Self {
         let state =
-            NonNull::new(unsafe { appine_cpu_new(mmu.raw.as_ptr()) }).unwrap_or_else(|| {
+            NonNull::new(unsafe { kazeterm_cpu_new(mmu.raw.as_ptr()) }).unwrap_or_else(|| {
                 std::alloc::handle_alloc_error(std::alloc::Layout::new::<CpuState>())
             });
         Cpu { state }
@@ -501,22 +501,22 @@ impl Cpu {
 
     /// Executes from the current pc until the kernel layer is needed.
     pub fn run(&mut self) -> Exit {
-        let rc = unsafe { appine_cpu_run(self.state.as_ptr()) };
+        let rc = unsafe { kazeterm_cpu_run(self.state.as_ptr()) };
         self.decode_exit(rc)
-            .expect("appine_cpu_run returned EXIT_NONE")
+            .expect("kazeterm_cpu_run returned EXIT_NONE")
     }
 
     /// Executes the given instruction at the current pc (without fetching). Returns `None` when
     /// it completes normally.
     pub fn exec_insn(&mut self, insn: u32) -> Option<Exit> {
-        let rc = unsafe { appine_cpu_exec_insn(self.state.as_ptr(), insn) };
+        let rc = unsafe { kazeterm_cpu_exec_insn(self.state.as_ptr(), insn) };
         self.decode_exit(rc)
     }
 
     /// Executes the instruction at pc under the interpreter (ptrace single-step), ignoring kicks.
     /// Returns `None` when it completes normally.
     pub fn step(&mut self) -> Option<Exit> {
-        let rc = unsafe { appine_cpu_step(self.state.as_ptr()) };
+        let rc = unsafe { kazeterm_cpu_step(self.state.as_ptr()) };
         self.decode_exit(rc)
     }
 
@@ -550,7 +550,7 @@ impl Cpu {
             6 => Exit::InvalidateCode { addr: s.fault_addr },
             7 => {
                 let mut f = RawHostFault::default();
-                unsafe { appine_host_fault_last(&mut f) };
+                unsafe { kazeterm_host_fault_last(&mut f) };
                 Exit::HostFault {
                     signal: f.signo,
                     code: f.code,
@@ -558,7 +558,7 @@ impl Cpu {
                     pc: f.pc,
                 }
             }
-            _ => panic!("unknown appine_exit {rc}"),
+            _ => panic!("unknown kazeterm_exit {rc}"),
         })
     }
 
@@ -572,12 +572,12 @@ impl Cpu {
             return None;
         }
         // SAFETY: the bound mmu outlives the Cpu (Cpu::new, Cpu::reset)
-        NonNull::new(unsafe { appine_mmu_translate(mmu, gva, required_prot) }.cast())
+        NonNull::new(unsafe { kazeterm_mmu_translate(mmu, gva, required_prot) }.cast())
     }
 
     /// Invalidates the whole software TLB.
     pub fn tlb_flush(&mut self) {
-        unsafe { appine_cpu_tlb_flush(self.state.as_ptr()) }
+        unsafe { kazeterm_cpu_tlb_flush(self.state.as_ptr()) }
     }
 
     /// Clears all state and rebinds to `mmu` (used by execve); the [`Kicker`] stays valid.
@@ -586,7 +586,7 @@ impl Cpu {
     ///
     /// `mmu` must outlive this `Cpu`.
     pub unsafe fn reset(&mut self, mmu: &Mmu) {
-        unsafe { appine_cpu_init(self.state.as_ptr(), mmu.raw.as_ptr()) }
+        unsafe { kazeterm_cpu_init(self.state.as_ptr(), mmu.raw.as_ptr()) }
     }
 
     /// Guest registers.
@@ -604,7 +604,7 @@ impl Cpu {
 
 impl Drop for Cpu {
     fn drop(&mut self) {
-        unsafe { appine_cpu_free(self.state.as_ptr()) }
+        unsafe { kazeterm_cpu_free(self.state.as_ptr()) }
     }
 }
 
@@ -624,7 +624,7 @@ impl Kicker {
     ///
     /// The Cpu that created this handle must still be alive.
     pub unsafe fn kick(&self) {
-        unsafe { appine_cpu_kick(self.0.as_ptr()) }
+        unsafe { kazeterm_cpu_kick(self.0.as_ptr()) }
     }
 }
 
@@ -705,7 +705,7 @@ pub struct DbtSpace {
     key: u64,
 }
 
-// SAFETY: the C side protects the shared parts with its own lock (dbt.c's struct appine_dbt)
+// SAFETY: the C side protects the shared parts with its own lock (dbt.c's struct kazeterm_dbt)
 unsafe impl Send for DbtSpace {}
 unsafe impl Sync for DbtSpace {}
 
@@ -718,7 +718,7 @@ impl DbtSpace {
     /// translations left with the same key and the same `regs`, those are taken back first, and
     /// the instance is also recorded under it when it goes back to the pool.
     pub fn new(key: u64, regs: DbtRegs) -> Option<Arc<Self>> {
-        NonNull::new(unsafe { appine_dbt_new(key, regs) })
+        NonNull::new(unsafe { kazeterm_dbt_new(key, regs) })
             .map(|raw| Arc::new(DbtSpace { raw, key }))
     }
 
@@ -726,13 +726,13 @@ impl DbtSpace {
     /// mappings of the new address space that are exactly the same as the recorded ones
     /// ([`Self::set_sources`]) need not be checked block by block.
     pub fn trust(&self, sources: &[DbtSource]) {
-        unsafe { appine_dbt_trust(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
+        unsafe { kazeterm_dbt_trust(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
     }
 
     /// Allocates a tag for one address space sharing this instance (not repeated until the
     /// instance goes back to the pool); returns `None` when they run out (60-some thousand).
     pub fn new_tag(&self) -> Option<u16> {
-        match unsafe { appine_dbt_new_tag(self.raw.as_ptr()) } {
+        match unsafe { kazeterm_dbt_new_tag(self.raw.as_ptr()) } {
             0 => None,
             tag => Some(tag as u16),
         }
@@ -743,7 +743,7 @@ impl DbtSpace {
     /// address spaces share it, drops the translations valid only for the original address
     /// space. Other threads may be running.
     pub fn retire_outside(&self, sources: &[DbtSource]) {
-        unsafe { appine_dbt_retire_outside(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
+        unsafe { kazeterm_dbt_retire_outside(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
     }
 
     /// When several address spaces share this instance, the trusted file mappings they all map
@@ -751,21 +751,21 @@ impl DbtSpace {
     /// shared by all address spaces, and blocks elsewhere (JIT-generated code) are only for the
     /// address space that translated them, told apart by the tag given at [`Dbt::attach`].
     pub fn share(&self, sources: &[DbtSource]) {
-        unsafe { appine_dbt_share(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
+        unsafe { kazeterm_dbt_share(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
     }
 
     /// The address space is no longer in use (the translations go back to the pool): records the
     /// mappings the translations come from, at most [`Self::SOURCES`] ranges. The caller
     /// guarantees that mappings with the same identity have the same content.
     pub fn set_sources(&self, sources: &[DbtSource]) {
-        unsafe { appine_dbt_set_sources(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
+        unsafe { kazeterm_dbt_set_sources(self.raw.as_ptr(), sources.as_ptr(), sources.len()) }
     }
 }
 
 impl Drop for DbtSpace {
     fn drop(&mut self) {
         // Every attached Dbt holds an Arc, so by the time we get here they are all detached
-        unsafe { appine_dbt_free(self.raw.as_ptr(), self.key) }
+        unsafe { kazeterm_dbt_free(self.raw.as_ptr(), self.key) }
     }
 }
 
@@ -803,7 +803,7 @@ impl Dbt {
     /// Attaches to `space`. `tag` is the tag of the thread's address space
     /// ([`DbtSpace::new_tag`]), 0 when the instance is not shared by several address spaces.
     pub fn attach(space: &Arc<DbtSpace>, tag: u16) -> Option<Self> {
-        NonNull::new(unsafe { appine_dbt_attach(space.raw.as_ptr(), tag.into()) }).map(|raw| Dbt {
+        NonNull::new(unsafe { kazeterm_dbt_attach(space.raw.as_ptr(), tag.into()) }).map(|raw| Dbt {
             raw,
             space: space.clone(),
         })
@@ -811,15 +811,15 @@ impl Dbt {
 
     /// Same semantics as [`Cpu::run`], but executes in translated code.
     pub fn run(&mut self, cpu: &mut Cpu) -> Exit {
-        let rc = unsafe { appine_dbt_run(self.raw.as_ptr(), cpu.state.as_ptr()) };
+        let rc = unsafe { kazeterm_dbt_run(self.raw.as_ptr(), cpu.state.as_ptr()) };
         cpu.decode_exit(rc)
-            .expect("appine_dbt_run returned EXIT_NONE")
+            .expect("kazeterm_dbt_run returned EXIT_NONE")
     }
 
     /// Discards all translations: this has to wait until every thread has left translated code,
     /// and is completed by the next [`Dbt::run`].
     pub fn flush(&mut self) {
-        unsafe { appine_dbt_flush(self.raw.as_ptr()) }
+        unsafe { kazeterm_dbt_flush(self.raw.as_ptr()) }
     }
 
     /// About to run in a different address space (after exec): keeps the translations and,
@@ -827,7 +827,7 @@ impl Dbt {
     /// ones that do not match, and clearing everything when most do not match. Cheaper than
     /// copying the translation templates again after [`Dbt::flush`].
     pub fn recheck(&mut self) {
-        unsafe { appine_dbt_recheck(self.raw.as_ptr()) }
+        unsafe { kazeterm_dbt_recheck(self.raw.as_ptr()) }
     }
 
     /// Invalidates, among the blocks starting in the pages covered by `[start, start + len)`,
@@ -835,7 +835,7 @@ impl Dbt {
     /// (a translation depends only on the pc and the instruction words); when there is no room,
     /// it is the same as [`Dbt::flush`].
     pub fn invalidate(&mut self, cpu: &Cpu, start: u64, len: u64) {
-        unsafe { appine_dbt_invalidate(self.raw.as_ptr(), cpu.state.as_ptr(), start, len) }
+        unsafe { kazeterm_dbt_invalidate(self.raw.as_ptr(), cpu.state.as_ptr(), start, len) }
     }
 
     /// The attached instance.
@@ -847,14 +847,14 @@ impl Dbt {
     /// invalidations it did.
     pub fn stats(&self) -> DbtStats {
         let mut stats = DbtStats::default();
-        unsafe { appine_dbt_get_stats(self.raw.as_ptr(), &mut stats) };
+        unsafe { kazeterm_dbt_get_stats(self.raw.as_ptr(), &mut stats) };
         stats
     }
 }
 
 impl Drop for Dbt {
     fn drop(&mut self) {
-        unsafe { appine_dbt_detach(self.raw.as_ptr()) }
+        unsafe { kazeterm_dbt_detach(self.raw.as_ptr()) }
     }
 }
 
@@ -862,7 +862,7 @@ impl Drop for Dbt {
 /// dropped when host memory is tight (Android's `onTrimMemory`), and the next run of the same
 /// program copies the templates again.
 pub fn trim_dbt_pool() {
-    unsafe { appine_dbt_trim() }
+    unsafe { kazeterm_dbt_trim() }
 }
 
 /// Unmaps the pages of Tier 1's code cache that were written through the writable view (content
@@ -870,13 +870,13 @@ pub fn trim_dbt_pool() {
 /// pages touched through both views count twice; writing again later only faults them back in.
 /// Must be called periodically: the kernel layer's timer thread does it once a second.
 pub fn unmap_written_code() {
-    unsafe { appine_dbt_unmap_written() }
+    unsafe { kazeterm_dbt_unmap_written() }
 }
 
 /// How many bytes in total were written through the writable view and not yet unmapped
 /// ([`unmap_written_code`]): they count twice in the host's RSS.
 pub fn written_code_bytes() -> u64 {
-    unsafe { appine_dbt_written_bytes() }
+    unsafe { kazeterm_dbt_written_bytes() }
 }
 
 // ---- Process-wide ----
@@ -887,24 +887,24 @@ pub fn written_code_bytes() -> u64 {
 /// other faults first write a one-line report to stderr and are then passed to the original
 /// handling (on Android, debuggerd produces a tombstone from it).
 pub fn install_fault_guard() {
-    unsafe { appine_fault_guard_install() }
+    unsafe { kazeterm_fault_guard_install() }
 }
 
 /// The `AT_HWCAP` advertised to the guest: host support ∩ implemented by Tier 0 ∩ the whitelist
 /// (the engine map).
 pub fn guest_hwcap() -> u64 {
-    unsafe { appine_guest_hwcap() }
+    unsafe { kazeterm_guest_hwcap() }
 }
 
 /// The `AT_HWCAP2` advertised to the guest, by the same rule as [`guest_hwcap`].
 pub fn guest_hwcap2() -> u64 {
-    unsafe { appine_guest_hwcap2() }
+    unsafe { kazeterm_guest_hwcap2() }
 }
 
 /// The `MIDR_EL1` the guest reads (used by `/proc/cpuinfo`); 0 when the host does not allow
 /// reading ID registers.
 pub fn guest_midr() -> u64 {
-    unsafe { appine_guest_midr() }
+    unsafe { kazeterm_guest_midr() }
 }
 
 /// HWCAP bits, with the same values as Linux's `HWCAP_*`.
@@ -976,7 +976,7 @@ pub mod hwcap2 {
 /// Checks whether [`CpuState`]'s layout matches the C struct.
 pub fn layout_matches() -> bool {
     unsafe {
-        appine_cpu_layout_check(
+        kazeterm_cpu_layout_check(
             size_of::<CpuState>(),
             offset_of!(CpuState, x),
             offset_of!(CpuState, pc),
@@ -1008,9 +1008,9 @@ mod tests {
     ))]
     fn failed_internal_checks_end_only_the_run() {
         unsafe extern "C" {
-            fn appine_guard_selftest() -> i32;
+            fn kazeterm_guard_selftest() -> i32;
         }
         super::install_fault_guard();
-        assert_eq!(unsafe { appine_guard_selftest() }, libc::SIGABRT);
+        assert_eq!(unsafe { kazeterm_guard_selftest() }, libc::SIGABRT);
     }
 }

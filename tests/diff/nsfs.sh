@@ -250,14 +250,14 @@ busybox nsenter --net=/tmp/nsfs/run/bbnet true; echo "after umount: $?"
 # iproute2's ip netns: add bind-mounts a network namespace created by unshare under
 # /var/run/netns (the native side's image has no /var or /run)
 [ -e /var/run ] || { mkdir -p /var /run && ln -s ../run /var/run; }
-ip netns add appine-a
+ip netns add kazeterm-a
 ip netns list
-ip netns exec appine-a ip -o link show | cut -d: -f2 | cut -d' ' -f2
-ip netns exec appine-a sh -c 'ip link set lo up && ip -4 -o addr show lo | cut -d" " -f2,7'
-ip netns exec appine-a ip -o link show lo | grep -o 'state [A-Z]*'
-ip -n appine-a -o link show | wc -l
+ip netns exec kazeterm-a ip -o link show | cut -d: -f2 | cut -d' ' -f2
+ip netns exec kazeterm-a sh -c 'ip link set lo up && ip -4 -o addr show lo | cut -d" " -f2,7'
+ip netns exec kazeterm-a ip -o link show lo | grep -o 'state [A-Z]*'
+ip -n kazeterm-a -o link show | wc -l
 ip netns identify $$ | wc -c
-ip netns exec appine-a sh -c 'ip netns identify $$'
-ip netns delete appine-a
+ip netns exec kazeterm-a sh -c 'ip netns identify $$'
+ip netns delete kazeterm-a
 ip netns list | wc -l
-ip netns exec appine-a true 2>&1 | sed 's/: .*$//'
+ip netns exec kazeterm-a true 2>&1 | sed 's/: .*$//'

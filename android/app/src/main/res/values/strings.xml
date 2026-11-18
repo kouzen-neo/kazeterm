@@ -4,7 +4,7 @@
 <resources>
 
     <!-- Application and common actions -->
-    <string name="app_name" translatable="false">Appine</string>
+    <string name="app_name" translatable="false">KazeTerm</string>
     <string name="navigate_up">Back</string>
     <string name="close">Close</string>
     <string name="allow">Allow</string>
@@ -47,7 +47,7 @@
     <string name="reset_terminal">Reset terminal</string>
     <string name="keep_screen_on">Keep screen on</string>
     <string name="modifier_locked">%1$s locked</string>
-    <string name="tmux_control_detached">tmux control mode (tmux -CC) cannot be shown here, so Appine detached it; its session goes on, and tmux attach brings it back.</string>
+    <string name="tmux_control_detached">tmux control mode (tmux -CC) cannot be shown here, so KazeTerm detached it; its session goes on, and tmux attach brings it back.</string>
 
     <string name="tab_number">Tab %1$d</string>
     <string name="tab_description">Tab %1$d: %2$s</string>
@@ -78,7 +78,7 @@
     <!-- Links -->
     <string name="open_link">Open link</string>
     <string name="link_no_app">No app can open this link</string>
-    <string name="link_remote_file">This file is on %1$s, not in Appine</string>
+    <string name="link_remote_file">This file is on %1$s, not in KazeTerm</string>
     <string name="link_hidden_file">File access is disabled. Enable in Settings: \"Allow other apps to access files\"</string>
     <string name="link_missing_file">Cannot find this file</string>
 
@@ -153,16 +153,16 @@
     <!-- Privacy mode -->
     <string name="settings_privacy">Privacy mode</string>
     <string name="privacy_summary">Require unlock on return</string>
-    <string name="privacy_enable_message">Require biometrics or your screen lock to open Appine. Screenshots and notification details will be hidden, and other apps will lose file access. Background programs will keep running.</string>
+    <string name="privacy_enable_message">Require biometrics or your screen lock to open KazeTerm. Screenshots and notification details will be hidden, and other apps will lose file access. Background programs will keep running.</string>
     <string name="privacy_file_access">Unavailable while privacy mode is on</string>
 
-    <string name="privacy_locked">Appine is locked</string>
+    <string name="privacy_locked">KazeTerm is locked</string>
     <string name="privacy_unlock">Unlock</string>
-    <string name="privacy_leave">Leave Appine</string>
+    <string name="privacy_leave">Leave KazeTerm</string>
     <string name="privacy_authenticate">Use biometrics or your screen lock</string>
     <string name="privacy_unavailable">Authentication is unavailable. Set up a screen lock in Android settings, or try again later.</string>
 
-    <string name="privacy_notification">Unlock Appine to view the terminal</string>
+    <string name="privacy_notification">Unlock KazeTerm to view the terminal</string>
 
     <!-- File access and document roots -->
     <string name="settings_file_access">Allow other apps to access files</string>
@@ -258,7 +258,7 @@
 
     <string name="channel_network">Network services</string>
     <string name="listening_title">%1$s is listening on port %2$d</string>
-    <string name="listening_mapped">Other devices connect to port %1$d: apps cannot use port %2$d on this phone, so Appine moved it there.</string>
+    <string name="listening_mapped">Other devices connect to port %1$d: apps cannot use port %2$d on this phone, so KazeTerm moved it there.</string>
     <string name="listening_direct">Other devices on the network can connect to it</string>
 
     <string name="channel_problems">Processes and services</string>
@@ -270,24 +270,24 @@
     <string name="ended_resources">The previous session ended because Android stopped the app for using too many resources in the background</string>
     <string name="ended_user">The previous session ended because the app was force-stopped</string>
     <string name="ended_updated">The previous session ended because the app was updated</string>
-    <string name="ended_crash">The previous session ended because Appine crashed, a bug in Appine</string>
-    <string name="ended_anr">The previous session ended because Appine stopped responding, a bug in Appine</string>
+    <string name="ended_crash">The previous session ended because KazeTerm crashed, a bug in KazeTerm</string>
+    <string name="ended_anr">The previous session ended because KazeTerm stopped responding, a bug in KazeTerm</string>
 
     <!-- Problem reports -->
-    <string name="crashed_title">Appine crashed</string>
-    <string name="crashed_text">The previous session ended at %1$s because Appine crashed. This is a bug in Appine; copy the report to include it in your feedback.</string>
-    <string name="anr_title">Appine stopped responding</string>
-    <string name="anr_text">The previous session ended at %1$s because Appine stopped responding. This is a bug in Appine; copy the report to include it in your feedback.</string>
+    <string name="crashed_title">KazeTerm crashed</string>
+    <string name="crashed_text">The previous session ended at %1$s because KazeTerm crashed. This is a bug in KazeTerm; copy the report to include it in your feedback.</string>
+    <string name="anr_title">KazeTerm stopped responding</string>
+    <string name="anr_text">The previous session ended at %1$s because KazeTerm stopped responding. This is a bug in KazeTerm; copy the report to include it in your feedback.</string>
 
     <string name="killed_title">%1$s was killed</string>
     <string name="killed_oom_app">%1$s (pid %2$d) was killed: the app\'s memory reached its limit (%3$s of %4$s), and the out-of-memory killer chose it.</string>
     <string name="killed_oom_cgroup">%1$s (pid %2$d) was killed: cgroup %3$s reached its memory.max (%4$s of %5$s).</string>
-    <string name="killed_bug">%1$s (pid %2$d) was ended by an internal error in Appine. This is a bug in Appine; copy the report from the notification, or see it with dmesg.</string>
+    <string name="killed_bug">%1$s (pid %2$d) was ended by an internal error in KazeTerm. This is a bug in KazeTerm; copy the report from the notification, or see it with dmesg.</string>
 
-    <string name="stall_title">Appine\'s kernel is stuck</string>
-    <string name="stall_text">One operation in Appine\'s kernel has been running for %1$d s, and every program waits for it to finish. This is a bug in Appine; copy the report to include it in your feedback.</string>
-    <string name="stall_ended_title">Appine\'s kernel was stuck</string>
-    <string name="stall_ended_text">One operation in Appine\'s kernel ran for %1$d s, and every program waited for it to finish. This is a bug in Appine; copy the report to include it in your feedback.</string>
+    <string name="stall_title">KazeTerm\'s kernel is stuck</string>
+    <string name="stall_text">One operation in KazeTerm\'s kernel has been running for %1$d s, and every program waits for it to finish. This is a bug in KazeTerm; copy the report to include it in your feedback.</string>
+    <string name="stall_ended_title">KazeTerm\'s kernel was stuck</string>
+    <string name="stall_ended_text">One operation in KazeTerm\'s kernel ran for %1$d s, and every program waited for it to finish. This is a bug in KazeTerm; copy the report to include it in your feedback.</string>
 
     <plurals name="boot_failed_title">
         <item quantity="one">%d service did not start</item>

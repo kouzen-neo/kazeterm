@@ -1,16 +1,16 @@
-# Written by Appine beside /etc/profile.d/appine.sh, which reads this file, and replaced together
+# Written by KazeTerm beside /etc/profile.d/kazeterm.sh, which reads this file, and replaced together
 # with it.
 #
-# bash's shell integration marks (OSC 133, see appine.sh). A login bash reads this file through the
-# profile, and on Alpine every interactive bash also through /etc/bash/appine.sh, which Alpine's
+# bash's shell integration marks (OSC 133, see kazeterm.sh). A login bash reads this file through the
+# profile, and on Alpine every interactive bash also through /etc/bash/kazeterm.sh, which Alpine's
 # /etc/bash/bashrc reads, so a nested bash (bash, su without -l) is marked too, with its own
 # prompt. Reading it again changes nothing.
 if [ -n "${BASH_VERSION-}" ]; then
     # PS0 runs once per submitted command, before its redirections or pipelines. History can
     # exclude commands (or be disabled); never use an older entry as the current title.
-    __appine_preexec() {
+    __kazeterm_preexec() {
         local command=bash
-        if [[ -o history && $HISTCMD -gt ${__appine_history_id:-$HISTCMD} ]]; then
+        if [[ -o history && $HISTCMD -gt ${__kazeterm_history_id:-$HISTCMD} ]]; then
             command=$(HISTTIMEFORMAT= builtin history 1)
             command=${command#*[0-9][* ] }
         fi
@@ -21,7 +21,7 @@ if [ -n "${BASH_VERSION-}" ]; then
     # the arrows); the marks around PS1 (P, B: the input starts) and PS2, and the start of the
     # output (C, from PS0), are added again whenever something replaced them, so a PS1 that
     # ~/.bashrc or anything later sets is marked from the next prompt on
-    __appine_prompt() {
+    __kazeterm_prompt() {
         local status=$?
         printf '\033]133;D;%s\007\033]133;A;redraw=last;cl=line\007' "$status"
         # Restore the directory after a program's title, without letting path controls end OSC.
@@ -29,12 +29,12 @@ if [ -n "${BASH_VERSION-}" ]; then
         case $PS1 in *'133;B'*) ;; *) PS1='\[\e]133;P;k=i\a\]'$PS1'\[\e]133;B\a\]' ;; esac
         case ${PS2-} in *'133;B'*) ;; *) PS2='\[\e]133;P;k=s\a\]'${PS2-}'\[\e]133;B\a\]' ;; esac
         case ${PS0-} in *'133;C'*) ;; *) PS0=${PS0-}'\e]133;C\a' ;; esac
-        case ${PS0-} in *'__appine_preexec'*) ;; *) PS0=${PS0-}'$(__appine_preexec)' ;; esac
-        __appine_history_id=$HISTCMD
+        case ${PS0-} in *'__kazeterm_preexec'*) ;; *) PS0=${PS0-}'$(__kazeterm_preexec)' ;; esac
+        __kazeterm_history_id=$HISTCMD
         return "$status"
     }
     case ${PROMPT_COMMAND-} in
-    *__appine_prompt*) ;;
-    *) PROMPT_COMMAND="__appine_prompt${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    *__kazeterm_prompt*) ;;
+    *) PROMPT_COMMAND="__kazeterm_prompt${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
     esac
 fi

@@ -324,7 +324,7 @@ capabilities (`kernel/cred`).
 - `kernel/cgroup`: `bpf::check_device`, cgroup mkdir/rmdir.
 - Credentials (`permission`, `owns`, `capable_wrt`, `new_owner`, `for_access`),
   `pidns`/`nsproxy`; `kernel/signal`'s `stub` for devices without a driver.
-- `appine_hal` (`statvfs`, `memory_info`).
+- `kazeterm_hal` (`statvfs`, `memory_info`).
 
 ## Invariants and gotchas
 

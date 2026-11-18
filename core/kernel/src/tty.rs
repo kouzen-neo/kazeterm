@@ -1676,7 +1676,7 @@ const NS: i64 = 1_000_000_000;
 
 /// The current wall-clock time (nanoseconds).
 pub(crate) fn wall_ns() -> i64 {
-    appine_hal::clock_gettime(0)
+    kazeterm_hal::clock_gettime(0)
         .map(|(s, ns)| s * NS + ns)
         .unwrap_or(0)
 }

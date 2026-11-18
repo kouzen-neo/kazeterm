@@ -984,7 +984,7 @@ mod tests {
 
     #[test]
     fn merges_layers() {
-        let dir = std::env::temp_dir().join(format!("appine-ovl-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kazeterm-ovl-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let s = Store::create(&dir).unwrap();
         let root = super::super::store::ROOT;
@@ -1045,7 +1045,7 @@ mod tests {
     /// replaced by a rename unlink it (inotify's `IN_EXCL_UNLINK` asks).
     #[test]
     fn nodes_stay_linked_until_removed_or_replaced() {
-        let dir = std::env::temp_dir().join(format!("appine-ovl-linked-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kazeterm-ovl-linked-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let s = Store::create(&dir).unwrap();
         let root = super::super::store::ROOT;
@@ -1086,7 +1086,7 @@ mod tests {
     /// below a kept or held node, or removed after another thread's system call began.
     #[test]
     fn removed_nodes_go_once_unused() {
-        let dir = std::env::temp_dir().join(format!("appine-ovl-sweep-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kazeterm-ovl-sweep-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let s = Store::create(&dir).unwrap();
         let root = super::super::store::ROOT;

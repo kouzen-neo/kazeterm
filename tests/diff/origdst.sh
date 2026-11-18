@@ -440,7 +440,7 @@ N
 # it this way), the rest to 1084; 2293 and 2294 are DNATed to B, and FORWARD rejects B's 1085 (B
 # listens there); UDP port 53 is hijacked to 1053. A and B are in the same subnet, so what is
 # DNATed to B needs masquerade for B's replies to pass through the outer namespace and be
-# translated back (Appine does not execute POSTROUTING; the connections are at the socket layer
+# translated back (KazeTerm does not execute POSTROUTING; the connections are at the socket layer
 # anyway)
 nft -f - <<'N'
 table ip t {

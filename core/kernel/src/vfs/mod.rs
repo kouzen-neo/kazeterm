@@ -733,7 +733,7 @@ impl TmpfsParams {
     /// `shmem_default_max_blocks` and `shmem_default_max_inodes`, which are equal without high
     /// memory).
     pub fn default_limit() -> u64 {
-        appine_hal::memory_info().0 / 2 / TMPFS_PAGE
+        kazeterm_hal::memory_info().0 / 2 / TMPFS_PAGE
     }
 }
 
@@ -934,7 +934,7 @@ impl Vfs {
                 root_gone: false,
                 flags: ROOT_FLAGS,
                 dev: ROOT_DEV,
-                source: b"appine".to_vec(),
+                source: b"kazeterm".to_vec(),
                 expiring: false,
                 pin: None,
                 locks: 0,
@@ -1031,7 +1031,7 @@ impl Vfs {
         // /run: as systemd and OpenRC mount it, 20% of physical memory and 800k inodes
         if let Some(point) = subdir(root.as_ref(), b"run") {
             let params = TmpfsParams {
-                blocks: appine_hal::memory_info().0 / 5 / TMPFS_PAGE,
+                blocks: kazeterm_hal::memory_info().0 / 5 / TMPFS_PAGE,
                 inodes: 800 << 10,
                 ..TmpfsParams::boot(0o755)
             };
@@ -3988,7 +3988,7 @@ mod tests {
     }
 
     fn sample(name: &str) -> (Vfs, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!("appine-vfs-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kazeterm-vfs-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let s = Store::create(&dir).unwrap();
         let bin = s.mkdir(ROOT, b"bin", 0o755, 0, 0).unwrap();
@@ -4477,7 +4477,7 @@ mod tests {
             usr.clone(),
             (bin.clone(), None),
             ms::RELATIME,
-            b"appine".to_vec(),
+            b"kazeterm".to_vec(),
             Some(ROOT_DEV),
         );
         let top = Node::Store(id, ino(&usr));

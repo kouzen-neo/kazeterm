@@ -87,7 +87,7 @@ loop:
 	words := strings.Fields("the quick brown fox jumps over the lazy dog")
 	sort.Strings(words)
 	fmt.Println(strings.Join(words, ","))
-	fmt.Printf("%x\n", sha256.Sum256([]byte("appine")))
+	fmt.Printf("%x\n", sha256.Sum256([]byte("kazeterm")))
 	fmt.Println(math.Sqrt(2), math.Exp(1), strconv.FormatFloat(1e21, 'g', -1, 64), math.MaxInt64, -0.0)
 
 	defer func() {

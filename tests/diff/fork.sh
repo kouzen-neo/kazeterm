@@ -437,7 +437,7 @@ gcc -O2 -o commit commit.c
 # A 1 TB MAP_NORESERVE mapping with only a few pages touched (ASan's shadow memory works like
 # this): fork succeeds, the child reads the contents, writes its own copy, and untouched pages
 # are zero; after PROT_NONE and back, and after an mremap move, the contents are still there and
-# a further fork sees them too; resident memory is only the few touched pages. Appine builds
+# a further fork sees them too; resident memory is only the few touched pages. KazeTerm builds
 # page tables on demand, and fork lends pages only where there are entries (round 179); fork
 # used to ignore MAP_NORESERVE when requesting host memory for the child, so exceeding the total
 # memory was ENOMEM

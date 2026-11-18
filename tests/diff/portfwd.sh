@@ -11,16 +11,16 @@
 # privileged container, where packets really go through the bridges and nat.
 #
 # - The outer namespace connecting directly to 8080 on B, where nothing listens, is not compared:
-#   in Appine the outer listener holding 8080 binds the wildcard address on the host, which also
+#   in KazeTerm the outer listener holding 8080 binds the wildcard address on the host, which also
 #   covers B's loopback address on the host, so the connection succeeds (natively ECONNREFUSED).
-# - The iifname rule uses an interface that does not exist: when Appine decides whether to
+# - The iifname rule uses an interface that does not exist: when KazeTerm decides whether to
 #   forward a connection from outside, it assumes the connection came in on the host's first
 #   interface; if the rule holds for it, this outer listener is handed to the forwarding thread,
 #   and A's connections are taken by it too (deferred).
 # - Containers in the same subnet connecting to a published port through the gateway, and a
 #   container connecting back to its own published port (hairpin), are not compared: natively
 #   the reply does not go through the gateway, and without masquerade the connection fails
-#   (netavark adds masquerade for this, Appine does not execute it).
+#   (netavark adds masquerade for this, KazeTerm does not execute it).
 exec 2>&1
 cd /tmp
 cat > srv.py <<'PY'

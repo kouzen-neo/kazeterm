@@ -4,7 +4,7 @@
 #
 #   c=$(docker create --platform linux/arm64 debian:trixie)
 #   docker export $c | gzip -1 > target/glibc/debian-trixie.tar.gz; docker rm $c
-#   scripts/dev target/linux-arm64/release/appine-run --rootfs target/glibc/debian-store \
+#   scripts/dev target/linux-arm64/release/kazeterm-run --rootfs target/glibc/debian-store \
 #       --import target/glibc/debian-trixie.tar.gz
 #   scripts/survey -s target/glibc/debian-store glibc/debian-install glibc/debian-c ...
 export DEBIAN_FRONTEND=noninteractive

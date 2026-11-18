@@ -28,7 +28,7 @@ outlives an Activity:
   shape and blinking, whether the volume keys switch tabs, tab-list button visibility, distro switch), the preferences
   kept in `Settings`.
 
-Root: `android/app/src/main/java/io/github/mthli/appine/TerminalService.kt`, `Notifications.kt`,
+Root: `android/app/src/main/java/com/kazeterm/TerminalService.kt`, `Notifications.kt`,
 `Settings.kt`, `Tabs.kt`, `BrowserBridge.kt`, `Diagnostics.kt`.
 
 Outside the module: rootfs import, downloads, mirrors and `login.sh` (`android/setup`); the screen
@@ -49,7 +49,7 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   `onOpenUrl` (guest browser request; true acknowledges Android accepted it), `onNotice`, `onRestarting`, `onExitAll` (sessions redraw their view themselves). Activities
   register in `onServiceConnected` and leave in `onStop`; "UI visible" means at least one listener
   (the Settings fragment included).
-- `worker` — a single-thread executor (`appine-worker`) for the calls that take a kernel handle
+- `worker` — a single-thread executor (`kazeterm-worker`) for the calls that take a kernel handle
   and the BKL in the background (the poll's fetches, `setRoutes`, `consoleCwd`, `trimMemory` with
   the tabs' scrollback compression after it, `shutdown`, `stop`), together with what must stay
   ordered with them: saving tabs (their terminals' snapshots included), resolving an `auto` login, changed directories,
@@ -124,12 +124,12 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
 - `onCreate` creates the four channels, starts foreground (type `specialUse` on API 34+) and takes
   a killed run (`Tabs.takeKilled`; with no marker it deletes `files/tabs/` and there is none): its
   saved tabs, and how its process ended, looked up by the marker's pid in Android's exit records
-  (`ApplicationExitInfo`); a crash or ANR of Appine posts a notification at once. Then it calls
+  (`ApplicationExitInfo`); a crash or ANR of KazeTerm posts a notification at once. Then it calls
   `start(Rootfs.importing())` when no rootfs is ready (Alpine on the first run, else the distro an
   import was last started for), else `start(null)`.
 - `start` clears `startError`, sets `starting` (the wake lock follows) and runs on an
-  `appine-start` thread: import when a distro is given (`Rootfs.prepare`, with progress to the
-  notification and listeners, then an `appine-mirrors` thread choosing a mirror once, android/setup),
+  `kazeterm-start` thread: import when a distro is given (`Rootfs.prepare`, with progress to the
+  notification and listeners, then an `kazeterm-mirrors` thread choosing a mirror once, android/setup),
   `ensureNetworkConfig`, `ensureContainersConfig`, `ensureLoginTools`, `ensureBrowser`, `updateProfile`, then
   `Native.start(store, tier)` under `Rootfs.access`'s write lock (`tier` is the saved setting in
   all builds, defaulting to 1).
@@ -148,7 +148,7 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
 - Which start: when no store is ready (`startOrImport`, at creation and when an exit finishes with
   a UI back) the distro the last import was started for is imported first, otherwise the store
   starts as it is.
-- Boot (`appine-boot` thread): run the osclock script without a console (failures only logged),
+- Boot (`kazeterm-boot` thread): run the osclock script without a console (failures only logged),
   `Native.boot` (blocks until inittab's boot entries finish), then notify OpenRC services that
   failed to start, if the kernel is still the same.
 
@@ -185,7 +185,7 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   "exit all" meanwhile, finish the exit); the UI opens a new tab when the new kernel is ready and
   no sessions exist.
 - Distro switch/reset (`switchTo`, allowed while no switch or download is under way and either a
-  kernel runs or the start failed): download on an `appine-download` thread (progress in Settings
+  kernel runs or the start failed): download on an `kazeterm-download` thread (progress in Settings
   and the notification, both cancellable; a failure other than a cancel shows a notice); when it
   finishes, `replace` if a kernel runs or the start failed, else record it in `pendingReplace`
   while a start or restart is under way (in any other state it is dropped). After a failed start
@@ -200,7 +200,7 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   unless tabs of a killed run are still waiting to be restored, unregisters the network callback,
   releases the sessions, shuts a remaining kernel down on the worker (best effort), shuts the
   worker down and releases the wake lock. A start completing after destruction closes its browser
-  bridge and shuts its returned kernel handle down on a separate `appine-stop` thread.
+  bridge and shuts its returned kernel handle down on a separate `kazeterm-stop` thread.
 
 ### Wake lock and notification
 
@@ -276,9 +276,9 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   replacement keeps `restore` for the next one): each saved tab reopens with its saved login
   setting and cwd, below its terminal as saved (its snapshot, read and inflated when the tab is
   first shown, when the index's version is this build's and it decodes; else its transcript) and a
-  yellow `[appine]` notice saying why the run ended and when the tabs were saved; the saved current tab becomes `focus`. Seven reasons are told
+  yellow `[kazeterm]` notice saying why the run ended and when the tabs were saved; the saved current tab becomes `focus`. Seven reasons are told
   apart: low memory, too many resources in the background, force-stopped (user requested or
-  stopped), the app updated (from Android 14), a crash (Java or native) and an ANR of Appine;
+  stopped), the app updated (from Android 14), a crash (Java or native) and an ANR of KazeTerm;
   anything else, no record or no pid gives "Android stopped the app".
 
 ### What programs ask of the app
@@ -312,14 +312,14 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   at once (`VtSession.statusSeen`). A status that goes without the user (the program was killed or
   stopped waiting) takes its notification away, unless a bell or a program's notification has
   replaced it since. A clipboard write sets
-  the clipboard from any tab (labelled Appine), or clears it; before Android 13, which shows copies
+  the clipboard from any tab (labelled KazeTerm), or clears it; before Android 13, which shows copies
   itself, a toast says a program copied text. A clipboard read (OSC 52) from the tab in front goes
   to the listeners' `onClipboardRead`, where the terminal Activity asks the user; from any other
   tab it is answered at once with an empty clipboard (`VtSession.answerClipboardRead(null)`):
   Android lets an app read the clipboard only while it has the focus, and the program would
   otherwise wait for a timeout.
 - tmux's control mode (tmux -CC), which the terminal detaches as it starts (android/vtcore),
-  ending (`onTmuxDetached`) is told in that tab as a yellow `[appine]` line
+  ending (`onTmuxDetached`) is told in that tab as a yellow `[kazeterm]` line
   (`VtSession.showMessage`): it cannot be shown, its session goes on, and `tmux attach` brings it
   back.
 - A command the shell's prompt marks (OSC 133) saw finish (`onCommandFinished`, timed by the
@@ -336,7 +336,7 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   256 KiB parts per stream for the current process and one previous process (2 MiB total).
   A shared instance lock protects rotation, appends and snapshots; older bytes are discarded.
   A daemon reader captures only the current PID's main/crash logcat, warnings and errors plus
-  INFO for `appine`, `Rootfs` and `TerminalService`. Capture failure is reported in exports.
+  INFO for `kazeterm`, `Rootfs` and `TerminalService`. Capture failure is reported in exports.
   Native stderr reaches this stream through the existing JNI redirect; release builds still
   leave detailed kernel debug logging off. Sudden process death can lose the final logcat lines.
 - Fault reports are saved when built, even if notifications are later dismissed; a stall's
@@ -353,7 +353,7 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   archives, failing if older files cannot be removed. `DiagnosticProvider` is non-exported and
   exposes only that directory through FileProvider. Settings grants temporary read-only access
   to one archive after its final privacy check. An intentional share remains readable by its
-  recipient while Appine is backgrounded; raw retention files and rootfs are not provider roots.
+  recipient while KazeTerm is backgrounded; raw retention files and rootfs are not provider roots.
   `Diagnostics.export(forSave = true)` instead uses `cache/diagnostic-saves`, outside the provider
   root and share pruning. Each pending picker/transfer owns its ZIP; cancellation, owner destruction
   while pending, or completed transfer deletes it. `install` attempts to delete save orphans from
@@ -365,12 +365,12 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
 - Kill reports (one tab-separated line each: console, pid, command, `bug` or `oom`, and three
   fields: for a bug the kernel's report line, its log records and the unimplemented paths, for an
   OOM kill the cgroup path (empty for the app-wide limit), usage and limit): written as
-  `[appine] …` into the tab whose console with that number is open,
+  `[kazeterm] …` into the tab whose console with that number is open,
   else the newest tab that had it (ended tabs keep their number, which the kernel hands to the next
   console), when the process had one (`VtSession.showMessage`, queued until a tab's terminal exists), in yellow above the cursor line
   (skipped on the alternate screen); a notification "<command> was killed" follows unless the
   message was shown in the tab in front (another tab or Settings in front does not count), and
-  always for an Appine bug. OOM kills say whether the app's limit or a cgroup's `memory.max` (in
+  always for an KazeTerm bug. OOM kills say whether the app's limit or a cgroup's `memory.max` (in
   MiB or GiB) was reached.
 - Bugs always notify with "copy report": app version and build, device (Android release and API,
   maker and model, ABI, page size), distro and the saved tier, the kernel's
@@ -379,12 +379,12 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
   "Unimplemented paths reached" the 10 the guest reached most since boot, with a line for the rest
   (`kernel/signal`). "Copy report" puts the text on the clipboard (with a toast before Android 13)
   and takes that notification away.
-- Crashes of the last run: a crash (Java or native) or ANR record of the killed run posts "Appine
-  crashed" or "Appine stopped responding" (id 3) with "copy report": the bug report's app, device,
+- Crashes of the last run: a crash (Java or native) or ANR record of the killed run posts "KazeTerm
+  crashed" or "KazeTerm stopped responding" (id 3) with "copy report": the bug report's app, device,
   distro and tier lines and one line with the pid, the kind (with the signal for a native crash),
   the time in UTC and, for an ANR, Android's description.
 - Too-long holds of the BKL (`kernel/process`'s watchdog): a new stall of the current kernel posts
-  "Appine's kernel is stuck" (id 4) with the seconds when first seen (not refreshed) and "copy
+  "KazeTerm's kernel is stuck" (id 4) with the seconds when first seen (not refreshed) and "copy
   report" (the watchdog's report line); once it has ended, a notification still showing becomes
   "was stuck" with the total seconds and the kernel log record in its report, without alerting
   again (a dismissed one stays dismissed); a stall first seen after it ended posts "was stuck"
@@ -443,9 +443,9 @@ sessions' internals and the console adapter (`android/vt`), native terminals and
 - Debug and release builds share the saved tier preference; a Tier 0 choice from an earlier
   debug install is also honoured by a release build when that preference is retained.
 - Normal background kernel work goes through the single worker, so polls and saves are
-  ordered before stop and shutdown; `Native.start` runs on `appine-start`, the boot calls on
-  `appine-boot`, a tab's console opening on the main thread. If destruction races a start,
-  its abandoned handle is shut down on `appine-stop`. A stale kernel handle is harmless
+  ordered before stop and shutdown; `Native.start` runs on `kazeterm-start`, the boot calls on
+  `kazeterm-boot`, a tab's console opening on the main thread. If destruction races a start,
+  its abandoned handle is shut down on `kazeterm-stop`. A stale kernel handle is harmless
   (the JNI table no longer finds it). A call that must answer while the BKL is stuck (`bklStall`)
   must not take it and runs on the main thread.
 - Results of a poll other than changed directories are dropped if the kernel changed meanwhile

@@ -4,9 +4,9 @@
 #
 #   scripts/release-sources [output directory]
 #
-#   appine-<commit>.tar.gz            Appine itself (git archive HEAD; an error when the work tree
+#   kazeterm-<commit>.tar.gz            KazeTerm itself (git archive HEAD; an error when the work tree
 #                                     has changes)
-#   appine-<commit>-vendor.tar.gz     cargo vendor: the crates statically linked into the app
+#   kazeterm-<commit>-vendor.tar.gz     cargo vendor: the crates statically linked into the app
 #   alpine-<version>-gpl-sources.tar  the GPL packages of the Alpine minirootfs in the APK and of
 #                                     the packages bundled beside it (bash, readline, procps-ng,
 #                                     libintl, bubblewrap, libcap2): each one's
@@ -42,22 +42,22 @@ sha512() {
     fi | cut -d' ' -f1
 }
 
-# ---- Appine itself ----
+# ---- KazeTerm itself ----
 cd "$root"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     echo "release-sources: the work tree has changes; commit them first" >&2
     exit 1
 fi
 rev=$(git rev-parse --short=12 HEAD)
-git archive --format=tar.gz --prefix="appine-$rev/" -o "$out/appine-$rev.tar.gz" HEAD
-echo "$out/appine-$rev.tar.gz"
+git archive --format=tar.gz --prefix="kazeterm-$rev/" -o "$out/kazeterm-$rev.tar.gz" HEAD
+echo "$out/kazeterm-$rev.tar.gz"
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cargo vendor --locked --quiet "$work/vendor" >/dev/null
-tar -czf "$out/appine-$rev-vendor.tar.gz" -C "$work" vendor
+tar -czf "$out/kazeterm-$rev-vendor.tar.gz" -C "$work" vendor
 rm -rf "$work/vendor"
-echo "$out/appine-$rev-vendor.tar.gz"
+echo "$out/kazeterm-$rev-vendor.tar.gz"
 
 # ---- libghostty-vt: the source release and its Zig packages, both as published ----
 src=$("$root/scripts/fetch-ghostty" | sed -n 's/^fetch-ghostty: //p')
@@ -96,7 +96,7 @@ if [ ! -s "$work/gpl" ]; then
 fi
 {
     echo "Source code of the GPL-licensed packages in the Alpine Linux $version minirootfs"
-    echo "that the Appine app bundles ($(basename "$tarball")) and among the Alpine"
+    echo "that the KazeTerm app bundles ($(basename "$tarball")) and among the Alpine"
     echo "packages it bundles beside it, which it installs in the system. Each directory"
     echo "holds the package's directory in Alpine's aports repository at the given commit"
     echo "(the APKBUILD and patches) and the upstream sources that the APKBUILD names,"

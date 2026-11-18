@@ -24,7 +24,7 @@ use crate::process::{CpuTime, RLIMIT_CORE, Signal, ThreadGroup};
 use crate::ptrace::{HwDebug, Regs};
 use crate::signal::SigInfo;
 use crate::task::Task;
-use appine_engine::{CpuState, PAGE_SIZE, prot};
+use kazeterm_engine::{CpuState, PAGE_SIZE, prot};
 
 /// Maximum length of `core_pattern` (Linux's `CORENAME_MAX_SIZE`).
 pub(crate) const PATTERN_MAX: usize = 128;

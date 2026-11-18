@@ -21,7 +21,7 @@
 # Built Starnix programs in no case, and why:
 # - they act on the development VM itself with the native side's privileges: reboot_test,
 #   sysfs_power_test (suspends), time_test and timerfd_mutable_test (set the clock);
-# - Appine does not implement what they test: bpf_test (bpf(2) has only cgroup device programs,
+# - KazeTerm does not implement what they test: bpf_test (bpf(2) has only cgroup device programs,
 #   which the bpf-devices case covers), perf_event_open_test and userfaultfd_test (ENOSYS),
 #   tun_test;
 # - devices neither side has: input_test, uinput_test, udev_test, touch_standby_test,
@@ -38,7 +38,7 @@ if [ ! -d "$T" ]; then
 fi
 cd /tmp
 # gVisor's ExecTest.ExecuteOnlySpecialFiles names its special files by pid and leaves them behind
-# when it fails; Appine's store keeps /tmp, and the same pid in the lane's next run fails on them
+# when it fails; KazeTerm's store keeps /tmp, and the same pid in the lane's next run fails on them
 rm -f /tmp/exec-only-*
 # Core files would change the shell's report of a crash on one side only
 ulimit -c 0
@@ -140,6 +140,6 @@ pkill -P "$watcher" sleep 2>/dev/null
 wait "$watcher"
 rm -f hang.out hang.tmp
 # Some gVisor fs tests change the mode of their test directory, /tmp itself: the native side's
-# container ends with the case, but Appine's store is reused by the next cases of the lane, which
+# container ends with the case, but KazeTerm's store is reused by the next cases of the lane, which
 # expect the sticky, world-writable /tmp (protected_symlinks)
 chmod 1777 /tmp

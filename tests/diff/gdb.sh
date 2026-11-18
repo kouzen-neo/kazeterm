@@ -71,7 +71,7 @@ gdb -batch -nx -ex 'set print thread-events off' -ex 'break worker' -ex run -ex 
 # Stop at system calls (PTRACE_SYSCALL)
 gdb -batch -nx -ex 'catch syscall writev' -ex run -ex 'info registers x8' -ex continue -ex continue ./loop 2>&1 | norm
 # Hardware watchpoints (write, two unaligned bytes, read, read-write) and hardware breakpoints,
-# with another thread triggering a watchpoint. Appine's are checked only by the interpreter, and
+# with another thread triggering a watchpoint. KazeTerm's are checked only by the interpreter, and
 # threads that have them run only in Tier 0. kill at the end: if it ran to completion, whether the
 # program's last output or gdb's report of the thread exiting comes first is not fixed
 cat > watch.c <<'C'

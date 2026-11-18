@@ -1,7 +1,7 @@
 //! Connections from outside the host to published ports (docs/rounds/173-port-forwarding.md).
 //!
 //! When the initial namespace has PREROUTING DNAT rules (ports published by podman or docker), a
-//! connection from outside Appine (another device, a browser on the phone) to that port on the
+//! connection from outside KazeTerm (another device, a browser on the phone) to that port on the
 //! host reaches the socket the guest is listening on in the host (the one podman holds the port
 //! with and never accepts on). Such a socket is duplicated and handed to the host thread here: it
 //! accepts connections, connects to the DNAT destination (the container's loopback address on the
@@ -75,12 +75,12 @@ impl Forwarder {
         let event = match self.shared.event.get() {
             Some(e) => e,
             None => {
-                let e = appine_hal::Event::new()?;
+                let e = kazeterm_hal::Event::new()?;
                 let _ = self.shared.event.set(e);
                 self.shared.event.get().unwrap()
             }
         };
-        let dup = appine_hal::dup(fd)?;
+        let dup = kazeterm_hal::dup(fd)?;
         let mut st = self.shared.state.lock().unwrap();
         st.next += 1;
         let id = st.next;
@@ -92,7 +92,7 @@ impl Forwarder {
                 .spawn(move || run(&shared));
             if spawned.is_err() {
                 st.ports.remove(&id);
-                appine_hal::net::close(dup);
+                kazeterm_hal::net::close(dup);
                 return Err(11);
             }
             st.running = true;
@@ -119,7 +119,7 @@ impl Drop for Forwarder {
 #[derive(Default)]
 struct Shared {
     state: Mutex<State>,
-    event: std::sync::OnceLock<appine_hal::Event>,
+    event: std::sync::OnceLock<kazeterm_hal::Event>,
 }
 
 #[derive(Default)]
@@ -188,8 +188,8 @@ impl Conn {
     }
 
     fn close(&self) {
-        appine_hal::net::close(self.client);
-        appine_hal::net::close(self.upstream);
+        kazeterm_hal::net::close(self.client);
+        kazeterm_hal::net::close(self.upstream);
         if let Some(a) = self.outside {
             forget_outside(a);
         }
@@ -220,12 +220,12 @@ fn run(shared: &Shared) {
             let mut st = shared.state.lock().unwrap();
             for fd in st.closing.drain(..) {
                 ports.retain(|_, (f, _)| *f != fd);
-                appine_hal::net::close(fd);
+                kazeterm_hal::net::close(fd);
             }
             ports = st.ports.clone();
             if st.stop {
                 for (fd, _) in st.ports.values() {
-                    appine_hal::net::close(*fd);
+                    kazeterm_hal::net::close(*fd);
                 }
                 st.ports.clear();
                 st.running = false;
@@ -234,7 +234,7 @@ fn run(shared: &Shared) {
                     c.close();
                 }
                 for r in &relays {
-                    appine_hal::net::close(r.fd);
+                    kazeterm_hal::net::close(r.fd);
                 }
                 return;
             }
@@ -242,7 +242,7 @@ fn run(shared: &Shared) {
         relays.retain(|r| {
             let keep = ports.contains_key(&r.port) && r.last.elapsed() < UDP_IDLE;
             if !keep {
-                appine_hal::net::close(r.fd);
+                kazeterm_hal::net::close(r.fd);
             }
             keep
         });
@@ -291,7 +291,7 @@ fn run(shared: &Shared) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
         };
-        match appine_hal::poll(&mut fds, timeout) {
+        match kazeterm_hal::poll(&mut fds, timeout) {
             Ok(_) => {}
             Err(EINTR) => continue,
             Err(_) => {
@@ -314,7 +314,7 @@ fn run(shared: &Shared) {
             }
             // Accept at most 64 at a time so the other connections do not starve
             for n in 0..64 {
-                let (client, from) = match appine_hal::net::accept(fd) {
+                let (client, from) = match kazeterm_hal::net::accept(fd) {
                     Ok(c) => c,
                     // Readable but nothing taken: out of fds, or a listener shut down (readable
                     // for good); leave it out of the poll for a while
@@ -338,7 +338,7 @@ fn run(shared: &Shared) {
                         client_shut: false,
                     }),
                     // The destination cannot be reached: the client sees the connection closed
-                    Err(_) => appine_hal::net::close(client),
+                    Err(_) => kazeterm_hal::net::close(client),
                 }
             }
         }
@@ -368,8 +368,8 @@ fn run(shared: &Shared) {
                 continue;
             };
             let mut buf = vec![0u8; 65536];
-            while let Ok(m) = appine_hal::net::recvmsg(r.fd, &mut buf, 0, 0) {
-                let _ = appine_hal::net::sendmsg(
+            while let Ok(m) = kazeterm_hal::net::recvmsg(r.fd, &mut buf, 0, 0) {
+                let _ = kazeterm_hal::net::sendmsg(
                     *port_fd,
                     &buf[..m.len.min(buf.len())],
                     &r.client,
@@ -388,7 +388,7 @@ fn step(c: &mut Conn, cr: i16, ur: i16) -> Result<(), i32> {
         if ur == 0 {
             return Ok(());
         }
-        let err = appine_hal::net::getsockopt(c.upstream, SOL_SOCKET, SO_ERROR, 4)?;
+        let err = kazeterm_hal::net::getsockopt(c.upstream, SOL_SOCKET, SO_ERROR, 4)?;
         match i32::from_le_bytes(err[..4].try_into().unwrap()) {
             0 => c.ready = true,
             e => return Err(e),
@@ -402,7 +402,7 @@ fn step(c: &mut Conn, cr: i16, ur: i16) -> Result<(), i32> {
         (c.upstream, ur, c.up_eof, c.up_shut),
     ] {
         if r & POLLERR != 0 {
-            let err = appine_hal::net::getsockopt(fd, SOL_SOCKET, SO_ERROR, 4)?;
+            let err = kazeterm_hal::net::getsockopt(fd, SOL_SOCKET, SO_ERROR, 4)?;
             match i32::from_le_bytes(err[..4].try_into().unwrap()) {
                 0 => {}
                 e => return Err(e),
@@ -422,11 +422,11 @@ fn step(c: &mut Conn, cr: i16, ur: i16) -> Result<(), i32> {
     drain(c.client, &mut c.to_client)?;
     // One side reached its end and all its data went across: half-close toward the other side
     if c.client_eof && c.to_up.is_empty() && !c.up_shut {
-        let _ = appine_hal::net::shutdown(c.upstream, SHUT_WR);
+        let _ = kazeterm_hal::net::shutdown(c.upstream, SHUT_WR);
         c.up_shut = true;
     }
     if c.up_eof && c.to_client.is_empty() && !c.client_shut {
-        let _ = appine_hal::net::shutdown(c.client, SHUT_WR);
+        let _ = kazeterm_hal::net::shutdown(c.client, SHUT_WR);
         c.client_shut = true;
     }
     Ok(())
@@ -435,7 +435,7 @@ fn step(c: &mut Conn, cr: i16, ur: i16) -> Result<(), i32> {
 /// Reads from `fd` into `buf` (up to [`BUFFER`]): end of file is Ok(false).
 fn fill(fd: i32, buf: &mut Vec<u8>) -> Result<bool, i32> {
     let mut chunk = vec![0u8; BUFFER - buf.len()];
-    match appine_hal::read(fd, &mut chunk) {
+    match kazeterm_hal::read(fd, &mut chunk) {
         Ok(0) => Ok(false),
         Ok(n) => {
             buf.extend_from_slice(&chunk[..n]);
@@ -449,7 +449,7 @@ fn fill(fd: i32, buf: &mut Vec<u8>) -> Result<bool, i32> {
 /// Writes `buf` to `fd` (whatever cannot be written stays).
 fn drain(fd: i32, buf: &mut Vec<u8>) -> Result<(), i32> {
     while !buf.is_empty() {
-        match appine_hal::net::sendmsg(fd, buf, &[], &[], 0) {
+        match kazeterm_hal::net::sendmsg(fd, buf, &[], &[], 0) {
             Ok(n) => {
                 buf.drain(..n);
             }
@@ -465,7 +465,7 @@ fn drain(fd: i32, buf: &mut Vec<u8>) -> Result<(), i32> {
 fn datagrams(id: u64, fd: i32, target: &Target, relays: &mut Vec<Relay>) {
     let mut buf = vec![0u8; 65536];
     for _ in 0..64 {
-        let Ok(m) = appine_hal::net::recvmsg(fd, &mut buf, 0, 0) else {
+        let Ok(m) = kazeterm_hal::net::recvmsg(fd, &mut buf, 0, 0) else {
             break;
         };
         let data = &buf[..m.len.min(buf.len())];
@@ -491,7 +491,7 @@ fn datagrams(id: u64, fd: i32, target: &Target, relays: &mut Vec<Relay>) {
             }
         };
         r.last = Instant::now();
-        let _ = appine_hal::net::sendmsg(r.fd, data, &[], &[], 0);
+        let _ = kazeterm_hal::net::sendmsg(r.fd, data, &[], &[], 0);
     }
 }
 
@@ -500,7 +500,7 @@ fn datagrams(id: u64, fd: i32, target: &Target, relays: &mut Vec<Relay>) {
 /// IPv4 address and port, first binds a 127.254.x.y address and that port (letting the host choose
 /// if the port cannot be bound) and records it; otherwise binds `t.source`.
 fn open(t: &Target, client: Option<([u8; 4], u16)>) -> Result<(i32, bool, Option<[u8; 4]>), i32> {
-    let fd = appine_hal::net::socket(
+    let fd = kazeterm_hal::net::socket(
         family(&t.addr),
         if t.udp { SOCK_DGRAM } else { SOCK_STREAM },
         0,
@@ -509,11 +509,11 @@ fn open(t: &Target, client: Option<([u8; 4], u16)>) -> Result<(i32, bool, Option
     let bound = match client.filter(|_| family(&t.addr) == 2) {
         Some((ip, port)) => {
             let host = take_outside();
-            let at = |p: u16| appine_hal::net::sockaddr(std::net::SocketAddr::from((host, p)));
+            let at = |p: u16| kazeterm_hal::net::sockaddr(std::net::SocketAddr::from((host, p)));
             let r =
-                appine_hal::net::bind(fd, &at(port)).or_else(|_| appine_hal::net::bind(fd, &at(0)));
+                kazeterm_hal::net::bind(fd, &at(port)).or_else(|_| kazeterm_hal::net::bind(fd, &at(0)));
             if r.is_ok() {
-                let hport = appine_hal::net::sockname(fd, false)
+                let hport = kazeterm_hal::net::sockname(fd, false)
                     .ok()
                     .map_or(0, |a| u16::from_be_bytes([a[2], a[3]]));
                 record_outside(host, ip, port, hport);
@@ -524,17 +524,17 @@ fn open(t: &Target, client: Option<([u8; 4], u16)>) -> Result<(i32, bool, Option
         None => t
             .source
             .as_ref()
-            .map_or(Ok(()), |src| appine_hal::net::bind(fd, src)),
+            .map_or(Ok(()), |src| kazeterm_hal::net::bind(fd, src)),
     };
     if let Err(e) = bound {
-        appine_hal::net::close(fd);
+        kazeterm_hal::net::close(fd);
         return Err(e);
     }
-    match appine_hal::net::connect(fd, &t.addr) {
+    match kazeterm_hal::net::connect(fd, &t.addr) {
         Ok(()) => Ok((fd, true, outside)),
         Err(EINPROGRESS) => Ok((fd, false, outside)),
         Err(e) => {
-            appine_hal::net::close(fd);
+            kazeterm_hal::net::close(fd);
             if let Some(a) = outside {
                 forget_outside(a);
             }
@@ -625,18 +625,18 @@ mod tests {
     const AF_INET: i32 = 2;
 
     fn loopback(port: u16) -> Vec<u8> {
-        appine_hal::net::sockaddr(std::net::SocketAddr::from(([127, 0, 0, 1], port)))
+        kazeterm_hal::net::sockaddr(std::net::SocketAddr::from(([127, 0, 0, 1], port)))
     }
 
     fn port(fd: i32) -> u16 {
-        let a = appine_hal::net::sockname(fd, false).unwrap();
+        let a = kazeterm_hal::net::sockname(fd, false).unwrap();
         u16::from_be_bytes([a[2], a[3]])
     }
 
     /// Waits, blocking, until the fd is ready (used in tests).
     fn wait(fd: i32, ev: i16) {
         let mut f = [(fd, ev, 0)];
-        appine_hal::poll(&mut f, Some(Duration::from_secs(5))).unwrap();
+        kazeterm_hal::poll(&mut f, Some(Duration::from_secs(5))).unwrap();
         assert_ne!(f[0].2, 0, "timed out");
     }
 
@@ -644,12 +644,12 @@ mod tests {
     /// the reply back, and both sides end after closing.
     #[test]
     fn tcp_is_forwarded() {
-        let server = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(server, &loopback(0)).unwrap();
-        appine_hal::net::listen(server, 8).unwrap();
-        let held = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(held, &loopback(0)).unwrap();
-        appine_hal::net::listen(held, 8).unwrap();
+        let server = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(server, &loopback(0)).unwrap();
+        kazeterm_hal::net::listen(server, 8).unwrap();
+        let held = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(held, &loopback(0)).unwrap();
+        kazeterm_hal::net::listen(held, 8).unwrap();
         let f = Forwarder::default();
         let h = f
             .add(
@@ -662,34 +662,34 @@ mod tests {
             )
             .unwrap();
         // The "outside" client
-        let c = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        let _ = appine_hal::net::connect(c, &loopback(port(held)));
+        let c = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        let _ = kazeterm_hal::net::connect(c, &loopback(port(held)));
         wait(server, POLLIN);
-        let (s, _) = appine_hal::net::accept(server).unwrap();
+        let (s, _) = kazeterm_hal::net::accept(server).unwrap();
         wait(c, POLLOUT);
-        appine_hal::net::sendmsg(c, b"ping", &[], &[], 0).unwrap();
+        kazeterm_hal::net::sendmsg(c, b"ping", &[], &[], 0).unwrap();
         wait(s, POLLIN);
         let mut buf = [0u8; 16];
-        assert_eq!(appine_hal::read(s, &mut buf), Ok(4));
+        assert_eq!(kazeterm_hal::read(s, &mut buf), Ok(4));
         assert_eq!(&buf[..4], b"ping");
-        appine_hal::net::sendmsg(s, b"pong!", &[], &[], 0).unwrap();
-        appine_hal::net::close(s);
+        kazeterm_hal::net::sendmsg(s, b"pong!", &[], &[], 0).unwrap();
+        kazeterm_hal::net::close(s);
         wait(c, POLLIN);
-        assert_eq!(appine_hal::read(c, &mut buf), Ok(5));
+        assert_eq!(kazeterm_hal::read(c, &mut buf), Ok(5));
         assert_eq!(&buf[..5], b"pong!");
         // The destination closed: the client reads end of file
         wait(c, POLLIN);
-        assert_eq!(appine_hal::read(c, &mut buf), Ok(0));
+        assert_eq!(kazeterm_hal::read(c, &mut buf), Ok(0));
         // No longer forwarded: incoming connections are not accepted by anyone
         drop(h);
         std::thread::sleep(Duration::from_millis(100));
-        let c2 = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        let _ = appine_hal::net::connect(c2, &loopback(port(held)));
+        let c2 = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        let _ = kazeterm_hal::net::connect(c2, &loopback(port(held)));
         let mut f2 = [(server, POLLIN, 0)];
-        appine_hal::poll(&mut f2, Some(Duration::from_millis(300))).unwrap();
+        kazeterm_hal::poll(&mut f2, Some(Duration::from_millis(300))).unwrap();
         assert_eq!(f2[0].2, 0);
         for fd in [server, held, c, c2] {
-            appine_hal::net::close(fd);
+            kazeterm_hal::net::close(fd);
         }
     }
 
@@ -700,7 +700,7 @@ mod tests {
     fn outside_clients_keep_their_address() {
         // Use a non-loopback IPv4 address of the host as the outside client; skip the test if
         // there is none
-        let Some(ip) = appine_hal::net::interfaces().iter().find_map(|i| {
+        let Some(ip) = kazeterm_hal::net::interfaces().iter().find_map(|i| {
             i.addrs
                 .iter()
                 .find(|(f, a, _)| *f == AF_INET && a.len() == 4 && a[0] != 127)
@@ -709,13 +709,13 @@ mod tests {
             return;
         };
         let at =
-            |ip: [u8; 4], p: u16| appine_hal::net::sockaddr(std::net::SocketAddr::from((ip, p)));
-        let server = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(server, &loopback(0)).unwrap();
-        appine_hal::net::listen(server, 8).unwrap();
-        let held = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(held, &at([0; 4], 0)).unwrap();
-        appine_hal::net::listen(held, 8).unwrap();
+            |ip: [u8; 4], p: u16| kazeterm_hal::net::sockaddr(std::net::SocketAddr::from((ip, p)));
+        let server = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(server, &loopback(0)).unwrap();
+        kazeterm_hal::net::listen(server, 8).unwrap();
+        let held = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(held, &at([0; 4], 0)).unwrap();
+        kazeterm_hal::net::listen(held, 8).unwrap();
         let f = Forwarder::default();
         let _h = f
             .add(
@@ -727,11 +727,11 @@ mod tests {
                 },
             )
             .unwrap();
-        let c = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(c, &at(ip, 0)).unwrap();
-        let _ = appine_hal::net::connect(c, &at(ip, port(held)));
+        let c = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(c, &at(ip, 0)).unwrap();
+        let _ = kazeterm_hal::net::connect(c, &at(ip, port(held)));
         wait(server, POLLIN);
-        let (s, peer) = appine_hal::net::accept(server).unwrap();
+        let (s, peer) = kazeterm_hal::net::accept(server).unwrap();
         let host: [u8; 4] = peer[4..8].try_into().unwrap();
         let hport = u16::from_be_bytes([peer[2], peer[3]]);
         assert_eq!(host[..2], [127, OUTSIDE_BLOCK]);
@@ -740,8 +740,8 @@ mod tests {
         assert_eq!(outside_peer(host, hport), Some((ip, port(c))));
         assert_eq!(outside_peer(host, hport.wrapping_add(1)), None);
         // After both sides close, the record is gone
-        appine_hal::net::close(c);
-        appine_hal::net::close(s);
+        kazeterm_hal::net::close(c);
+        kazeterm_hal::net::close(s);
         for _ in 0..50 {
             if outside_peer(host, hport).is_none() {
                 break;
@@ -751,8 +751,8 @@ mod tests {
         assert_eq!(outside_peer(host, hport), None);
         // A connection from a loopback address is not an outside client
         assert_eq!(outside_client(&loopback(4000)), None);
-        appine_hal::net::close(server);
-        appine_hal::net::close(held);
+        kazeterm_hal::net::close(server);
+        kazeterm_hal::net::close(held);
     }
 
     /// CPU time (clock ticks) of the forwarding threads of this process, on Linux hosts.
@@ -774,12 +774,12 @@ mod tests {
     /// out of the poll for a while: neither makes the thread spin.
     #[test]
     fn resets_and_dead_listeners_do_not_spin() {
-        let server = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(server, &loopback(0)).unwrap();
-        appine_hal::net::listen(server, 8).unwrap();
-        let held = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        appine_hal::net::bind(held, &loopback(0)).unwrap();
-        appine_hal::net::listen(held, 8).unwrap();
+        let server = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(server, &loopback(0)).unwrap();
+        kazeterm_hal::net::listen(server, 8).unwrap();
+        let held = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        kazeterm_hal::net::bind(held, &loopback(0)).unwrap();
+        kazeterm_hal::net::listen(held, 8).unwrap();
         let f = Forwarder::default();
         let _h = f
             .add(
@@ -791,18 +791,18 @@ mod tests {
                 },
             )
             .unwrap();
-        let c = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
-        let _ = appine_hal::net::connect(c, &loopback(port(held)));
+        let c = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).unwrap();
+        let _ = kazeterm_hal::net::connect(c, &loopback(port(held)));
         wait(server, POLLIN);
-        let (s, _) = appine_hal::net::accept(server).unwrap();
+        let (s, _) = kazeterm_hal::net::accept(server).unwrap();
         wait(c, POLLOUT);
-        appine_hal::net::sendmsg(c, b"x", &[], &[], 0).unwrap();
-        appine_hal::net::shutdown(c, SHUT_WR).unwrap();
+        kazeterm_hal::net::sendmsg(c, b"x", &[], &[], 0).unwrap();
+        kazeterm_hal::net::shutdown(c, SHUT_WR).unwrap();
         let mut buf = [0u8; 16];
         wait(s, POLLIN);
-        assert_eq!(appine_hal::read(s, &mut buf), Ok(1));
+        assert_eq!(kazeterm_hal::read(s, &mut buf), Ok(1));
         wait(s, POLLIN);
-        assert_eq!(appine_hal::read(s, &mut buf), Ok(0));
+        assert_eq!(kazeterm_hal::read(s, &mut buf), Ok(0));
         let idle = |what: &str| {
             std::thread::sleep(Duration::from_millis(100));
             if let Some(before) = forward_ticks() {
@@ -816,14 +816,14 @@ mod tests {
         };
         // The client resets (SO_LINGER with a zero timeout) after its half-close
         let linger = [1i32.to_le_bytes(), 0i32.to_le_bytes()].concat();
-        appine_hal::net::setsockopt(c, SOL_SOCKET, 13, &linger).unwrap();
-        appine_hal::net::close(c);
+        kazeterm_hal::net::setsockopt(c, SOL_SOCKET, 13, &linger).unwrap();
+        kazeterm_hal::net::close(c);
         idle("reset");
         // A listener shut down for reading polls readable for good while accept fails
-        appine_hal::net::shutdown(held, 0).unwrap();
+        kazeterm_hal::net::shutdown(held, 0).unwrap();
         idle("shut-down listener");
         for fd in [server, held, s] {
-            appine_hal::net::close(fd);
+            kazeterm_hal::net::close(fd);
         }
     }
 
@@ -831,10 +831,10 @@ mod tests {
     /// listening socket.
     #[test]
     fn udp_is_forwarded() {
-        let server = appine_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
-        appine_hal::net::bind(server, &loopback(0)).unwrap();
-        let held = appine_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
-        appine_hal::net::bind(held, &loopback(0)).unwrap();
+        let server = kazeterm_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
+        kazeterm_hal::net::bind(server, &loopback(0)).unwrap();
+        let held = kazeterm_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
+        kazeterm_hal::net::bind(held, &loopback(0)).unwrap();
         let f = Forwarder::default();
         let _h = f
             .add(
@@ -846,20 +846,20 @@ mod tests {
                 },
             )
             .unwrap();
-        let c = appine_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
-        appine_hal::net::sendmsg(c, b"query", &loopback(port(held)), &[], 0).unwrap();
+        let c = kazeterm_hal::net::socket(AF_INET, SOCK_DGRAM, 0).unwrap();
+        kazeterm_hal::net::sendmsg(c, b"query", &loopback(port(held)), &[], 0).unwrap();
         wait(server, POLLIN);
         let mut buf = [0u8; 64];
-        let m = appine_hal::net::recvmsg(server, &mut buf, 0, 0).unwrap();
+        let m = kazeterm_hal::net::recvmsg(server, &mut buf, 0, 0).unwrap();
         assert_eq!(&buf[..m.len], b"query");
-        appine_hal::net::sendmsg(server, b"answer", &m.addr, &[], 0).unwrap();
+        kazeterm_hal::net::sendmsg(server, b"answer", &m.addr, &[], 0).unwrap();
         wait(c, POLLIN);
-        let r = appine_hal::net::recvmsg(c, &mut buf, 0, 0).unwrap();
+        let r = kazeterm_hal::net::recvmsg(c, &mut buf, 0, 0).unwrap();
         assert_eq!(&buf[..r.len], b"answer");
         // The reply comes from the port the client sent to
         assert_eq!(r.addr[2..8], loopback(port(held))[2..8]);
         for fd in [server, held, c] {
-            appine_hal::net::close(fd);
+            kazeterm_hal::net::close(fd);
         }
     }
 }

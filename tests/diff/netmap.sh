@@ -14,7 +14,7 @@
 #   that calls sendto without binding first; it used to get bound to the loopback address when
 #   the first destination was in a namespace).
 # - An address absent from a directly connected subnet: natively it is EHOSTUNREACH only after
-#   the ARP timeout (about 3 seconds), in Appine at once; after the peer's namespace is gone the
+#   the ARP timeout (about 3 seconds), in KazeTerm at once; after the peer's namespace is gone the
 #   native ARP cache remains, and connecting to its address has to wait for the timeout, so this
 #   item is not compared.
 exec 2>&1
@@ -66,7 +66,7 @@ try:
         if kind == "udpconn":
             before = c.getsockname()[1]
             c.connect((addr, port))
-            # The port does not change (Appine used to release the port the host assigned here)
+            # The port does not change (KazeTerm used to release the port the host assigned here)
             same = c.getsockname()[1] == before
             print(f"{msg}: connected {c.getsockname()[0]} -> {c.getpeername()[0]}, same port {same}")
             c.send(msg.encode())
@@ -189,7 +189,7 @@ for dst in 10.50.0.1 10.50.0.3; do
 done
 
 echo "== /proc/net/tcp"
-# Connections and listeners still open (Appine does not see the TIME_WAIT ones), ports other than
+# Connections and listeners still open (KazeTerm does not see the TIME_WAIT ones), ports other than
 # 8083 replaced with PORT
 serve "$A" tcp 0.0.0.0 8083 1
 APID=$A nsenter -t "$B" -n python3 -c '
@@ -204,7 +204,7 @@ def show(who, text):
             continue
         ends = [e if e.endswith(":1F93") else e.split(":")[0] + ":PORT" for e in f[1:3]]
         rows.append(" ".join([who, *ends, f[3]]))
-    # Row order is not compared (Linux lists listeners first, Appine by the order of the fds)
+    # Row order is not compared (Linux lists listeners first, KazeTerm by the order of the fds)
     print("\n".join(sorted(rows)))
 show("B", open("/proc/net/tcp").read())
 a = subprocess.run(["nsenter", "-t", os.environ["APID"], "-n", "cat", "/proc/net/tcp"], capture_output=True, text=True)

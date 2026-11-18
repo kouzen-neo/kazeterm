@@ -449,7 +449,7 @@ PY
 # byte goes to the master's own input (what master reads return), and a master is never the
 # controlling terminal. Since 6.2 dev.tty.legacy_tiocsti off (as distribution kernels ship it)
 # refuses everyone without CAP_SYS_ADMIN with EIO before 6.1's EPERM, so both count as refused, and
-# typing into one's own controlling terminal is tested only in Appine (tests/guest/tiocsti.c)
+# typing into one's own controlling terminal is tested only in KazeTerm (tests/guest/tiocsti.c)
 python3 - <<'PY'
 import errno, fcntl, functools, os, select
 

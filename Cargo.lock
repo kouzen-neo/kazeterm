@@ -9,21 +9,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "appine-android"
+name = "kazeterm-android"
 version = "1.0.0"
 dependencies = [
- "appine-kernel",
+ "kazeterm-kernel",
  "cc",
  "jni",
  "libc",
 ]
 
 [[package]]
-name = "appine-bench"
+name = "kazeterm-bench"
 version = "1.0.0"
 
 [[package]]
-name = "appine-engine"
+name = "kazeterm-engine"
 version = "1.0.0"
 dependencies = [
  "cc",
@@ -31,18 +31,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "appine-hal"
+name = "kazeterm-hal"
 version = "1.0.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
-name = "appine-kernel"
+name = "kazeterm-kernel"
 version = "1.0.0"
 dependencies = [
- "appine-engine",
- "appine-hal",
+ "kazeterm-engine",
+ "kazeterm-hal",
  "flate2",
  "libc",
  "rusqlite",
@@ -50,20 +50,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "appine-lockstep"
+name = "kazeterm-lockstep"
 version = "1.0.0"
 dependencies = [
- "appine-engine",
+ "kazeterm-engine",
  "cc",
 ]
 
 [[package]]
-name = "appine-run"
+name = "kazeterm-run"
 version = "1.0.0"
 dependencies = [
- "appine-bench",
- "appine-hal",
- "appine-kernel",
+ "kazeterm-bench",
+ "kazeterm-hal",
+ "kazeterm-kernel",
 ]
 
 [[package]]

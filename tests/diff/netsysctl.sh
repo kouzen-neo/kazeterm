@@ -3,7 +3,7 @@
 # permissions and default values of the commonly used entries under /proc/sys/net, writes (writing
 # k integers changes the first k, too many or non-numbers are EINVAL, the congestion control
 # algorithm must be one that exists, read-only ones cannot be written), and that each namespace
-# has its own copy. The `sysctls:` of docker and compose write these inside the container (Appine
+# has its own copy. The `sysctls:` of docker and compose write these inside the container (KazeTerm
 # used to lack these files, so the containers would not start). The listing of the whole directory
 # is not compared: Linux 6.1 and 6.8 have different entries. Nor is the default maximum of
 # tcp_rmem: 6.1 and 6.8 go up to 6 MB, newer kernels (CI's) up to 32 MB (all set by the memory

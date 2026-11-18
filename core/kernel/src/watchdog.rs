@@ -7,7 +7,7 @@
 //!
 //! Each holder records itself in [`Hold`](crate::kernel::Hold) when it takes the lock, without
 //! reading a clock. The watchdog looks at it every fifth of the threshold; once it has seen the
-//! same hold for the threshold (10 s; `APPINE_BKL_WATCHDOG` sets it in seconds, and 0 turns the
+//! same hold for the threshold (10 s; `KAZETERM_BKL_WATCHDOG` sets it in seconds, and 0 turns the
 //! watchdog off) it reports:
 //!
 //! - at once, without the BKL: one line on the host's stderr (logcat on Android) naming the guest
@@ -76,9 +76,9 @@ impl Watchdog {
     }
 }
 
-/// [`THRESHOLD`], or the seconds in `APPINE_BKL_WATCHDOG`; None when that is 0.
+/// [`THRESHOLD`], or the seconds in `KAZETERM_BKL_WATCHDOG`; None when that is 0.
 fn threshold() -> Option<Duration> {
-    match std::env::var("APPINE_BKL_WATCHDOG").map(|v| v.trim().parse::<u64>()) {
+    match std::env::var("KAZETERM_BKL_WATCHDOG").map(|v| v.trim().parse::<u64>()) {
         Ok(Ok(0)) => None,
         Ok(Ok(secs)) => Some(Duration::from_secs(secs)),
         _ => Some(THRESHOLD),
@@ -133,17 +133,17 @@ fn watch(shared: &Arc<Shared>, stop: &AtomicBool, threshold: Duration) {
 /// Reports a hold that has lasted `held`, without the BKL: returns its [`Stall::id`] and the
 /// holder's host thread name.
 fn report(shared: &Shared, s: &HoldSample, held: Duration) -> (u64, String) {
-    let (name, activity) = appine_hal::thread_activity(s.host_tid)
+    let (name, activity) = kazeterm_hal::thread_activity(s.host_tid)
         .unwrap_or_else(|| (String::from("?"), String::from("gone")));
     let secs = held.as_secs();
     let report = match holder(s) {
         Some(guest) => format!(
-            "appine: {guest} has held the BKL for {secs} s {} at guest pc {:#x} (host thread \
+            "kazeterm: {guest} has held the BKL for {secs} s {} at guest pc {:#x} (host thread \
              {name}, tid {}, {activity})",
             s.entry.doing, s.entry.pc, s.host_tid,
         ),
         None => format!(
-            "appine: host thread {name} (tid {}, {activity}) has held the BKL for {secs} s",
+            "kazeterm: host thread {name} (tid {}, {activity}) has held the BKL for {secs} s",
             s.host_tid
         ),
     };
@@ -165,10 +165,10 @@ fn ended(shared: &Arc<Shared>, id: u64, s: &HoldSample, host: &str, held: Durati
     let secs = held.as_secs();
     let line = match holder(s) {
         Some(guest) => format!(
-            "appine: {guest} held the BKL for {secs} s {} at guest pc {:#x}",
+            "kazeterm: {guest} held the BKL for {secs} s {} at guest pc {:#x}",
             s.entry.doing, s.entry.pc,
         ),
-        None => format!("appine: host thread {host} held the BKL for {secs} s"),
+        None => format!("kazeterm: host thread {host} held the BKL for {secs} s"),
     };
     eprintln!("{line}");
     set(shared, id, |stall| {

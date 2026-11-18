@@ -20,7 +20,7 @@
 
 What it is for: LTP acquires its test device this way (and runs on tmpfs over it), `losetup`
 works, and tools such as mkfs can write images through it. Nothing can be mounted from a device:
-Appine has no disk filesystems.
+KazeTerm has no disk filesystems.
 
 Root: `core/kernel/src/syscall/loopdev.rs`.
 

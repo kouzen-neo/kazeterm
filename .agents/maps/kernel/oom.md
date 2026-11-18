@@ -141,7 +141,7 @@ measures (`kernel/procfs`); group exit and kill reports (`kernel/signal`, `kerne
   included); the victim is logged and counted twice, as Linux's `mem_cgroup_scan_tasks` does.
 - `unmap_code_views` runs on the timer thread whether or not there is a limit: at once after a
   resume from idle, then once a second while any task runs, and once more when everything is idle,
-  it calls `appine_engine::unmap_written_code`, because translation-cache pages written through the
+  it calls `kazeterm_engine::unmap_written_code`, because translation-cache pages written through the
   writable W^X view count twice in RssShmem. It is timed rather than continuous because each unmap
   makes the next write to every such page fault again.
 
@@ -182,8 +182,8 @@ measures (`kernel/procfs`); group exit and kill reports (`kernel/signal`, `kerne
 
 - `kernel/mm`: VMAs, CoW sets and loans, `FileMaps`, `UNMAPPING`, `shmem_like`; `shootdown`
   (`kernel/mmu`) for borrowed pages a release re-points.
-- `appine_hal` (`memory_usage` from `/proc/self/status`, `memory_info`, `mincore` and pagemap
-  reads), `appine_engine` (`written_code_bytes`, `unmap_written_code`), `kernel/cgroup` (`memory_limits`,
+- `kazeterm_hal` (`memory_usage` from `/proc/self/status`, `memory_info`, `mincore` and pagemap
+  reads), `kazeterm_engine` (`written_code_bytes`, `unmap_written_code`), `kernel/cgroup` (`memory_limits`,
   `measure_memory`, `memory_event`, `oom_group`), `signal::group_exit`, the kernel log (`printk`)
   and kill reports (`bug::record_kill`).
 

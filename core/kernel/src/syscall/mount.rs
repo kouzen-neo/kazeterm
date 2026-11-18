@@ -460,7 +460,7 @@ fn overlay_layers(
 
 /// The mount and store directory an overlay layer's path names (Linux's `ovl_mount_dir_noesc`,
 /// then `clone_private_mount`): EINVAL when it is not a directory, for a directory in a synthetic
-/// filesystem or in another overlay (Linux accepts an overlay as a lower layer; Appine does not),
+/// filesystem or in another overlay (Linux accepts an overlay as a lower layer; KazeTerm does not),
 /// on a mount of another mount namespace, and with a mount locked in place under it (the overlay
 /// would uncover what that mount hides).
 fn overlay_dir(cx: &Cx<'_>, vfs: &Vfs, path: &[u8]) -> Result<(MountId, Ino), Errno> {
@@ -855,7 +855,7 @@ fn parse_tmpfs(data: &[u8]) -> Result<TmpfsOptions, Errno> {
                 let (n, rest) = memparse(v)?;
                 let bytes = match rest {
                     b"" => n,
-                    b"%" => n.saturating_mul(appine_hal::memory_info().0) / 100,
+                    b"%" => n.saturating_mul(kazeterm_hal::memory_info().0) / 100,
                     _ => return Err(Errno::EINVAL),
                 };
                 o.blocks = Some(bytes.div_ceil(PAGE));

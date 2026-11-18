@@ -18,7 +18,7 @@ static uint8_t unpacked[TEXT_BYTES];
 static uint32_t table[1 << HASH_BITS];
 
 static const char *const words[] = {
-    "the",   "appine", "alpine", "linux",  "android", "kernel", "page",  "table", "memory",
+    "the",   "kazeterm", "alpine", "linux",  "android", "kernel", "page",  "table", "memory",
     "cpu",   "block",  "branch", "cache",  "signal",  "thread", "file",  "inode", "socket",
     "shell", "busybox", "musl",  "binary", "translate", "a",    "of",    "and",   "to",
 };

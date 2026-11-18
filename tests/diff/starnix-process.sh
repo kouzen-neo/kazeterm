@@ -17,7 +17,7 @@ SKIP="$SKIP:ZombieProcTest.Attr*:ZombieProcTest.ClearRefs:ZombieProcTest.Io:Zomb
 SKIP="$SKIP:ZombieProcTest.Sched:ZombieProcTest.Schedstat"
 SKIP="$SKIP:ZombieProcTest.TimerslackNs:ZombieProcTest.Wchan"
 # Cannot be compared: the native kernel fails reading a zombie leader's auxv and environ, where the
-# test (and Appine) expect them empty
+# test (and KazeTerm) expect them empty
 SKIP="$SKIP:ZombieProcTest.Auxv:ZombieProcTest.Environ"
 # Hang on both sides (killed after 60 s, so only the timeout would be compared): a thread ending
 # through the raw exit syscall never marks itself exited, which musl's pthread_join waits for
@@ -26,7 +26,7 @@ SKIP="$SKIP:ZombieProcTest.Auxv:ZombieProcTest.Environ"
 # it forever
 SKIP="$SKIP:ExitTest.SysExitGroupMultipleThread:RobustFutexTest.FutexStateAfterExecCheck"
 # Cannot be compared: docker sets its own RLIMIT_NOFILE; the test needs Linux 6.3 and skips itself
-# on Appine's 6.1; the alarm timer is checked 5 µs after it is due, too close under load
+# on KazeTerm's 6.1; the alarm timer is checked 5 µs after it is due, too close under load
 SKIP="$SKIP:KernelDefaults/RLimitDefaultTest.CurAndMaxDefaults/NOFILE"
 SKIP="$SKIP:PrctlTest.SetresuidAndSetresgidNoopPreservesFsIds:Timers.RealtimeAlarm"
 # Cannot be compared on CI: flag 1 of pidfd_send_signal is PIDFD_SIGNAL_THREAD since 6.9, so the

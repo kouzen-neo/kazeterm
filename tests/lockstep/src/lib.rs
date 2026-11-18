@@ -111,7 +111,7 @@ impl fmt::Display for Mismatch {
         )?;
         writeln!(
             f,
-            "  reproduce: cargo run -p appine-lockstep -- --class {} --seed {}  (iteration {})",
+            "  reproduce: cargo run -p kazeterm-lockstep -- --class {} --seed {}  (iteration {})",
             self.class, self.seed, self.iteration
         )?;
         let (Some(hw), Some(interp)) = (&self.hardware, &self.interpreter) else {
@@ -184,7 +184,7 @@ pub fn run(_config: &Config) -> Result<Vec<ClassReport>, Box<Mismatch>> {
 mod runner {
     use std::ptr::NonNull;
 
-    use appine_engine::{Cpu, Dbt, DbtRegs, Exit, Mmu, prot};
+    use kazeterm_engine::{Cpu, Dbt, DbtRegs, Exit, Mmu, prot};
 
     use super::*;
     use crate::classes::{CLASSES, Case, Class, DATA_BYTES, Env, Gen};

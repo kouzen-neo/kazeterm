@@ -1,8 +1,8 @@
 /*
  * Classic BPF filters on TCP sockets when the host refuses them. A host with Linux 5d39580f68e6
  * lets only CAP_NET_ADMIN attach SO_ATTACH_FILTER to a TCP socket, and the app never has it, so
- * Appine keeps the program itself; a test hook of debug builds (appine-run must set
- * APPINE_TEST_HOOKS=1) makes any host act that way. With the hook on, a guest with CAP_NET_ADMIN
+ * KazeTerm keeps the program itself; a test hook of debug builds (kazeterm-run must set
+ * KAZETERM_TEST_HOOKS=1) makes any host act that way. With the hook on, a guest with CAP_NET_ADMIN
  * attaches, reads back, replaces and detaches the program as on Linux, sockets accepted from a
  * listener inherit it, a locked filter cannot be changed, a bad program is still refused, and
  * without CAP_NET_ADMIN the attach is EPERM. Prints "all ok" when every check passes.

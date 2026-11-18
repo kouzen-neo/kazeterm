@@ -9,7 +9,7 @@
 # default, because a kernel built to default to redirect_dir=on (CI's) renames a merged directory
 # in place, where mv would otherwise copy it. Not compared: whiteouts' link counts (6.8 shares one
 # whiteout inode), the work directory's contents and the trusted.overlay.origin/impure attributes
-# Linux writes (Appine keeps origins in memory)
+# Linux writes (KazeTerm keeps origins in memory)
 cd /tmp
 umount -R /tmp/ovl 2>/dev/null
 rm -rf ovl

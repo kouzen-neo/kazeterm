@@ -1,6 +1,6 @@
 [package]
-name = "appine-hal"
-description = "Host abstraction layer for the Appine kernel"
+name = "kazeterm-hal"
+description = "Host abstraction layer for the KazeTerm kernel"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

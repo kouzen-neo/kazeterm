@@ -529,7 +529,7 @@ signals may still be delivered).
 
 - `kernel/mmu`: page-table entries (`map_pages`, `fill_shared`, `map_shared`, `protect_shared`,
   `move_entries`), `sync`, `quiesce`, `shootdown`, code groups.
-- `appine_hal`: host `mmap`/`munmap`/`madvise` wrappers (private anonymous memory, file mapping
+- `kazeterm_hal`: host `mmap`/`munmap`/`madvise` wrappers (private anonymous memory, file mapping
   with host-page alignment, `map_file_over`, discard, remove, populate), `fstat`, `msync`,
   `mincore`-based residency, pagemap reads (`touched_pages`, `has_private_pages`), memfds,
   `ram_and_swap`, `page_size`.

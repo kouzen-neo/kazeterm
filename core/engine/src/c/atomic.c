@@ -16,25 +16,25 @@
 #define BIT(x, n) ((unsigned)(((x) >> (n)) & 1u))
 #define FIELD(x, hi, lo) ((unsigned)(((x) >> (lo)) & ((1u << ((hi) - (lo) + 1)) - 1)))
 
-static enum appine_exit undef(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit undef(struct kazeterm_cpu *c, uint32_t insn)
 {
     c->exit_info = insn;
-    return APPINE_EXIT_UNDEF;
+    return KAZETERM_EXIT_UNDEF;
 }
 
-static enum appine_exit next(struct appine_cpu *c)
+static enum kazeterm_exit next(struct kazeterm_cpu *c)
 {
     c->pc += 4;
-    return APPINE_EXIT_NONE;
+    return KAZETERM_EXIT_NONE;
 }
 
-static void set_x(struct appine_cpu *c, unsigned r, uint64_t v)
+static void set_x(struct kazeterm_cpu *c, unsigned r, uint64_t v)
 {
     if (r != 31)
         c->x[r] = v;
 }
 
-static uint64_t get_x(const struct appine_cpu *c, unsigned r)
+static uint64_t get_x(const struct kazeterm_cpu *c, unsigned r)
 {
     return r == 31 ? 0 : c->x[r];
 }
@@ -43,34 +43,34 @@ static uint64_t get_x(const struct appine_cpu *c, unsigned r)
  * Gets the host address of an aligned access. These instructions require natural alignment,
  * otherwise it is an alignment fault; an aligned access never crosses a page. When access is
  * write, read permission is also required. watch is which kind of hardware watchpoint this
- * access counts as (APPINE_WATCH_*; a read-modify-write counts as both).
+ * access counts as (KAZETERM_WATCH_*; a read-modify-write counts as both).
  */
-static void *atomic_target_off(struct appine_cpu *c, unsigned rn, int64_t off, unsigned bytes,
+static void *atomic_target_off(struct kazeterm_cpu *c, unsigned rn, int64_t off, unsigned bytes,
                                uint32_t access, uint32_t watch)
 {
     uint64_t va = rn == 31 ? c->sp : c->x[rn];
     if (rn == 31 && (c->sp & 15)) {
-        raise_fault(c, c->sp, access, APPINE_FAULT_SP_ALIGN);
+        raise_fault(c, c->sp, access, KAZETERM_FAULT_SP_ALIGN);
         return NULL;
     }
     va = untag(va + (uint64_t)off);
     if (va & (bytes - 1)) {
-        raise_fault(c, va, access, APPINE_FAULT_ALIGN);
+        raise_fault(c, va, access, KAZETERM_FAULT_ALIGN);
         return NULL;
     }
-    if (access == APPINE_ACCESS_WRITE && !tlb_lookup(c, va, APPINE_ACCESS_READ)) {
-        raise_fault(c, va, APPINE_ACCESS_READ, APPINE_FAULT_PAGE);
+    if (access == KAZETERM_ACCESS_WRITE && !tlb_lookup(c, va, KAZETERM_ACCESS_READ)) {
+        raise_fault(c, va, KAZETERM_ACCESS_READ, KAZETERM_FAULT_PAGE);
         return NULL;
     }
     void *p = tlb_lookup(c, va, access);
     if (!p)
-        raise_fault(c, va, access, APPINE_FAULT_PAGE);
+        raise_fault(c, va, access, KAZETERM_FAULT_PAGE);
     else if (UNLIKELY(watch_hit(c, va, bytes, watch)))
-        return raise_fault(c, va, access, APPINE_FAULT_WATCH), NULL;
+        return raise_fault(c, va, access, KAZETERM_FAULT_WATCH), NULL;
     return p;
 }
 
-static void *atomic_target(struct appine_cpu *c, unsigned rn, unsigned bytes, uint32_t access,
+static void *atomic_target(struct kazeterm_cpu *c, unsigned rn, unsigned bytes, uint32_t access,
                            uint32_t watch)
 {
     return atomic_target_off(c, rn, 0, bytes, access, watch);
@@ -153,16 +153,16 @@ static bool cas(void *p, unsigned bytes, const uint64_t expected[2], const uint6
 }
 
 /* LDXR/LDAXR/LDXP/LDAXP, STXR/STLXR/STXP/STLXP */
-static enum appine_exit exclusive(struct appine_cpu *c, uint32_t insn, bool pair)
+static enum kazeterm_exit exclusive(struct kazeterm_cpu *c, uint32_t insn, bool pair)
 {
     unsigned size = FIELD(insn, 31, 30), load = BIT(insn, 22), ordered = BIT(insn, 15);
     unsigned rs = FIELD(insn, 20, 16), rt2 = FIELD(insn, 14, 10), rn = FIELD(insn, 9, 5);
     unsigned rt = insn & 31;
     unsigned esize = 1u << size, bytes = pair ? 2 * esize : esize;
-    void *p = atomic_target(c, rn, bytes, load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE,
-                            load ? APPINE_WATCH_LOAD : APPINE_WATCH_STORE);
+    void *p = atomic_target(c, rn, bytes, load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE,
+                            load ? KAZETERM_WATCH_LOAD : KAZETERM_WATCH_STORE);
     if (!p)
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
     uint64_t va = untag(rn == 31 ? c->sp : c->x[rn]);
 
     if (load) {
@@ -208,14 +208,14 @@ static void store_release(void *p, unsigned bytes, uint64_t v)
 }
 
 /* LDAR/STLR */
-static enum appine_exit acquire_release(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit acquire_release(struct kazeterm_cpu *c, uint32_t insn)
 {
     unsigned size = FIELD(insn, 31, 30), load = BIT(insn, 22), rn = FIELD(insn, 9, 5);
     unsigned rt = insn & 31, bytes = 1u << size;
-    void *p = atomic_target(c, rn, bytes, load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE,
-                            load ? APPINE_WATCH_LOAD : APPINE_WATCH_STORE);
+    void *p = atomic_target(c, rn, bytes, load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE,
+                            load ? KAZETERM_WATCH_LOAD : KAZETERM_WATCH_STORE);
     if (!p)
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
     if (load) {
         uint64_t v[2];
         load_atomic(p, bytes, true, v);
@@ -228,12 +228,12 @@ static enum appine_exit acquire_release(struct appine_cpu *c, uint32_t insn)
 
 /* LDAPR, LDAPRB, LDAPRH (LRCPC): read as LDAR does; acquire is stronger than RCpc, which the
  * architecture allows */
-static enum appine_exit load_acquire_rcpc(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit load_acquire_rcpc(struct kazeterm_cpu *c, uint32_t insn)
 {
     unsigned bytes = 1u << FIELD(insn, 31, 30), rt = insn & 31;
-    void *p = atomic_target(c, FIELD(insn, 9, 5), bytes, APPINE_ACCESS_READ, APPINE_WATCH_LOAD);
+    void *p = atomic_target(c, FIELD(insn, 9, 5), bytes, KAZETERM_ACCESS_READ, KAZETERM_WATCH_LOAD);
     if (!p)
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
     uint64_t v[2];
     load_atomic(p, bytes, true, v);
     set_x(c, rt, v[0]);
@@ -245,16 +245,16 @@ static enum appine_exit load_acquire_rcpc(struct appine_cpu *c, uint32_t insn)
  * and LDAR do (alignment required). opc is 00 store, 01 load with zero extension, 10 load with
  * sign extension to 64 bits, 11 extension to 32 bits
  */
-static enum appine_exit rcpc_unscaled(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit rcpc_unscaled(struct kazeterm_cpu *c, uint32_t insn)
 {
     unsigned bytes = 1u << FIELD(insn, 31, 30), opc = FIELD(insn, 23, 22), rt = insn & 31;
     int64_t off = (int64_t)((uint64_t)FIELD(insn, 20, 12) << 55) >> 55;
     bool load = opc != 0;
     void *p = atomic_target_off(c, FIELD(insn, 9, 5), off, bytes,
-                                load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE,
-                                load ? APPINE_WATCH_LOAD : APPINE_WATCH_STORE);
+                                load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE,
+                                load ? KAZETERM_WATCH_LOAD : KAZETERM_WATCH_STORE);
     if (!p)
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
     if (!load) {
         store_release(p, bytes, get_x(c, rt));
         return next(c);
@@ -271,21 +271,21 @@ static enum appine_exit rcpc_unscaled(struct appine_cpu *c, uint32_t insn)
 }
 
 /* Executes one LSE instruction as is on the translated host address */
-static enum appine_exit native_atomic(struct appine_cpu *c, uint32_t insn, unsigned bytes,
+static enum kazeterm_exit native_atomic(struct kazeterm_cpu *c, uint32_t insn, unsigned bytes,
                                       const struct native_desc *d)
 {
-    void *p = atomic_target(c, FIELD(insn, 9, 5), bytes, APPINE_ACCESS_WRITE,
-                            APPINE_WATCH_LOAD | APPINE_WATCH_STORE);
+    void *p = atomic_target(c, FIELD(insn, 9, 5), bytes, KAZETERM_ACCESS_WRITE,
+                            KAZETERM_WATCH_LOAD | KAZETERM_WATCH_STORE);
     if (!p)
-        return APPINE_EXIT_FAULT;
-    if (!appine_native_exec(insn, d, c, p))
+        return KAZETERM_EXIT_FAULT;
+    if (!kazeterm_native_exec(insn, d, c, p))
         return undef(c, insn);
     return next(c);
 }
 
-enum appine_exit appine_atomic_exec(struct appine_cpu *c, uint32_t insn)
+enum kazeterm_exit kazeterm_atomic_exec(struct kazeterm_cpu *c, uint32_t insn)
 {
-    bool lse = appine_has(APPINE_HWCAP_ATOMICS);
+    bool lse = kazeterm_has(KAZETERM_HWCAP_ATOMICS);
     unsigned size = FIELD(insn, 31, 30);
 
     if ((insn & 0x3f000000) == 0x08000000) { /* exclusives, acquire/release, CAS, CASP */
@@ -324,14 +324,14 @@ enum appine_exit appine_atomic_exec(struct appine_cpu *c, uint32_t insn)
     /* size 11 has no sign-extending load, size 10 none extending to 32 bits */
     if ((insn & 0x3f200c00) == 0x19000000) {
         unsigned opc = FIELD(insn, 23, 22);
-        if (!appine_has(APPINE_HWCAP_ILRCPC) || (size == 3 && opc >= 2) || (size == 2 && opc == 3))
+        if (!kazeterm_has(KAZETERM_HWCAP_ILRCPC) || (size == 3 && opc >= 2) || (size == 2 && opc == 3))
             return undef(c, insn);
         return rcpc_unscaled(c, insn);
     }
     /* LDAPR is in the LSE group: A = 1, R = 0, Rs all ones (the only form LLVM accepts), o3 = 1,
      * opc = 100 */
     if ((insn & 0x3ffffc00) == 0x38bfc000)
-        return appine_has(APPINE_HWCAP_LRCPC) ? load_acquire_rcpc(c, insn) : undef(c, insn);
+        return kazeterm_has(KAZETERM_HWCAP_LRCPC) ? load_acquire_rcpc(c, insn) : undef(c, insn);
     if ((insn & 0x3f200c00) == 0x38200000 && !BIT(insn, 26)) { /* LD<op>, SWP */
         unsigned o3 = BIT(insn, 15), opc = FIELD(insn, 14, 12);
         if (!lse || (o3 && opc != 0)) /* the other forms with o3 = 1 and opc ≠ 0 are undefined */

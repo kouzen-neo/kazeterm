@@ -265,7 +265,7 @@ print("a library from the mount:", z.zlibVersion().decode() == zlib.ZLIB_RUNTIME
 '
 rm m/big m/libz.so.1 out
 echo "-- upper layer"
-# Without RENAME_WHITEOUT (Appine) fuse-overlayfs leaves .wh. files instead of whiteout devices
+# Without RENAME_WHITEOUT (KazeTerm) fuse-overlayfs leaves .wh. files instead of whiteout devices
 find u ! -type c ! -name '.wh.*' | sort | sed 's/^/  /'
 echo "-- unmount"
 umount m && echo unmounted

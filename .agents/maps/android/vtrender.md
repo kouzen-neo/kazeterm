@@ -14,7 +14,7 @@
 cache and `VtGlyphs`' shapes, with the bundled JetBrains Mono font.
 
 Root: `VtFrame.kt`, `VtScreen.kt`, `VtRenderer.kt`, `VtImages.kt` and `VtGlyphs.kt` in
-`android/app/src/main/java/io/github/mthli/appine/`, `android/app/src/main/assets/fonts/`, and the
+`android/app/src/main/java/com/kazeterm/`, `android/app/src/main/assets/fonts/`, and the
 frame-format specification and Frames section of `hosts/android/src/vt.c` (including frame-driven
 search progress, viewport match encoding and Kitty image extraction).
 
@@ -42,7 +42,7 @@ as a caller as well as rendering; it does not transfer those lifecycle methods h
 
 ## Public entry points
 
-- Native: `appine_vt_frame` and `appine_vt_image`, reached through android/vtcore's `VtNative.frame`
+- Native: `kazeterm_vt_frame` and `kazeterm_vt_image`, reached through android/vtcore's `VtNative.frame`
   and `VtNative.image` with its tab lock and JNI buffer/bitmap handling.
 - `VtFrame`: header accessors, `placement` and `takeRows`; the format is shared with vt.c.
 - `VtScreen`: `resize`, `span`, cell arrays, default colours and cursor state.

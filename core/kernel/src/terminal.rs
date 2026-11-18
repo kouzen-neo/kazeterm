@@ -7,12 +7,12 @@
 //! objects only while holding the BKL, and they wait through the same mechanism: a guest write to
 //! the terminal requests a wake, and a host thread waiting for output wakes up.
 //!
-//! `appine-run` uses [`bridge`] to connect the host terminal to a console.
+//! `kazeterm-run` uses [`bridge`] to connect the host terminal to a console.
 
 use std::rc::Rc;
 use std::sync::Arc;
 
-use appine_hal::Event;
+use kazeterm_hal::Event;
 
 use crate::cell::RefCell;
 use crate::errno::Errno;
@@ -233,7 +233,7 @@ pub(crate) fn close(k: &mut Kernel, id: u32) -> Result<(), Errno> {
     Ok(())
 }
 
-// ---- The appine-run bridge ----
+// ---- The kazeterm-run bridge ----
 
 /// A terminal attached to the host ([`RunOptions::terminal`](crate::RunOptions::terminal)).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -269,7 +269,7 @@ pub(crate) fn initial_size(term: &Terminal) -> Winsize {
     term.size.and_then(host_winsize).unwrap_or_default()
 }
 
-/// The bridge thread of `appine-run`: connects the host terminal to console `id` until process
+/// The bridge thread of `kazeterm-run`: connects the host terminal to console `id` until process
 /// `pid` ends, all guest threads have exited and the output has been written.
 pub(crate) fn bridge(shared: Arc<Shared>, term: Terminal, id: u32, pid: Tid) {
     let event = Arc::new(Event::new().expect("cannot create an eventfd for the terminal"));
@@ -319,7 +319,7 @@ pub(crate) fn bridge(shared: Arc<Shared>, term: Terminal, id: u32, pid: Tid) {
             }
             if fd == term.input {
                 drop(k);
-                let n = appine_hal::read(fd, &mut buf[..room.min(READ_CHUNK)]);
+                let n = kazeterm_hal::read(fd, &mut buf[..room.min(READ_CHUNK)]);
                 k = shared.lock();
                 match n {
                     Ok(n) if n > 0 => {
@@ -330,7 +330,7 @@ pub(crate) fn bridge(shared: Arc<Shared>, term: Terminal, id: u32, pid: Tid) {
                     _ => eof = Eof::Pending,
                 }
             } else {
-                appine_hal::drain(fd);
+                kazeterm_hal::drain(fd);
                 if let Some(w) = term.size.and_then(host_winsize) {
                     let _ = resize(&k, id, w);
                 }
@@ -342,7 +342,7 @@ pub(crate) fn bridge(shared: Arc<Shared>, term: Terminal, id: u32, pid: Tid) {
 /// Writes all the data to the host fd; drops it when the host side has closed.
 fn write_all(fd: i32, mut data: &[u8]) {
     while !data.is_empty() {
-        match appine_hal::write(fd, data) {
+        match kazeterm_hal::write(fd, data) {
             Ok(0) | Err(_) => return,
             Ok(n) => data = &data[n..],
         }
@@ -379,7 +379,7 @@ fn send_eof(k: &Kernel, id: u32) -> bool {
 fn host_winsize(fd: i32) -> Option<Winsize> {
     const TIOCGWINSZ: u64 = 0x5413;
     let mut b = [0u8; 8];
-    appine_hal::ioctl(fd, TIOCGWINSZ, &mut b).ok()?;
+    kazeterm_hal::ioctl(fd, TIOCGWINSZ, &mut b).ok()?;
     let w = Winsize::decode(&b);
     (w.rows > 0 && w.cols > 0).then_some(w)
 }

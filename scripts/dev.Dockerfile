@@ -1,4 +1,4 @@
-# Appine's Linux arm64 development environment (design doc §13.3), built automatically by
+# KazeTerm's Linux arm64 development environment (design doc §13.3), built automatically by
 # scripts/dev.
 # llvm provides llvm-mc, which independently checks the interpreter's instruction whitelist;
 # musl-tools provides musl-gcc, which compiles the guest test programs linked with musl

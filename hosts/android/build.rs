@@ -3,7 +3,7 @@
 //! (where the crate is empty) it does nothing.
 //!
 //! The libghostty-vt source comes from scripts/fetch-ghostty
-//! (target/ghostty/libghostty-vt-<version>, or APPINE_GHOSTTY_SRC), with the release's Zig
+//! (target/ghostty/libghostty-vt-<version>, or KAZETERM_GHOSTTY_SRC), with the release's Zig
 //! packages beside it (the same path with `-deps`), which `zig build --system` takes, so this build
 //! needs no network. The Zig binary is `zig` on PATH or ZIG; the build finds the NDK through
 //! ANDROID_NDK_HOME, which the Gradle task sets.
@@ -17,14 +17,14 @@ const GHOSTTY: &str = "libghostty-vt-1.0.0";
 
 fn main() {
     println!("cargo:rerun-if-changed=src/vt.c");
-    println!("cargo:rerun-if-env-changed=APPINE_GHOSTTY_SRC");
+    println!("cargo:rerun-if-env-changed=KAZETERM_GHOSTTY_SRC");
     println!("cargo:rerun-if-env-changed=ZIG");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("android") {
         return;
     }
 
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let src = env::var_os("APPINE_GHOSTTY_SRC").map_or_else(
+    let src = env::var_os("KAZETERM_GHOSTTY_SRC").map_or_else(
         || manifest.join("../../target/ghostty").join(GHOSTTY),
         PathBuf::from,
     );
@@ -90,7 +90,7 @@ fn main() {
         .std("c11")
         .warnings(true)
         .extra_warnings(true)
-        .compile("appine_vt");
+        .compile("kazeterm_vt");
     // After vt.c, which uses it
     println!(
         "cargo:rustc-link-search=native={}",

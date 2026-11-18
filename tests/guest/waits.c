@@ -359,7 +359,7 @@ int main(void)
     CHECK(sigtimedwait(&usr2, NULL, &short_wait) < 0 && errno == EAGAIN, "sigtimedwait");
     ok("sigtimedwait timeout");
     struct mq_attr attr = {.mq_maxmsg = 4, .mq_msgsize = 16};
-    mqd_t mq = mq_open("/appine-waits", O_CREAT | O_RDWR, 0600, &attr);
+    mqd_t mq = mq_open("/kazeterm-waits", O_CREAT | O_RDWR, 0600, &attr);
     CHECK(mq != (mqd_t)-1, "mq_open");
     struct timespec now;
     clock_gettime(CLOCK_REALTIME, &now);
@@ -372,7 +372,7 @@ int main(void)
     CHECK(mq_timedreceive(mq, buf, sizeof buf, NULL, &now) < 0 && errno == ETIMEDOUT,
           "mq_timedreceive");
     mq_close(mq);
-    mq_unlink("/appine-waits");
+    mq_unlink("/kazeterm-waits");
     ok("mq_timedreceive timeout");
     unsigned long ctx = 0;
     CHECK(syscall(SYS_io_setup, 1, &ctx) == 0, "io_setup");
@@ -486,7 +486,7 @@ int main(void)
     CHECK(waitpid(child, &st, 0) == child && WEXITSTATUS(st) == 5, "waitpid");
     ok("waitpid");
     seccomp_listener();
-    /* syslog reads: the log of a newly started Appine is empty, so wait until a signal arrives
+    /* syslog reads: the log of a newly started KazeTerm is empty, so wait until a signal arrives
      * (the handler has no SA_RESTART: EINTR); then wait until someone writes /dev/kmsg */
     struct sigaction sa = {.sa_handler = on_alrm};
     sigaction(SIGALRM, &sa, NULL);

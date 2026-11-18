@@ -1,9 +1,9 @@
-//! The Appine kernel layer: the Linux user-space ABI implemented in-process (design doc §3 and
+//! The KazeTerm kernel layer: the Linux user-space ABI implemented in-process (design doc §3 and
 //! each module's map).
 //!
 //! Every guest thread runs on its own host thread, and the kernel layer is protected by one big
 //! kernel lock; through [`Machine`] the host starts processes and opens consoles (the Android
-//! terminal tabs, `appine-run`). The root filesystem is the inode store.
+//! terminal tabs, `kazeterm-run`). The root filesystem is the inode store.
 
 mod bpf;
 mod bug;
@@ -56,8 +56,8 @@ mod vdso;
 pub mod vfs;
 mod watchdog;
 
-pub use appine_engine::DbtStats;
-pub use appine_hal::net::Route as HostRoute;
+pub use kazeterm_engine::DbtStats;
+pub use kazeterm_hal::net::Route as HostRoute;
 pub use bug::{KillReason, KillReport};
 pub use inittab::Power;
 pub use loader::LoadError;
@@ -97,11 +97,11 @@ pub fn import_rootfs(store: &Path, tarball: &Path) -> Result<ImportReport, Errno
 pub fn sync_store(store: &Path) -> Result<(), Errno> {
     let dir =
         std::fs::File::open(store).map_err(|e| Errno(e.raw_os_error().unwrap_or(Errno::EIO.0)))?;
-    appine_hal::syncfs(std::os::fd::AsRawFd::as_raw_fd(&dir)).map_err(Errno)
+    kazeterm_hal::syncfs(std::os::fd::AsRawFd::as_raw_fd(&dir)).map_err(Errno)
 }
 
 /// Writes a file in the inode store (for the host to prepare configuration files, such as
-/// `/etc/profile.d/appine.sh` on first start); `path` is a guest path. See [`vfs::write_file`].
+/// `/etc/profile.d/kazeterm.sh` on first start); `path` is a guest path. See [`vfs::write_file`].
 pub fn write_file(
     store: &Path,
     path: &str,

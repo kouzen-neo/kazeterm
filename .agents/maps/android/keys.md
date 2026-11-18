@@ -9,7 +9,7 @@
 
 ## Responsibilities
 
-`android/keys` owns `ExtraKeysView.kt` in `android/app/src/main/java/io/github/mthli/appine/`: adaptive
+`android/keys` owns `ExtraKeysView.kt` in `android/app/src/main/java/com/kazeterm/`: adaptive
 rows, pages, key touch/repeat handling, one-shot/locked modifiers and shared indicator helpers.
 `MainActivity.Keys`/`Host`, routing to the terminal, insets/IME translation and shared resources
 remain `android/terminal`; terminal key encoding remains `android/vtview`.

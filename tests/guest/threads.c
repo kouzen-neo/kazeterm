@@ -1,6 +1,6 @@
 /*
  * Guest test program for threads, futexes and signals (M3a): build with musl-gcc -static and run
- * directly in appine-run (no rootfs needed). Each check that passes prints a line "ok <name>"; a
+ * directly in kazeterm-run (no rootfs needed). Each check that passes prints a line "ok <name>"; a
  * failure prints the reason and exits with 1; when all pass it prints "all ok" at the end.
  */
 #define _GNU_SOURCE

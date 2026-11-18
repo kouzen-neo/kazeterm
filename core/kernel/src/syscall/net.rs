@@ -121,14 +121,14 @@ pub(super) fn socket(cx: &mut Cx<'_>, domain: i32, ty: u32, protocol: i32) -> Sy
             } else {
                 base
             };
-            let fd = appine_hal::net::socket(domain, host_ty, protocol).map_err(Errno)?;
+            let fd = kazeterm_hal::net::socket(domain, host_ty, protocol).map_err(Errno)?;
             let mut s = InetSocket::new(fd, domain, host_ty);
             s.raw = base == SOCK_RAW;
             if s.raw {
                 // Enable IP_RECVERR and the like on the host for it (crate::rawicmp); everything
                 // received goes through the aggregation point
                 for &(level, name) in crate::rawicmp::RawIcmp::host_options(domain) {
-                    let _ = appine_hal::net::setsockopt(fd, level, name, &1i32.to_le_bytes());
+                    let _ = kazeterm_hal::net::setsockopt(fd, level, name, &1i32.to_le_bytes());
                 }
                 let tap = crate::rawicmp::tap_for(cx.k(), &net)?;
                 s.icmp = Some(crate::rawicmp::RawIcmp::new(domain, tap));
@@ -352,10 +352,10 @@ pub(super) fn bind(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResult {
                     let try_bind = |h: u16| {
                         let mut a = host_addr.clone();
                         set_port(&mut a, h);
-                        appine_hal::net::bind(fd, &a)
+                        kazeterm_hal::net::bind(fd, &a)
                     };
                     let bound = || {
-                        appine_hal::net::sockname(fd, false)
+                        kazeterm_hal::net::sockname(fd, false)
                             .ok()
                             .and_then(|a| port_of(&a))
                     };
@@ -379,10 +379,10 @@ pub(super) fn bind(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResult {
                     let try_bind = |h: u16| {
                         let mut a = host_addr.clone();
                         set_port(&mut a, h);
-                        appine_hal::net::bind(fd, &a)
+                        kazeterm_hal::net::bind(fd, &a)
                     };
                     let bound = || {
-                        appine_hal::net::sockname(fd, false)
+                        kazeterm_hal::net::sockname(fd, false)
                             .ok()
                             .and_then(|a| port_of(&a))
                     };
@@ -397,7 +397,7 @@ pub(super) fn bind(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResult {
                         crate::klog::printk(
                             &cx.kr().klog,
                             crate::klog::level::INFO,
-                            format_args!("appine: port {port}/{proto} is {host} on the host"),
+                            format_args!("kazeterm: port {port}/{proto} is {host} on the host"),
                         );
                     }
                     s.lease = Some(lease);
@@ -406,10 +406,10 @@ pub(super) fn bind(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResult {
                 // A raw socket may be bound again (raw_bind), but its host ping socket refuses a
                 // second bind: binding the address it already has succeeds without one
                 None if s.icmp.is_some()
-                    && appine_hal::net::sockname(s.fd, false).is_ok_and(|cur| {
+                    && kazeterm_hal::net::sockname(s.fd, false).is_ok_and(|cur| {
                         port_of(&cur) != Some(0) && same_host(&cur, &host_addr)
                     }) => {}
-                None => appine_hal::net::bind(s.fd, &host_addr).map_err(Errno)?,
+                None => kazeterm_hal::net::bind(s.fd, &host_addr).map_err(Errno)?,
             }
             if s.net.is_some() {
                 s.bound = true;
@@ -572,14 +572,14 @@ pub(super) fn listen(cx: &mut Cx<'_>, fd: i32, backlog: i32) -> SysResult {
                 .as_ref()
                 .and_then(|ns| crate::netns::implicit_bind(ns, s.family, s.icmp6()));
             ensure_bound(s, src.as_deref())?;
-            appine_hal::net::listen(s.fd, backlog).map_err(Errno)?;
+            kazeterm_hal::net::listen(s.fd, backlog).map_err(Errno)?;
             s.listening = true;
             // TCP listens in a new network namespace are registered in the namespace: incoming
             // connections are judged by it (crate::netns)
             if let Some(net) = &s.net
                 && s.listener.is_none()
                 && map_proto(s) == IPPROTO_TCP
-                && let Ok(local) = appine_hal::net::sockname(s.fd, false)
+                && let Ok(local) = kazeterm_hal::net::sockname(s.fd, false)
                 && let Some(host) = port_of(&local)
             {
                 let port = match s.local_map {
@@ -603,7 +603,7 @@ pub(super) fn listen(cx: &mut Cx<'_>, fd: i32, backlog: i32) -> SysResult {
             forward_socket(cx.kr(), s);
             // A listen other devices can reach (design doc §12 item 7): the app notifies the user
             // which port on the host to connect to
-            if let Ok(local) = appine_hal::net::sockname(s.fd, false)
+            if let Ok(local) = kazeterm_hal::net::sockname(s.fd, false)
                 && let (Some(ip), Some(host)) = (ip_of(&local), port_of(&local))
                 && !ip.is_loopback()
             {
@@ -680,11 +680,11 @@ fn accept_host(
         };
     let deadline = timeout.map(|t| Instant::now() + t);
     loop {
-        match appine_hal::net::accept(host_fd) {
+        match kazeterm_hal::net::accept(host_fd) {
             Ok((new, peer)) => {
                 let mut new = InetSocket::new(new, family, ty);
                 new.proto = proto;
-                // The listener's timeouts and the filter kept in Appine carry over (sk_clone_lock
+                // The listener's timeouts and the filter kept in KazeTerm carry over (sk_clone_lock
                 // copies the whole sock and shares sk_filter)
                 (new.rcvtimeo, new.sndtimeo) = (timeout, sndtimeo);
                 let (mark, filter, v6only) = &inherited;
@@ -702,7 +702,7 @@ fn accept_host(
                 // destination seen in this namespace (SO_ORIGINAL_DST, crate::origdst)
                 if ty == SOCK_STREAM
                     && !cx.kr().orig_dst.is_empty()
-                    && let Ok(local) = appine_hal::net::sockname(new.fd, false)
+                    && let Ok(local) = kazeterm_hal::net::sockname(new.fd, false)
                     && let (Some(p), Some(l)) = (
                         crate::origdst::end_of(&peer),
                         crate::origdst::end_of(&local),
@@ -766,7 +766,7 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
             if stub_capable(s) {
                 s.stub_peer = is_stub(&addr);
                 if s.stub_peer {
-                    let _ = appine_hal::net::connect(s.fd, &addr);
+                    let _ = kazeterm_hal::net::connect(s.fd, &addr);
                     return Ok(0);
                 }
             }
@@ -850,17 +850,17 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
                     // Disconnect only when really connected on the host; disconnecting releases
                     // the port the kernel assigned (when bound to port 0, udp_disconnect), so bind
                     // the original one back, keeping getsockname and the registered port unchanged
-                    if was.is_none() && appine_hal::net::sockname(s.fd, true).is_ok() {
-                        let old = appine_hal::net::sockname(s.fd, false).ok();
-                        let _ = appine_hal::net::connect(s.fd, &[0u8; 16]);
+                    if was.is_none() && kazeterm_hal::net::sockname(s.fd, true).is_ok() {
+                        let old = kazeterm_hal::net::sockname(s.fd, false).ok();
+                        let _ = kazeterm_hal::net::connect(s.fd, &[0u8; 16]);
                         if let Some(o) = old
-                            && appine_hal::net::sockname(s.fd, false)
+                            && kazeterm_hal::net::sockname(s.fd, false)
                                 .ok()
                                 .as_deref()
                                 .and_then(port_of)
                                 != port_of(&o)
                         {
-                            let _ = appine_hal::net::bind(s.fd, &o);
+                            let _ = kazeterm_hal::net::bind(s.fd, &o);
                         }
                     }
                     s.vconn = Some(host_addr);
@@ -886,7 +886,7 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
         }
         Socket::Netlink(_) | Socket::Unix(_) => unreachable!("handled above"),
     };
-    let r = appine_hal::net::connect(host_fd, &host_addr);
+    let r = kazeterm_hal::net::connect(host_fd, &host_addr);
     if tcp {
         count_connect(cx, &sock, r.err().map(Errno));
     }
@@ -897,7 +897,7 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
     if let Some(origs) = origs
         && (r.is_ok() || r == Err(Errno::EINPROGRESS.0))
         && (!origs.is_empty() || !cx.kr().orig_dst.is_empty())
-        && let Ok(local) = appine_hal::net::sockname(host_fd, false)
+        && let Ok(local) = kazeterm_hal::net::sockname(host_fd, false)
         && let (Some(a), Some(b)) = (
             crate::origdst::end_of(&local),
             crate::origdst::end_of(&host_addr),
@@ -938,7 +938,7 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
     let deadline = timeout.map(|t| Instant::now() + t);
     loop {
         let mut pfd = [(host_fd, POLLOUT, 0)];
-        appine_hal::poll(&mut pfd, Some(Duration::ZERO)).map_err(Errno)?;
+        kazeterm_hal::poll(&mut pfd, Some(Duration::ZERO)).map_err(Errno)?;
         if pfd[0].2 != 0 {
             break;
         }
@@ -954,13 +954,13 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
         }
         cx.wait_objects(deadline, &mut pfd, wake::FILE, &[wake::of(&sock)])?;
     }
-    let err = appine_hal::net::getsockopt(host_fd, SOL_SOCKET, SO_ERROR, 4).map_err(Errno)?;
+    let err = kazeterm_hal::net::getsockopt(host_fd, SOL_SOCKET, SO_ERROR, 4).map_err(Errno)?;
     match i32::from_le_bytes(err[..4].try_into().unwrap()) {
         // At the socket layer the host socket is still "connecting", and becomes "connected"
         // only after connecting once more: otherwise a later connect by the guest would succeed,
         // whereas on Linux connecting again after a blocking connect returned is EISCONN
         0 => {
-            let _ = appine_hal::net::connect(host_fd, &host_addr);
+            let _ = kazeterm_hal::net::connect(host_fd, &host_addr);
             if let Socket::Inet(s) = &mut *sock.borrow_mut() {
                 s.opening = false;
             }
@@ -971,7 +971,7 @@ pub(super) fn connect(cx: &mut Cx<'_>, fd: i32, addr: u64, len: u32) -> SysResul
         // the guest's: otherwise the guest's next connect on this socket would get that
         // ECONNABORTED instead of sending a new SYN
         e => {
-            let _ = appine_hal::net::connect(host_fd, &host_addr);
+            let _ = kazeterm_hal::net::connect(host_fd, &host_addr);
             if tcp {
                 count_connect(cx, &sock, Some(Errno(e)));
             }
@@ -989,25 +989,25 @@ fn blackhole(k: &crate::kernel::Kernel) -> Option<Vec<u8>> {
     k.blackhole
         .get_or_init(|| {
             const POLLOUT: i16 = 4;
-            let lo = appine_hal::net::sockaddr(std::net::SocketAddr::from(([127, 0, 0, 1], 0)));
-            let l = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).ok()?;
-            appine_hal::net::bind(l, &lo).ok()?;
-            appine_hal::net::listen(l, 0).ok()?;
-            let addr = appine_hal::net::sockname(l, false).ok()?;
+            let lo = kazeterm_hal::net::sockaddr(std::net::SocketAddr::from(([127, 0, 0, 1], 0)));
+            let l = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).ok()?;
+            kazeterm_hal::net::bind(l, &lo).ok()?;
+            kazeterm_hal::net::listen(l, 0).ok()?;
+            let addr = kazeterm_hal::net::sockname(l, false).ok()?;
             // Fill the accept queue: connect until one fails (even with backlog 0 one or two may
             // get in first)
             let connects = |wait: Duration| -> Option<(i32, bool)> {
-                let c = appine_hal::net::socket(AF_INET, SOCK_STREAM, 0).ok()?;
-                let _ = appine_hal::net::connect(c, &addr);
+                let c = kazeterm_hal::net::socket(AF_INET, SOCK_STREAM, 0).ok()?;
+                let _ = kazeterm_hal::net::connect(c, &addr);
                 let mut p = [(c, POLLOUT, 0)];
-                let _ = appine_hal::poll(&mut p, Some(wait));
-                let err = appine_hal::net::getsockopt(c, SOL_SOCKET, SO_ERROR, 4).ok()?;
+                let _ = kazeterm_hal::poll(&mut p, Some(wait));
+                let err = kazeterm_hal::net::getsockopt(c, SOL_SOCKET, SO_ERROR, 4).ok()?;
                 Some((c, p[0].2 & POLLOUT != 0 && err[..4] == [0; 4]))
             };
             for _ in 0..4 {
                 let (c, done) = connects(Duration::from_millis(200))?;
                 if !done {
-                    appine_hal::net::close(c);
+                    kazeterm_hal::net::close(c);
                     // The listener and the connections filled in stay forever
                     return Some(addr);
                 }
@@ -1029,14 +1029,14 @@ fn ensure_bound(s: &mut InetSocket, source: Option<&[u8]>) -> Result<(), Errno> 
         if !s.bound {
             match source {
                 Some(addr) => {
-                    appine_hal::net::bind(s.fd, addr).map_err(Errno)?;
+                    kazeterm_hal::net::bind(s.fd, addr).map_err(Errno)?;
                     s.any = true;
                     register_udp(s);
                     // A UDP socket sending to its own virtual address: register the port so that
                     // answers can be delivered (crate::netns)
                     if s.ty == SOCK_DGRAM
                         && crate::netns::is_self_source(&net, addr)
-                        && let Some(p) = appine_hal::net::sockname(s.fd, false)
+                        && let Some(p) = kazeterm_hal::net::sockname(s.fd, false)
                             .ok()
                             .as_deref()
                             .and_then(port_of)
@@ -1051,10 +1051,10 @@ fn ensure_bound(s: &mut InetSocket, source: Option<&[u8]>) -> Result<(), Errno> 
             s.bound = true;
         }
     } else if let Some(addr) = source
-        && appine_hal::net::sockname(s.fd, false)
+        && kazeterm_hal::net::sockname(s.fd, false)
             .ok()
             .is_some_and(|a| port_of(&a) == Some(0) && crate::netns::is_any(&a))
-        && appine_hal::net::bind(s.fd, addr).is_ok()
+        && kazeterm_hal::net::bind(s.fd, addr).is_ok()
     {
         // To the guest it is an autobound wildcard address (getsockname reports it before
         // connecting)
@@ -1074,7 +1074,7 @@ fn register_udp(s: &mut InetSocket) {
     {
         return;
     }
-    let Ok(local) = appine_hal::net::sockname(s.fd, false) else {
+    let Ok(local) = kazeterm_hal::net::sockname(s.fd, false) else {
         return;
     };
     let Some(host) = port_of(&local).filter(|&p| p != 0) else {
@@ -1217,7 +1217,7 @@ fn connected_peer(s: &InetSocket, addr: &[u8]) -> Vec<u8> {
             let mut a = addr.to_vec();
             a.resize(28, 0);
             let mapped = a[8..20] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff];
-            let mapped_local = appine_hal::net::sockname(s.fd, false)
+            let mapped_local = kazeterm_hal::net::sockname(s.fd, false)
                 .is_ok_and(|l| l.get(8..20) == Some(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff]));
             if a[8..24] == [0; 16] && mapped_local {
                 a[18..24].copy_from_slice(&[0xff, 0xff, 127, 0, 0, 1]);
@@ -1239,7 +1239,7 @@ fn connected_peer(s: &InetSocket, addr: &[u8]) -> Vec<u8> {
 /// The host socket's local (or with `peer`, peer) address as the guest sees it (getsockname,
 /// getpeername).
 fn inet_name(cx: &Cx<'_>, s: &InetSocket, peer: bool) -> Result<Vec<u8>, Errno> {
-    let mut a = appine_hal::net::sockname(s.fd, peer).map_err(Errno)?;
+    let mut a = kazeterm_hal::net::sockname(s.fd, peer).map_err(Errno)?;
     // A raw socket's local "port" is the protocol number (inet_sport, set by Linux's
     // inet_create), while the host's ping socket reports its number
     if s.icmp.is_some() && !peer && a.len() >= 4 {
@@ -1251,7 +1251,7 @@ fn inet_name(cx: &Cx<'_>, s: &InetSocket, peer: bool) -> Result<Vec<u8>, Errno> 
     let other = if peer {
         None
     } else {
-        appine_hal::net::sockname(s.fd, true).ok()
+        kazeterm_hal::net::sockname(s.fd, true).ok()
     };
     if peer && let Some(g) = &s.guest_peer {
         return Ok(g.clone());
@@ -1389,7 +1389,7 @@ pub(super) fn setsockopt(
         let mut host = [0u8; 16];
         host[..2].copy_from_slice(&(n as u16).to_le_bytes());
         host[8..16].copy_from_slice(&(insns.as_ptr() as u64).to_le_bytes());
-        let attach = |fd: i32| appine_hal::net::setsockopt(fd, level, name, &host);
+        let attach = |fd: i32| kazeterm_hal::net::setsockopt(fd, level, name, &host);
         let res = if tcp_filter && crate::bug::host_refuses_tcp_filters() {
             Err(Errno::EPERM.0)
         } else {
@@ -1398,9 +1398,9 @@ pub(super) fn setsockopt(
         let kept = match res {
             Ok(()) => None,
             Err(e) if e == Errno::EPERM.0 && tcp_filter => {
-                let scratch = appine_hal::net::socket(AF_INET, SOCK_DGRAM, 0).map_err(Errno)?;
+                let scratch = kazeterm_hal::net::socket(AF_INET, SOCK_DGRAM, 0).map_err(Errno)?;
                 let checked = attach(scratch);
-                appine_hal::net::close(scratch);
+                kazeterm_hal::net::close(scratch);
                 checked.map_err(Errno)?;
                 Some(insns)
             }
@@ -1413,7 +1413,7 @@ pub(super) fn setsockopt(
         }
         return Ok(0);
     }
-    // SO_DETACH_FILTER of a program kept in Appine (Linux's sk_detach_filter: EPERM while the
+    // SO_DETACH_FILTER of a program kept in KazeTerm (Linux's sk_detach_filter: EPERM while the
     // filter is locked); without one the host answers (ENOENT when it has none either)
     if (level, name) == (SOL_SOCKET, SO_DETACH_FILTER)
         && let Socket::Inet(s) = &mut *sock.borrow_mut()
@@ -1458,7 +1458,7 @@ pub(super) fn setsockopt(
                 let on = v.get(..4).ok_or(Errno::EINVAL)?;
                 s.v6only = i32::from_le_bytes(on.try_into().unwrap()) != 0;
             }
-            _ => appine_hal::net::setsockopt(s.fd, level, name, &v).map_err(Errno)?,
+            _ => kazeterm_hal::net::setsockopt(s.fd, level, name, &v).map_err(Errno)?,
         },
         Socket::Netlink(_) | Socket::Unix(_) => unreachable!("handled above"),
     }
@@ -1480,7 +1480,7 @@ fn new_timeouts(level: i32, name: i32) -> i32 {
 /// Whether the host socket's filter is locked (`SO_LOCK_FILTER`, which goes to the host): Linux
 /// then refuses to attach or detach one with EPERM. A host that cannot say counts as unlocked.
 fn filter_locked(host_fd: i32) -> bool {
-    appine_hal::net::getsockopt(host_fd, SOL_SOCKET, SO_LOCK_FILTER, 4)
+    kazeterm_hal::net::getsockopt(host_fd, SOL_SOCKET, SO_LOCK_FILTER, 4)
         .is_ok_and(|v| v.iter().any(|&b| b != 0))
 }
 
@@ -1722,7 +1722,7 @@ pub(super) fn getsockopt(
     }
     // SO_GET_FILTER: Linux's sk_get_filter takes optlen as a count of instructions (8 bytes
     // each), and optlen comes back as the program's count; with 0 only the count is asked, and
-    // fewer than the program has is EINVAL. A program kept in Appine (InetSocket::filter) answers
+    // fewer than the program has is EINVAL. A program kept in KazeTerm (InetSocket::filter) answers
     // itself; otherwise the host is asked with the count, never above BPF_MAXINSNS
     let inet = match &*sock.borrow() {
         Socket::Inet(s) => Some((s.fd, s.filter.clone())),
@@ -1742,7 +1742,7 @@ pub(super) fn getsockopt(
             }
             None => {
                 let count = room.min(BPF_MAXINSNS) as u32;
-                let (n, insns) = appine_hal::net::get_filter(host_fd, count).map_err(Errno)?;
+                let (n, insns) = kazeterm_hal::net::get_filter(host_fd, count).map_err(Errno)?;
                 (n as usize, insns)
             }
         };
@@ -1786,7 +1786,7 @@ pub(super) fn getsockopt(
                 // Raw ICMP is a ping socket on the host
                 (SOL_SOCKET, SO_TYPE) if s.raw => SOCK_RAW.to_le_bytes().to_vec(),
                 _ => {
-                    appine_hal::net::getsockopt(s.fd, level, name, room.min(256)).map_err(Errno)?
+                    kazeterm_hal::net::getsockopt(s.fd, level, name, room.min(256)).map_err(Errno)?
                 }
             },
             Socket::Netlink(_) => unreachable!("handled above"),
@@ -1867,7 +1867,7 @@ fn original_dst(
         let orig = if let Some(p) = &s.guest_peer {
             tracks.then(|| p.clone())?
         } else {
-            appine_hal::net::sockname(s.fd, true).ok()?;
+            kazeterm_hal::net::sockname(s.fd, true).ok()?;
             match s.track.as_ref().and_then(|t| t.orig_dst.clone()) {
                 Some(o) => o,
                 None if tracks => local,
@@ -2275,7 +2275,7 @@ pub(super) fn shutdown(cx: &mut Cx<'_>, fd: i32, how: i32) -> SysResult {
         Socket::Inet(s) => {
             const SHUT_RD: i32 = 0;
             const SHUT_RDWR: i32 = 2;
-            let r = appine_hal::net::shutdown(s.fd, how).map_err(Errno);
+            let r = kazeterm_hal::net::shutdown(s.fd, how).map_err(Errno);
             // The host records the shutdown even on an unconnected socket, failing with ENOTCONN
             // as Linux's inet_shutdown does, and recv needs to know about it (InetSocket::rd_shut)
             if matches!(r, Ok(()) | Err(Errno::ENOTCONN)) && matches!(how, SHUT_RD | SHUT_RDWR) {
@@ -2364,14 +2364,14 @@ pub(crate) fn send(
         // keep working. Like a UDP send, it autobinds an unbound socket (inet_send_prepare), so
         // the host socket is bound to the wildcard address; past DNS_MAX_INFLIGHT queries
         // resolving at once, a query is dropped, as by a server too busy to answer
-        if appine_hal::net::sockname(host_fd, false).is_ok_and(|a| port_of(&a) == Some(0)) {
+        if kazeterm_hal::net::sockname(host_fd, false).is_ok_and(|a| port_of(&a) == Some(0)) {
             let family = match &*sock.borrow() {
                 Socket::Inet(s) => s.family,
                 _ => AF_INET,
             };
             let mut any = vec![0u8; if family == AF_INET6 { 28 } else { 16 }];
             any[..2].copy_from_slice(&(family as u16).to_le_bytes());
-            let _ = appine_hal::net::bind(host_fd, &any);
+            let _ = kazeterm_hal::net::bind(host_fd, &any);
         }
         if cx.kr().dns_queries.len() >= DNS_MAX_INFLIGHT {
             crate::debug::log(format_args!(
@@ -2391,7 +2391,7 @@ pub(crate) fn send(
         let started = std::thread::Builder::new()
             .name("dns-stub".into())
             .spawn(move || {
-                let answer = appine_hal::net::dns_query(&query).unwrap_or_else(|e| {
+                let answer = kazeterm_hal::net::dns_query(&query).unwrap_or_else(|e| {
                     crate::debug::log(format_args!("DNS stub: query failed: errno {e}"));
                     servfail(&query)
                 });
@@ -2510,7 +2510,7 @@ pub(crate) fn send(
                 // bound by ensure_bound)
                 if s.net.is_none()
                     && let Some(src) = &m.source
-                    && appine_hal::net::sockname(s.fd, false)
+                    && kazeterm_hal::net::sockname(s.fd, false)
                         .ok()
                         .is_some_and(|a| crate::netns::is_any(&a))
                 {
@@ -2556,9 +2556,9 @@ pub(crate) fn send(
         let connected_udp = matches!(&*sock.borrow(),
             Socket::Inet(s) if s.icmp.is_none() && s.peer.is_some());
         if connected_udp && !addr.is_empty() {
-            let current = appine_hal::net::sockname(host_fd, true).unwrap_or_default();
+            let current = kazeterm_hal::net::sockname(host_fd, true).unwrap_or_default();
             if !same_endpoint(&current, addr) {
-                let _ = appine_hal::net::connect(host_fd, addr);
+                let _ = kazeterm_hal::net::connect(host_fd, addr);
             }
         }
     }
@@ -2569,7 +2569,7 @@ pub(crate) fn send(
     let mut done = 0;
     let mut sent_datagram = false;
     let r = loop {
-        let r = appine_hal::net::sendmsg(
+        let r = kazeterm_hal::net::sendmsg(
             host_fd,
             &data[done..],
             addr,
@@ -2829,7 +2829,7 @@ pub(crate) fn recv(
     loop {
         let host_flags = flags & !(MSG_DONTWAIT | MSG_WAITALL);
         let into = if peek { &mut buf[..] } else { &mut buf[got..] };
-        match appine_hal::net::recvmsg(host_fd, into, control_len, host_flags as i32) {
+        match kazeterm_hal::net::recvmsg(host_fd, into, control_len, host_flags as i32) {
             Ok(r) => {
                 // The peer is recorded (InetSocket::vconn): datagrams not from it are dropped
                 // (peeked ones must be taken off too)
@@ -2838,7 +2838,7 @@ pub(crate) fn recv(
                 if foreign {
                     if flags & MSG_PEEK != 0 {
                         let mut skip = vec![0u8; 1];
-                        let _ = appine_hal::net::recvmsg(host_fd, &mut skip, 0, 0);
+                        let _ = kazeterm_hal::net::recvmsg(host_fd, &mut skip, 0, 0);
                     }
                     continue;
                 }
@@ -3011,13 +3011,13 @@ fn wait_peek(
     if cx.interrupted() {
         return Err(Errno::ERESTARTSYS);
     }
-    let old = appine_hal::net::getsockopt(fd, SOL_SOCKET, SO_RCVLOWAT, 4);
+    let old = kazeterm_hal::net::getsockopt(fd, SOL_SOCKET, SO_RCVLOWAT, 4);
     let want = i32::try_from(want).unwrap_or(i32::MAX);
-    let _ = appine_hal::net::setsockopt(fd, SOL_SOCKET, SO_RCVLOWAT, &want.to_le_bytes());
+    let _ = kazeterm_hal::net::setsockopt(fd, SOL_SOCKET, SO_RCVLOWAT, &want.to_le_bytes());
     let mut pfd = [(fd, POLLIN, 0)];
     let r = cx.wait_objects(deadline, &mut pfd, wake::FILE, &[wake::of(sock)]);
     if let Ok(old) = old {
-        let _ = appine_hal::net::setsockopt(fd, SOL_SOCKET, SO_RCVLOWAT, &old);
+        let _ = kazeterm_hal::net::setsockopt(fd, SOL_SOCKET, SO_RCVLOWAT, &old);
     }
     r.map(|()| pfd[0].2 != 0)
 }
@@ -3363,7 +3363,7 @@ impl<'a> KernelHost<'a> {
 }
 
 impl crate::net::Host for KernelHost<'_> {
-    fn interfaces(&self) -> Vec<appine_hal::net::Interface> {
+    fn interfaces(&self) -> Vec<kazeterm_hal::net::Interface> {
         crate::netdev::base(&self.ns())
     }
 
@@ -3392,7 +3392,7 @@ impl crate::net::Host for KernelHost<'_> {
         crate::netdev::tables(&self.ns(), self.routes())
     }
 
-    fn all_interfaces(&self) -> Vec<appine_hal::net::Interface> {
+    fn all_interfaces(&self) -> Vec<kazeterm_hal::net::Interface> {
         crate::netdev::interfaces(&self.ns())
     }
 
@@ -3412,7 +3412,7 @@ impl crate::net::Host for KernelHost<'_> {
         }
     }
 
-    fn routes(&self) -> Option<Vec<appine_hal::net::Route>> {
+    fn routes(&self) -> Option<Vec<kazeterm_hal::net::Route>> {
         match &self.net {
             Some(_) => None,
             None => crate::route::host_routes(self.k),
@@ -3422,7 +3422,7 @@ impl crate::net::Host for KernelHost<'_> {
     fn tx_queue_len(&self, name: &str) -> Option<u32> {
         match &self.net {
             Some(_) => Some(1000),
-            None => appine_hal::net::tx_queue_len(name),
+            None => kazeterm_hal::net::tx_queue_len(name),
         }
     }
 
@@ -3544,12 +3544,12 @@ fn socket_ioctl(cx: &mut Cx<'_>, sock: &SocketRef, request: u32, arg: u64) -> Sy
         // address)
         (SIOCATMARK, Some(fd)) => {
             let mut b = [0u8; 4];
-            appine_hal::ioctl(fd, request as u64, &mut b).map_err(Errno)?;
+            kazeterm_hal::ioctl(fd, request as u64, &mut b).map_err(Errno)?;
             put(cx, arg, b).map(|()| 0)
         }
         (FIONREAD, Some(fd)) => {
             let mut b = [0u8; 4];
-            appine_hal::ioctl(fd, request as u64, &mut b).map_err(Errno)?;
+            kazeterm_hal::ioctl(fd, request as u64, &mut b).map_err(Errno)?;
             put(cx, arg, b).map(|()| 0)
         }
         (FIONREAD, None) => Err(Errno::ENOTTY),
@@ -3557,9 +3557,9 @@ fn socket_ioctl(cx: &mut Cx<'_>, sock: &SocketRef, request: u32, arg: u64) -> Sy
         // As with Linux's dev_ioctl, interface ioctls do not care about the socket's address
         // family (musl's if_nametoindex uses an AF_UNIX socket): borrow a temporary host socket
         (_, None) => {
-            let fd = appine_hal::net::socket(AF_INET, SOCK_DGRAM, 0).map_err(Errno)?;
+            let fd = kazeterm_hal::net::socket(AF_INET, SOCK_DGRAM, 0).map_err(Errno)?;
             let r = interface_ioctl(cx, fd, request, arg);
-            appine_hal::net::close(fd);
+            kazeterm_hal::net::close(fd);
             r
         }
     }
@@ -3863,12 +3863,12 @@ fn interface_ioctl(cx: &mut Cx<'_>, host_fd: i32, request: u32, arg: u64) -> Sys
     match request {
         r if IFREQ_GETTERS.contains(&r) => {
             let mut b: [u8; 40] = get(cx, arg)?;
-            appine_hal::ioctl(host_fd, r as u64, &mut b).map_err(Errno)?;
+            kazeterm_hal::ioctl(host_fd, r as u64, &mut b).map_err(Errno)?;
             if r == SIOCGIFHWADDR && b[16..18] == [0, 0] {
                 // Android does not let apps read hardware addresses, and the address family is 0
                 // too: fill in according to whether the interface is loopback
                 let mut flags = b;
-                appine_hal::ioctl(host_fd, SIOCGIFFLAGS as u64, &mut flags).map_err(Errno)?;
+                kazeterm_hal::ioctl(host_fd, SIOCGIFFLAGS as u64, &mut flags).map_err(Errno)?;
                 let loopback = u16::from_le_bytes([flags[16], flags[17]]) & IFF_LOOPBACK != 0;
                 let ty = if loopback {
                     ARPHRD_LOOPBACK
@@ -3901,7 +3901,7 @@ fn interface_ioctl(cx: &mut Cx<'_>, host_fd: i32, request: u32, arg: u64) -> Sys
                 host.as_mut_ptr() as u64
             };
             req[8..].copy_from_slice(&ptr.to_le_bytes());
-            appine_hal::ioctl(host_fd, SIOCGIFCONF as u64, &mut req).map_err(Errno)?;
+            kazeterm_hal::ioctl(host_fd, SIOCGIFCONF as u64, &mut req).map_err(Errno)?;
             let got = i32::from_le_bytes(req[..4].try_into().unwrap()).max(0) as usize;
             // Virtual devices in the boot namespace come after the host's
             let extra = crate::netdev::ifconf(&cx.kr().init_ns.net);
@@ -3996,7 +3996,7 @@ pub(crate) fn deliver_dns(k: &mut crate::kernel::Kernel, answers: &crate::kernel
             // A full receive queue drops the answer (__udp_enqueue_schedule_skb: what is queued
             // already exceeds SO_RCVBUF), counting answers by their length
             const SO_RCVBUF: i32 = 8;
-            let rcvbuf = appine_hal::net::getsockopt(s.fd, SOL_SOCKET, SO_RCVBUF, 4)
+            let rcvbuf = kazeterm_hal::net::getsockopt(s.fd, SOL_SOCKET, SO_RCVBUF, 4)
                 .ok()
                 .and_then(|v| Some(i32::from_le_bytes(v.get(..4)?.try_into().ok()?)))
                 .map_or(212_992, |v| v.max(0) as usize);
@@ -4181,7 +4181,7 @@ fn nat_proto(s: &InetSocket) -> Option<u8> {
 
 /// The host socket's local port (0 while unbound).
 fn local_port(s: &InetSocket) -> u16 {
-    appine_hal::net::sockname(s.fd, false)
+    kazeterm_hal::net::sockname(s.fd, false)
         .ok()
         .and_then(|a| port_of(&a))
         .unwrap_or(0)
@@ -4228,7 +4228,7 @@ fn forward_target(k: &crate::kernel::Kernel, s: &InetSocket) -> Option<crate::fo
     if !init.nft.borrow().has_nat(crate::nft::HOOK_PRE_ROUTING) {
         return None;
     }
-    let mut local = appine_hal::net::sockname(s.fd, false).ok()?;
+    let mut local = kazeterm_hal::net::sockname(s.fd, false).ok()?;
     let host_port = port_of(&local).filter(|&p| p != 0)?;
     if !udp && !s.listening {
         return None;
@@ -4388,7 +4388,7 @@ fn is_local(addr: &[u8]) -> bool {
     if ip.is_loopback() || ip.is_unspecified() {
         return true;
     }
-    appine_hal::net::interfaces().iter().any(|i| {
+    kazeterm_hal::net::interfaces().iter().any(|i| {
         i.addrs.iter().any(|(_, a, _)| {
             let own = match a.len() {
                 4 => IpAddr::V4(Ipv4Addr::from(<[u8; 4]>::try_from(&a[..]).unwrap())),

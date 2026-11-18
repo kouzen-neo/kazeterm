@@ -190,7 +190,7 @@ mod tests {
             let mut h = header(tar::EntryType::Link, 0o755, 0);
             b.append_link(&mut h, "./sbin/bb", "./bin/busybox").unwrap();
         });
-        let dir = std::env::temp_dir().join(format!("appine-import-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kazeterm-import-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let store = Store::create(&dir).unwrap();
         let report = import_tar_gz(&store, &data[..]).unwrap();

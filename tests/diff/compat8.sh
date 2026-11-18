@@ -1,13 +1,13 @@
 # docker-run-options: --privileged
-# appine-options: --memory-limit none
+# kazeterm-options: --memory-limit none
 # The small batch of the sixth map-bug triage: both sides start from the same top-level
 # directories and an empty /tmp; a standard signal sent again while pending keeps the first
 # sender's siginfo; a timerfd watched only by an EPOLLEXCLUSIVE interest wakes epoll_wait when it
 # expires; a cgroup directory has the mode mkdir gave it and is searched by it; the POSIX ACL
 # attributes are the only system.* ones, need the owner to change them, are validated, and an
-# ACL that restates the mode is a chmod (without a memory limit, so no OOM check wakes Appine's
+# ACL that restates the mode is a chmod (without a memory limit, so no OOM check wakes KazeTerm's
 # timer thread on its own and the timerfd's expiry is what wakes it). Not compared: the mode after an ACL with named entries
-# (Linux sets the group bits from the mask, Appine leaves the mode, as ACLs are not enforced)
+# (Linux sets the group bits from the mask, KazeTerm leaves the mode, as ACLs are not enforced)
 set -e
 cd /
 for d in bin etc home lib media mnt opt run sbin srv tmp usr var; do
@@ -87,7 +87,7 @@ int main(void)
 }
 C
 gcc -O1 -o extimer extimer.c
-# The store's deferred commits of what was just written would wake Appine's timer thread too
+# The store's deferred commits of what was just written would wake KazeTerm's timer thread too
 sleep 1
 ./extimer
 

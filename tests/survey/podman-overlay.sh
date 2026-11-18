@@ -1,4 +1,4 @@
-# podman with its overlay storage driver on Appine's overlayfs (rootful): what containers/storage
+# podman with its overlay storage driver on KazeTerm's overlayfs (rootful): what containers/storage
 # concludes from its probes, writes, deletions and renames inside containers over the image's
 # layers, an overlay volume (`:O`, whose changes stay out of the host directory), diff and commit,
 # a build whose later step deletes what an earlier one made, save and load, and how long starting

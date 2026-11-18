@@ -54,7 +54,7 @@ pub(crate) use tty::{hang_up, hang_up_closed};
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 
-use appine_engine::Cpu;
+use kazeterm_engine::Cpu;
 
 use crate::debug;
 use crate::errno::Errno;

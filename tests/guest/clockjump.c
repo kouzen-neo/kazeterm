@@ -1,6 +1,6 @@
 /*
  * Jumps of the host's wall clock (set, or the device resuming from sleep), simulated with a test
- * hook of debug builds (appine-run must set APPINE_TEST_HOOKS=1), since a test cannot set the
+ * hook of debug builds (kazeterm-run must set KAZETERM_TEST_HOOKS=1), since a test cannot set the
  * host's clock. A TFD_TIMER_CANCEL_ON_SET timerfd on an absolute realtime time becomes readable
  * and reads ECANCELED once (also waking a blocked read and an epoll_wait); other timerfds are left
  * alone; and waits on wall-clock deadlines (an absolute realtime sleep, a relative boottime sleep,

@@ -37,20 +37,20 @@ static bool with_gpr(struct native_desc *d, unsigned pos)
  * (features.c) */
 static bool fp16(void)
 {
-    return appine_has(APPINE_HWCAP_FPHP | APPINE_HWCAP_ASIMDHP);
+    return kazeterm_has(KAZETERM_HWCAP_FPHP | KAZETERM_HWCAP_ASIMDHP);
 }
 
 /* RDM: SQRDMLAH, SQRDMLSH */
 static bool rdm(void)
 {
-    return appine_has(APPINE_HWCAP_ASIMDRDM);
+    return kazeterm_has(KAZETERM_HWCAP_ASIMDRDM);
 }
 
 /* FHM: FMLAL, FMLSL (half-precision multiply, accumulating into single precision), advertised only
  * together with FP16 (features.c) */
 static bool fhm(void)
 {
-    return appine_has(APPINE_HWCAP_ASIMDFHM);
+    return kazeterm_has(KAZETERM_HWCAP_ASIMDFHM);
 }
 
 /* FCMA: FCMLA, FCADD. The half-precision forms also need FP16; double precision has only the
@@ -59,20 +59,20 @@ static bool fcma(unsigned q, unsigned size)
 {
     if (size == 0 || (size == 3 && !q) || (size == 1 && !fp16()))
         return false;
-    return appine_has(APPINE_HWCAP_FCMA);
+    return kazeterm_has(KAZETERM_HWCAP_FCMA);
 }
 
 /* BF16: BFDOT, BFMMLA, BFMLALB/T, BFCVT, BFCVTN */
 static bool bf16(void)
 {
-    return appine_has2(APPINE_HWCAP2_BF16);
+    return kazeterm_has2(KAZETERM_HWCAP2_BF16);
 }
 
 /* FRINTTS: FRINT32Z/X, FRINT64Z/X, rounding to an integral value in the 32- or 64-bit integer range
  * (JavaScript's and C's conversions) */
 static bool frint(void)
 {
-    return appine_has2(APPINE_HWCAP2_FRINT);
+    return kazeterm_has2(KAZETERM_HWCAP2_FRINT);
 }
 
 /* Whether the precision selected by an FP instruction's type/size field can be used: 3 is half
@@ -170,7 +170,7 @@ static bool vec_three_different(uint32_t insn)
     case 0xd: /* SQDMULL */
         return !u && (size == 1 || size == 2);
     case 0xe: /* PMULL: the 1Q form belongs to the PMULL extension */
-        return !u && (size == 0 || (size == 3 && appine_has(APPINE_HWCAP_PMULL)));
+        return !u && (size == 0 || (size == 3 && kazeterm_has(KAZETERM_HWCAP_PMULL)));
     case 0xf:
         return false;
     default: /* ADDL/ADDW/SUBL/SUBW/ADDHN/ABAL/SUBHN/ABDL/MLAL/MLSL/MULL */
@@ -347,13 +347,13 @@ static bool vec_three_extra(uint32_t insn)
     case 0x1: /* SQRDMLSH (vector) */
         return u && (size == 1 || size == 2) && rdm();
     case 0x2: /* SDOT/UDOT (vector) */
-        return size == 2 && appine_has(APPINE_HWCAP_ASIMDDP);
+        return size == 2 && kazeterm_has(KAZETERM_HWCAP_ASIMDDP);
     case 0x3: /* USDOT (vector) */
-        return size == 2 && !u && appine_has2(APPINE_HWCAP2_I8MM);
+        return size == 2 && !u && kazeterm_has2(KAZETERM_HWCAP2_I8MM);
     case 0x4: /* SMMLA/UMMLA: only the 128-bit form */
-        return size == 2 && q && appine_has2(APPINE_HWCAP2_I8MM);
+        return size == 2 && q && kazeterm_has2(KAZETERM_HWCAP2_I8MM);
     case 0x5: /* USMMLA */
-        return size == 2 && q && !u && appine_has2(APPINE_HWCAP2_I8MM);
+        return size == 2 && q && !u && kazeterm_has2(KAZETERM_HWCAP2_I8MM);
     case 0xd: /* BFMMLA: only the 128-bit form */
         return u && size == 1 && q && bf16();
     case 0xf: /* BFDOT (size 01), BFMLALB/BFMLALT (size 11, Q selects B/T) */
@@ -400,12 +400,12 @@ static bool vec_indexed(uint32_t insn)
     case 0xd: /* SQRDMULH; with U = 1 it is SQRDMLAH (RDM) */
         return hs && (!u || rdm());
     case 0xe: /* SDOT/UDOT (by element) */
-        return size == 2 && appine_has(APPINE_HWCAP_ASIMDDP);
+        return size == 2 && kazeterm_has(KAZETERM_HWCAP_ASIMDDP);
     case 0xf:
         if (u) /* SQRDMLSH (RDM) */
             return hs && rdm();
         /* SUDOT (size 00), USDOT (size 10): I8MM; BFDOT (size 01), BFMLALB/T (size 11): BF16 */
-        return (size & 1) ? bf16() : appine_has2(APPINE_HWCAP2_I8MM);
+        return (size & 1) ? bf16() : kazeterm_has2(KAZETERM_HWCAP2_I8MM);
     default:
         return false;
     }
@@ -593,16 +593,16 @@ static bool crypto_sha3(uint32_t insn)
 {
     unsigned opcode = FIELD(insn, 14, 12);
     if (opcode <= 3)
-        return appine_has(APPINE_HWCAP_SHA1); /* SHA1C/SHA1P/SHA1M/SHA1SU0 */
-    return opcode <= 6 && appine_has(APPINE_HWCAP_SHA2); /* SHA256H/SHA256H2/SHA256SU1 */
+        return kazeterm_has(KAZETERM_HWCAP_SHA1); /* SHA1C/SHA1P/SHA1M/SHA1SU0 */
+    return opcode <= 6 && kazeterm_has(KAZETERM_HWCAP_SHA2); /* SHA256H/SHA256H2/SHA256SU1 */
 }
 
 static bool crypto_sha2(uint32_t insn)
 {
     unsigned opcode = FIELD(insn, 16, 12);
     if (opcode <= 1)
-        return appine_has(APPINE_HWCAP_SHA1); /* SHA1H/SHA1SU1 */
-    return opcode == 2 && appine_has(APPINE_HWCAP_SHA2); /* SHA256SU0 */
+        return kazeterm_has(KAZETERM_HWCAP_SHA1); /* SHA1H/SHA1SU1 */
+    return opcode == 2 && kazeterm_has(KAZETERM_HWCAP_SHA2); /* SHA256SU0 */
 }
 
 /* ---- Scalar floating point ---- */
@@ -612,7 +612,7 @@ static bool fp_int_conversion(uint32_t insn, struct native_desc *d)
     unsigned sf = BIT(insn, 31), type = FIELD(insn, 23, 22), rmode = FIELD(insn, 20, 19);
     unsigned opcode = FIELD(insn, 18, 16);
     if (!sf && type == 1 && rmode == 3 && opcode == 6) /* FJCVTZS (JSCVT): also writes NZCV */
-        return appine_has(APPINE_HWCAP_JSCVT) && with_gpr(d, 0);
+        return kazeterm_has(KAZETERM_HWCAP_JSCVT) && with_gpr(d, 0);
     if (opcode == 6 || opcode == 7) { /* FMOV (general register ↔ floating point) */
         bool ok = (rmode == 0 && ((!sf && type == 0) || (sf && type == 1))) ||
                   (rmode == 1 && sf && type == 2) ||
@@ -698,7 +698,7 @@ static bool fp_scalar(uint32_t insn, struct native_desc *d)
 
 static bool crypto_ext(uint32_t insn)
 {
-    bool sha3 = appine_has(APPINE_HWCAP_SHA3), sha512 = appine_has(APPINE_HWCAP_SHA512);
+    bool sha3 = kazeterm_has(KAZETERM_HWCAP_SHA3), sha512 = kazeterm_has(KAZETERM_HWCAP_SHA512);
     if ((insn & 0xffc08000) == 0xce000000) /* EOR3, BCAX (four registers; SM3SS1 has bit 22 set) */
         return sha3;
     if ((insn & 0xffe00000) == 0xce800000) /* XAR */
@@ -710,7 +710,7 @@ static bool crypto_ext(uint32_t insn)
     return false;
 }
 
-bool appine_simd_dp_decode(uint32_t insn, struct native_desc *d)
+bool kazeterm_simd_dp_decode(uint32_t insn, struct native_desc *d)
 {
     unsigned op0 = FIELD(insn, 31, 28);
     only_v(d);
@@ -747,7 +747,7 @@ bool appine_simd_dp_decode(uint32_t insn, struct native_desc *d)
     }
     if ((op0 & 0x9) == 0x0) { /* 0xx0: Advanced SIMD vector, including AES */
         if ((insn & 0xfffe0c00) == 0x4e280800) /* AESE/AESD/AESMC/AESIMC */
-            return FIELD(insn, 16, 12) >= 4 && FIELD(insn, 16, 12) <= 7 && appine_has(APPINE_HWCAP_AES);
+            return FIELD(insn, 16, 12) >= 4 && FIELD(insn, 16, 12) <= 7 && kazeterm_has(KAZETERM_HWCAP_AES);
         if ((insn & 0xbfe08c00) == 0x0e000000) /* TBL/TBX */
             return true;
         if ((insn & 0xbf208c00) == 0x0e000800) { /* UZP/TRN/ZIP */
@@ -787,22 +787,22 @@ bool appine_simd_dp_decode(uint32_t insn, struct native_desc *d)
 
 /* ---- Memory access ---- */
 
-static uint8_t *vreg(struct appine_cpu *c, unsigned r)
+static uint8_t *vreg(struct kazeterm_cpu *c, unsigned r)
 {
     return (uint8_t *)c->v[r & 31];
 }
 
-static uint64_t gpr(const struct appine_cpu *c, unsigned r)
+static uint64_t gpr(const struct kazeterm_cpu *c, unsigned r)
 {
     return r == 31 ? 0 : c->x[r];
 }
 
-static uint64_t base_reg(const struct appine_cpu *c, unsigned rn)
+static uint64_t base_reg(const struct kazeterm_cpu *c, unsigned rn)
 {
     return rn == 31 ? c->sp : c->x[rn];
 }
 
-static void write_base(struct appine_cpu *c, unsigned rn, uint64_t v)
+static void write_base(struct kazeterm_cpu *c, unsigned rn, uint64_t v)
 {
     if (rn == 31)
         c->sp = v;
@@ -810,49 +810,49 @@ static void write_base(struct appine_cpu *c, unsigned rn, uint64_t v)
         c->x[rn] = v;
 }
 
-static enum appine_exit undef(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit undef(struct kazeterm_cpu *c, uint32_t insn)
 {
     c->exit_info = insn;
-    return APPINE_EXIT_UNDEF;
+    return KAZETERM_EXIT_UNDEF;
 }
 
 /* Confirms that every page of [va, va + len) can be accessed as access, and that no hardware
  * watchpoint is hit */
-static bool probe(struct appine_cpu *c, uint64_t va, uint64_t len, uint32_t access)
+static bool probe(struct kazeterm_cpu *c, uint64_t va, uint64_t len, uint32_t access)
 {
     va = untag(va);
     uint64_t end = va + len;
-    for (uint64_t p = va; p < end; p = (p & ~PAGE_MASK) + APPINE_PAGE_SIZE) {
+    for (uint64_t p = va; p < end; p = (p & ~PAGE_MASK) + KAZETERM_PAGE_SIZE) {
         if (!tlb_lookup(c, p, access))
-            return raise_fault(c, p, access, APPINE_FAULT_PAGE);
+            return raise_fault(c, p, access, KAZETERM_FAULT_PAGE);
     }
-    uint32_t watch = access == APPINE_ACCESS_READ ? APPINE_WATCH_LOAD : APPINE_WATCH_STORE;
+    uint32_t watch = access == KAZETERM_ACCESS_READ ? KAZETERM_WATCH_LOAD : KAZETERM_WATCH_STORE;
     if (UNLIKELY(watch_hit(c, va, len, watch)))
-        return raise_fault(c, va, access, APPINE_FAULT_WATCH);
+        return raise_fault(c, va, access, KAZETERM_FAULT_WATCH);
     return true;
 }
 
 /* SP-based accesses require SP to be 16-byte aligned */
-static bool check_sp(struct appine_cpu *c, unsigned rn, uint32_t access)
+static bool check_sp(struct kazeterm_cpu *c, unsigned rn, uint32_t access)
 {
     if (rn == 31 && (c->sp & 15))
-        return raise_fault(c, c->sp, access, APPINE_FAULT_SP_ALIGN);
+        return raise_fault(c, c->sp, access, KAZETERM_FAULT_SP_ALIGN);
     return true;
 }
 
 /* An access already probed, which cannot fail */
-static void copy_in(struct appine_cpu *c, uint64_t va, void *dst, unsigned n)
+static void copy_in(struct kazeterm_cpu *c, uint64_t va, void *dst, unsigned n)
 {
     (void)mem_read(c, va, dst, n);
 }
 
-static void copy_out(struct appine_cpu *c, uint64_t va, const void *src, unsigned n)
+static void copy_out(struct kazeterm_cpu *c, uint64_t va, const void *src, unsigned n)
 {
     (void)mem_write(c, va, src, n);
 }
 
 /* LD1–LD4/ST1–ST4 (multiple structures) */
-static enum appine_exit ldst_multiple(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit ldst_multiple(struct kazeterm_cpu *c, uint32_t insn)
 {
     unsigned q = BIT(insn, 30), load = BIT(insn, 22), post = BIT(insn, 23);
     unsigned rm = FIELD(insn, 20, 16), opcode = FIELD(insn, 15, 12), size = FIELD(insn, 11, 10);
@@ -872,14 +872,14 @@ static enum appine_exit ldst_multiple(struct appine_cpu *c, uint32_t insn)
     if (size == 3 && !q && selem != 1)
         return undef(c, insn);
 
-    uint32_t access = load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE;
+    uint32_t access = load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE;
     /* LD1/ST1 lay out each whole register contiguously in memory. */
     unsigned reg_bytes = 8u << q;
     unsigned copy_bytes = selem == 1 ? reg_bytes : 1u << size;
     unsigned copies = selem == 1 ? 1 : reg_bytes >> size;
     uint64_t addr = base_reg(c, rn), total = (uint64_t)rpt * selem * reg_bytes;
     if (!check_sp(c, rn, access) || !probe(c, addr, total, access))
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
 
     uint8_t regs[4][16] = {{0}};
     uint64_t offs = 0;
@@ -902,11 +902,11 @@ static enum appine_exit ldst_multiple(struct appine_cpu *c, uint32_t insn)
     if (post)
         write_base(c, rn, addr + (rm == 31 ? total : gpr(c, rm)));
     c->pc += 4;
-    return APPINE_EXIT_NONE;
+    return KAZETERM_EXIT_NONE;
 }
 
 /* LD1–LD4/ST1–ST4 (single structure) and LD1R–LD4R */
-static enum appine_exit ldst_single(struct appine_cpu *c, uint32_t insn)
+static enum kazeterm_exit ldst_single(struct kazeterm_cpu *c, uint32_t insn)
 {
     unsigned q = BIT(insn, 30), load = BIT(insn, 22), post = BIT(insn, 23), r = BIT(insn, 21);
     unsigned rm = FIELD(insn, 20, 16), opcode = FIELD(insn, 15, 13), s = BIT(insn, 12);
@@ -944,11 +944,11 @@ static enum appine_exit ldst_single(struct appine_cpu *c, uint32_t insn)
         break;
     }
 
-    uint32_t access = load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE;
+    uint32_t access = load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE;
     unsigned esize = 1u << scale;
     uint64_t addr = base_reg(c, rn), total = (uint64_t)selem * esize;
     if (!check_sp(c, rn, access) || !probe(c, addr, total, access))
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
 
     for (unsigned k = 0; k < selem; k++) {
         uint8_t *v = vreg(c, rt + k);
@@ -968,20 +968,20 @@ static enum appine_exit ldst_single(struct appine_cpu *c, uint32_t insn)
     if (post)
         write_base(c, rn, addr + (rm == 31 ? total : gpr(c, rm)));
     c->pc += 4;
-    return APPINE_EXIT_NONE;
+    return KAZETERM_EXIT_NONE;
 }
 
 /* Reads or writes n bytes (n ≤ 16) of a whole SIMD&FP register; a read zeroes the high part */
-static void load_v(struct appine_cpu *c, unsigned rt, uint64_t va, unsigned n)
+static void load_v(struct kazeterm_cpu *c, unsigned rt, uint64_t va, unsigned n)
 {
     uint8_t value[16] = {0};
     copy_in(c, va, value, n);
     memcpy(vreg(c, rt), value, 16);
 }
 
-enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
+enum kazeterm_exit kazeterm_simd_ldst(struct kazeterm_cpu *c, uint32_t insn)
 {
-    if (!appine_has(APPINE_HWCAP_FP | APPINE_HWCAP_ASIMD))
+    if (!kazeterm_has(KAZETERM_HWCAP_FP | KAZETERM_HWCAP_ASIMD))
         return undef(c, insn);
     if ((insn & 0xbf000000) == 0x0c000000)
         return ldst_multiple(c, insn);
@@ -996,11 +996,11 @@ enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
             return undef(c, insn);
         unsigned n = 4u << size;
         uint64_t va = c->pc + (uint64_t)(((int64_t)((uint64_t)FIELD(insn, 23, 5) << 45) >> 45) * 4);
-        if (!probe(c, va, n, APPINE_ACCESS_READ))
-            return APPINE_EXIT_FAULT;
+        if (!probe(c, va, n, KAZETERM_ACCESS_READ))
+            return KAZETERM_EXIT_FAULT;
         load_v(c, rt, va, n);
         c->pc += 4;
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
 
     if ((insn & 0x3e000000) == 0x2c000000) { /* LDP/STP/LDNP/STNP */
@@ -1008,12 +1008,12 @@ enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
         if (size == 3)
             return undef(c, insn);
         unsigned n = 4u << size;
-        uint32_t access = load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE;
+        uint32_t access = load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE;
         uint64_t base = base_reg(c, rn);
         int64_t off = ((int64_t)((uint64_t)FIELD(insn, 21, 15) << 57) >> 57) * (int64_t)n;
         uint64_t va = idx == 1 ? base : base + (uint64_t)off;
         if (!check_sp(c, rn, access) || !probe(c, va, 2 * n, access))
-            return APPINE_EXIT_FAULT;
+            return KAZETERM_EXIT_FAULT;
         if (load) {
             load_v(c, rt, va, n);
             load_v(c, rt2, va + n, n);
@@ -1024,7 +1024,7 @@ enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
         if (idx == 1 || idx == 3)
             write_base(c, rn, base + (uint64_t)off);
         c->pc += 4;
-        return APPINE_EXIT_NONE;
+        return KAZETERM_EXIT_NONE;
     }
 
     /* Single register: size = 00 with opc = 1x is the 128-bit Q register */
@@ -1036,7 +1036,7 @@ enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
     else
         scale = size;
     unsigned n = 1u << scale;
-    uint32_t access = load ? APPINE_ACCESS_READ : APPINE_ACCESS_WRITE;
+    uint32_t access = load ? KAZETERM_ACCESS_READ : KAZETERM_ACCESS_WRITE;
     uint64_t base = base_reg(c, rn), va, wb = 0;
     bool writeback = false;
 
@@ -1066,7 +1066,7 @@ enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
     }
 
     if (!check_sp(c, rn, access) || !probe(c, va, n, access))
-        return APPINE_EXIT_FAULT;
+        return KAZETERM_EXIT_FAULT;
     if (load)
         load_v(c, rt, va, n);
     else
@@ -1074,5 +1074,5 @@ enum appine_exit appine_simd_ldst(struct appine_cpu *c, uint32_t insn)
     if (writeback)
         write_base(c, rn, wb);
     c->pc += 4;
-    return APPINE_EXIT_NONE;
+    return KAZETERM_EXIT_NONE;
 }

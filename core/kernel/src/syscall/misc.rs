@@ -78,7 +78,7 @@ const GRND_RANDOM: u32 = 2;
 const GRND_INSECURE: u32 = 4;
 
 /// The kernel version `uname -r` reports, that is, the ABI contract (the kernel/signal map).
-const RELEASE: &[u8] = b"6.1.0-appine";
+const RELEASE: &[u8] = b"6.1.0-kazeterm";
 
 pub(super) fn futex(
     cx: &mut Cx<'_>,
@@ -581,7 +581,7 @@ pub(super) fn clock_nanosleep(
     // A relative sleep counts on the clock's base: CLOCK_BOOTTIME's goes on while the device
     // sleeps, CLOCK_REALTIME's moves to the monotonic base (Expiry::new)
     if flags & TIMER_ABSTIME == 0 {
-        appine_hal::clock_gettime(clock).map_err(Errno)?;
+        kazeterm_hal::clock_gettime(clock).map_err(Errno)?;
         return sleep_rest(cx, Expiry::new(clock, t, false)?, rem);
     }
     // An absolute time: re-executing with the same arguments simply continues the sleep
@@ -755,7 +755,7 @@ pub(super) fn clock_gettime(cx: &mut Cx<'_>, clock: i32, tp: u64) -> SysResult {
         }
         // Monotonic and boottime clocks get the time namespace offset added
         None => add_offset(
-            appine_hal::clock_gettime(clock).map_err(Errno)?,
+            kazeterm_hal::clock_gettime(clock).map_err(Errno)?,
             cx.time_offset(clock),
         ),
     };
@@ -765,7 +765,7 @@ pub(super) fn clock_gettime(cx: &mut Cx<'_>, clock: i32, tp: u64) -> SysResult {
 pub(super) fn clock_getres(cx: &mut Cx<'_>, clock: i32, res: u64) -> SysResult {
     let (sec, nsec) = match cpu_clock(cx, clock) {
         Some(ns) => ns.map(|_| (0, 1))?,
-        None => appine_hal::clock_getres(clock).map_err(Errno)?,
+        None => kazeterm_hal::clock_getres(clock).map_err(Errno)?,
     };
     if res != 0 {
         write_pair(cx, res, sec, nsec)?;
@@ -815,7 +815,7 @@ pub(super) fn clock_settime(cx: &mut Cx<'_>, clock: i32, tp: u64) -> SysResult {
 }
 
 /// adjtimex (`clock` None) and clock_adjtime: only queries are answered, with the host clock's
-/// NTP state from [`appine_hal::adjtimex_query`]. Anything that would change the clock or NTP
+/// NTP state from [`kazeterm_hal::adjtimex_query`]. Anything that would change the clock or NTP
 /// parameters is EPERM, treated as lacking `CAP_SYS_TIME` as with clock_settime
 /// (`timekeeping_validate_timex`). adjtimex writes the structure back whether it succeeds or
 /// fails, clock_adjtime only on success, as on Linux.
@@ -833,12 +833,12 @@ pub(super) fn adjtimex(cx: &mut Cx<'_>, clock: Option<i32>, buf: u64) -> SysResu
     const CLOCK_SGI_CYCLE: i32 = 10;
     const CLOCK_TAI: i32 = 11;
 
-    let mut tx: [u8; appine_hal::TIMEX_SIZE] = get(cx, buf)?;
+    let mut tx: [u8; kazeterm_hal::TIMEX_SIZE] = get(cx, buf)?;
     let modes = u32::from_le_bytes(tx[..4].try_into().unwrap());
     let freq = i64::from_le_bytes(tx[16..24].try_into().unwrap());
     let result = (|| {
         // do_clock_adjtime: only CLOCK_REALTIME can be adjusted; an fd-encoded dynamic clock
-        // would need the fd of a device such as PTP, which Appine does not have
+        // would need the fd of a device such as PTP, which KazeTerm does not have
         match clock {
             None | Some(CLOCK_REALTIME) => {}
             Some(c) if c < 0 && c & 7 == CLOCKFD => return Err(Errno::EINVAL),
@@ -869,7 +869,7 @@ pub(super) fn adjtimex(cx: &mut Cx<'_>, clock: Option<i32>, buf: u64) -> SysResu
         {
             return Err(Errno::EINVAL);
         }
-        let (state, host) = appine_hal::adjtimex_query(query_adjtime).map_err(Errno)?;
+        let (state, host) = kazeterm_hal::adjtimex_query(query_adjtime).map_err(Errno)?;
         // __do_adjtimex fills every named field, leaving modes and the padding alone
         for range in [8..44, 48..116, 120..164] {
             tx[range.clone()].copy_from_slice(&host[range]);
@@ -1029,7 +1029,7 @@ pub(crate) fn check_syslog_permissions(cx: &Cx<'_>, kind: i32, from_proc: bool) 
 
 pub(super) fn gettimeofday(cx: &mut Cx<'_>, tv: u64, tz: u64) -> SysResult {
     if tv != 0 {
-        let (sec, nsec) = appine_hal::clock_gettime(CLOCK_REALTIME).map_err(Errno)?;
+        let (sec, nsec) = kazeterm_hal::clock_gettime(CLOCK_REALTIME).map_err(Errno)?;
         write_pair(cx, tv, sec, nsec / 1000)?;
     }
     if tz != 0 {
@@ -1041,7 +1041,7 @@ pub(super) fn gettimeofday(cx: &mut Cx<'_>, tv: u64, tz: u64) -> SysResult {
 /// The `struct timezone` gettimeofday reports: the host kernel's, as the host's vDSO reports it
 /// (the kernel/signal map; the guest cannot set it, settimeofday being refused).
 pub(super) fn timezone() -> [u8; 8] {
-    let (west, dst) = appine_hal::timezone();
+    let (west, dst) = kazeterm_hal::timezone();
     let mut tz = [0u8; 8];
     tz[..4].copy_from_slice(&west.to_le_bytes());
     tz[4..].copy_from_slice(&dst.to_le_bytes());
@@ -1064,7 +1064,7 @@ pub(super) fn times(cx: &mut Cx<'_>, buf: u64) -> SysResult {
         put(cx, buf, b)?;
     }
     // The return value is the number of clock ticks since boot
-    let (sec, nsec) = appine_hal::clock_gettime(appine_hal::CLOCK_BOOTTIME).map_err(Errno)?;
+    let (sec, nsec) = kazeterm_hal::clock_gettime(kazeterm_hal::CLOCK_BOOTTIME).map_err(Errno)?;
     Ok(sec as u64 * ticks + nsec as u64 / (1_000_000_000 / ticks))
 }
 
@@ -1105,7 +1105,7 @@ pub(super) fn uname(cx: &mut Cx<'_>, buf: u64) -> SysResult {
         b"Linux",
         &uts.hostname.borrow(),
         RELEASE,
-        b"#1 SMP PREEMPT appine",
+        b"#1 SMP PREEMPT kazeterm",
         b"aarch64",
         &uts.domainname.borrow(),
     ];
@@ -1439,11 +1439,11 @@ pub(super) fn get_robust_list(cx: &mut Cx<'_>, pid: i32, head: u64, len: u64) ->
 
 pub(super) fn sysinfo(cx: &mut Cx<'_>, buf: u64) -> SysResult {
     // As with Linux's do_sysinfo, a fraction of a second rounds up to a whole second
-    let (secs, ns) = appine_hal::clock_gettime(appine_hal::CLOCK_BOOTTIME).map_err(Errno)?;
+    let (secs, ns) = kazeterm_hal::clock_gettime(kazeterm_hal::CLOCK_BOOTTIME).map_err(Errno)?;
     // Add the time namespace's boottime offset (Linux's timens_add_boottime)
-    let (secs, ns) = add_offset((secs, ns), cx.time_offset(appine_hal::CLOCK_BOOTTIME));
+    let (secs, ns) = add_offset((secs, ns), cx.time_offset(kazeterm_hal::CLOCK_BOOTTIME));
     let uptime = secs + i64::from(ns != 0);
-    let m = appine_hal::host_meminfo();
+    let m = kazeterm_hal::host_meminfo();
     let procs = cx.kr().tasks.len().min(u16::MAX as usize) as u16;
     // struct sysinfo (64-bit): uptime, loads[3], totalram, freeram, sharedram, bufferram,
     // totalswap, freeswap, procs, totalhigh, freehigh, mem_unit; copied from the host as
@@ -1474,7 +1474,7 @@ pub(super) fn sysinfo(cx: &mut Cx<'_>, buf: u64) -> SysResult {
 /// membarrier(2). Kicking the other threads that share the address space out of guest code amounts
 /// to a full memory barrier and context synchronization on them (V8 uses the `SYNC_CORE` form
 /// after rewriting code). Global commands also act only on this process: other processes share
-/// only shared mappings with it, and all of Appine's guest threads are in one host process, so a
+/// only shared mappings with it, and all of KazeTerm's guest threads are in one host process, so a
 /// host memory barrier is added here as well.
 pub(super) fn membarrier(cx: &mut Cx<'_>, cmd: i32, flags: u32) -> SysResult {
     const QUERY: i32 = 0;
@@ -1531,7 +1531,7 @@ pub(super) fn getrandom(cx: &mut Cx<'_>, buf: u64, len: usize, flags: u32) -> Sy
     let mut done = 0;
     while done < len {
         let n = (len - done).min(IO_CHUNK);
-        appine_hal::fill_random(&mut chunk[..n]).map_err(Errno)?;
+        kazeterm_hal::fill_random(&mut chunk[..n]).map_err(Errno)?;
         if let Err(e) = cx.mm().write(
             UserSlice::new(buf.wrapping_add(done as u64), n),
             &chunk[..n],

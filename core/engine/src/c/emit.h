@@ -3,8 +3,8 @@
  * (native.c). Each function returns the 32-bit encoding of one instruction; the caller guarantees
  * the range and alignment of immediates.
  */
-#ifndef APPINE_ENGINE_EMIT_H
-#define APPINE_ENGINE_EMIT_H
+#ifndef KAZETERM_ENGINE_EMIT_H
+#define KAZETERM_ENGINE_EMIT_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -359,4 +359,4 @@ static inline uint32_t enc_ret(void)
     return 0xd65f03c0u;
 }
 
-#endif /* APPINE_ENGINE_EMIT_H */
+#endif /* KAZETERM_ENGINE_EMIT_H */

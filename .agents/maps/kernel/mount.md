@@ -107,7 +107,7 @@ Outside the module:
   anonymous namespaces are not limited.
 - Boot (`Vfs::open`): when it is the store's only user (the store's exclusive flock), the store
   clears its `/dev/shm` and `/run` (not `/tmp`) and old detached directories. Mounts, in order:
-  `/` (id 1, store, `rw,relatime`, source `appine`, no mount point — Linux's invisible rootfs),
+  `/` (id 1, store, `rw,relatime`, source `kazeterm`, no mount point — Linux's invisible rootfs),
   `/proc` (2), `/dev` tmpfs (7, `mode=755`, nosuid and relatime only — neither nodev nor noexec;
   `dev::populate` fills it, falling back to the store directory if that fails), `/dev/pts` (3,
   devpts, without nodev), `/dev/shm` tmpfs (8, 1777, nosuid and nodev), `/dev/mqueue` (9, the boot

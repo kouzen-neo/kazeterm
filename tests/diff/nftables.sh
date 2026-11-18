@@ -11,7 +11,7 @@
 #   existing chain, no privilege;
 # - flush ruleset, of one family and of all, also as the first line of a file loaded with nft -f.
 # The native side is a privileged container, where the rules really run in the kernel. Counters
-# (always 0 in Appine) are all removed.
+# (always 0 in KazeTerm) are all removed.
 exec 2>&1
 cd /tmp
 cat > srv.py <<'PY'

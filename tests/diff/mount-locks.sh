@@ -13,7 +13,7 @@
 # the end of the namespace, leaves locked mounts on their detached parent (disconnect_mount), so an
 # fd kept in the detached tree still sees what hides a path, while unlocked mounts are
 # disconnected. The native side is privileged so that its /proc and /sys are rw and unmasked, as
-# Appine's are.
+# KazeTerm's are.
 set -e
 cd /tmp
 python3 - <<'PY'

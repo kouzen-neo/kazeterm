@@ -73,7 +73,7 @@ pub mod oflags {
 
 /// The kind of an open file.
 pub enum FileKind {
-    /// A host fd: `appine-run` hands the host's stdin/stdout/stderr to the guest as they are.
+    /// A host fd: `kazeterm-run` hands the host's stdin/stdout/stderr to the guest as they are.
     Host(i32),
     /// A regular file in the inode store.
     Regular {
@@ -640,9 +640,9 @@ pub struct EventFd {
     pub reads: u64,
 }
 
-/// Accumulated counts of newly arrived events on a host fd ([`appine_hal::Edges`]).
+/// Accumulated counts of newly arrived events on a host fd ([`kazeterm_hal::Edges`]).
 pub struct HostEdges {
-    edges: appine_hal::Edges,
+    edges: kazeterm_hal::Edges,
     counts: std::cell::Cell<[u64; 2]>,
     /// The host epoll may have events not yet taken: it was readable the last time it was polled
     /// together with the host fd ([`HostEdges::polled`]).
@@ -653,7 +653,7 @@ impl HostEdges {
     /// Starts recording newly arrived events on host fd `fd`.
     pub fn new(fd: i32) -> Result<HostEdges, i32> {
         Ok(HostEdges {
-            edges: appine_hal::Edges::new(fd)?,
+            edges: kazeterm_hal::Edges::new(fd)?,
             counts: std::cell::Cell::new([0; 2]),
             unread: std::cell::Cell::new(true),
         })

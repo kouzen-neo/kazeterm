@@ -2,7 +2,7 @@
 # (unlike openat, anything unknown is EINVAL), the path-resolution restrictions of
 # RESOLVE_BENEATH, IN_ROOT, NO_SYMLINKS, NO_MAGICLINKS and NO_XDEV, which also apply when O_CREAT
 # creates a file through a dangling symlink. Everything is done in /tmp and /proc: in the
-# container /etc/hosts and the like are bind mounts, in Appine they are not. From 6.4 on
+# container /etc/hosts and the like are bind mounts, in KazeTerm they are not. From 6.4 on
 # O_DIRECTORY|O_CREAT is EINVAL (not in 6.1); in 6.1 RESOLVE_CACHED with O_DIRECTORY is EAGAIN
 # (the O_TMPFILE macro includes O_DIRECTORY), in later kernels it is not; 6.1 and 6.8 strip
 # FMODE_NONOTIFY (0x4000000) as a bit that should not be given, while the newer kernels on CI

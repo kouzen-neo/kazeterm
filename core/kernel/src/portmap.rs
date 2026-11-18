@@ -34,7 +34,7 @@ use crate::errno::Errno;
 /// The default offset.
 pub const DEFAULT_OFFSET: u16 = 10000;
 
-/// The most listen events kept that the app has not taken yet (appine-run does not take them).
+/// The most listen events kept that the app has not taken yet (kazeterm-run does not take them).
 const MAX_EVENTS: usize = 32;
 
 /// How long after a mapping is fully released a new bind still uses the original host port:

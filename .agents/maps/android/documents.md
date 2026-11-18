@@ -20,7 +20,7 @@ app and in other apps' pickers:
 - change notifications in both directions;
 - the documents that the terminal's `file:` links name.
 
-Root: `android/app/src/main/java/io/github/mthli/appine/Documents.kt` (and its manifest entry).
+Root: `android/app/src/main/java/com/kazeterm/Documents.kt` (and its manifest entry).
 
 Outside the module: the store-side browse implementation, real-path checks, naming and ownership
 of new files (`kernel/store`); the poll that delivers guest changes (`android/service`); account

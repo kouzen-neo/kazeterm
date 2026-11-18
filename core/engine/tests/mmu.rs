@@ -2,7 +2,7 @@
 
 use std::ptr::NonNull;
 
-use appine_engine::{Mmu, PAGE_SIZE, prot};
+use kazeterm_engine::{Mmu, PAGE_SIZE, prot};
 
 #[repr(C, align(4096))]
 struct Page([u8; 4096]);

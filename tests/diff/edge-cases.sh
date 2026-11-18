@@ -533,7 +533,7 @@ gcc -O2 -o sel sel.c
 
 # Timed waits (futex relative and absolute, nanosleep, clock_nanosleep relative and absolute),
 # each interrupted by a signal after another thread unmapped its time argument, end with EINTR:
-# Linux's restart keeps the deadline and never reads the time again. Appine's no-BKL waits hand
+# Linux's restart keeps the deadline and never reads the time again. KazeTerm's no-BKL waits hand
 # their deadline to the BKL path, which read the time again (EFAULT). Then a thread whose timed
 # futex wait a seccomp filter (installed with TSYNC while it waited) refuses once a signal wakes
 # it must still wait the whole timeout of its next timed wait, on a shared word (always the BKL

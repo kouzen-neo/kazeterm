@@ -1,11 +1,11 @@
-# Written by Appine beside /etc/profile.d/appine.sh, which reads this file, and replaced together
+# Written by KazeTerm beside /etc/profile.d/kazeterm.sh, which reads this file, and replaced together
 # with it.
 #
-# zsh's shell integration marks and titles (OSC 133 and OSC 2, see appine.sh). The profile sets
+# zsh's shell integration marks and titles (OSC 133 and OSC 2, see kazeterm.sh). The profile sets
 # the default prompt; these hooks wrap whichever prompt the user or a theme chooses afterwards.
 # Alpine's zprofile reads /etc/profile in sh emulation. Register the hooks in local zsh mode so
 # array operations work without changing the caller's options. Reading this file again keeps
-# other hooks and registers each Appine hook only once.
+# other hooks and registers each KazeTerm hook only once.
 () {
     emulate -L zsh
     # Before each prompt: the end of the last command with its status (D); the marks around PS1
@@ -13,22 +13,22 @@
     # added again whenever something replaced them (~/.zshrc, a theme), and are sent again at
     # each redraw, as zle redraws the whole prompt. The function moves itself last, to run after
     # the hooks of themes that set PS1 before each prompt
-    __appine_precmd() {
+    __kazeterm_precmd() {
         local ret=$?
         emulate -L zsh
         printf '\033]133;D;%s\007' "$ret"
         printf '\033]2;%s\007' "${PWD//[[:cntrl:]]/?}"
         case $PS1 in *'133;B'*) ;; *) PS1=$'%{\e]133;A;cl=line\a%}'$PS1$'%{\e]133;B\a%}' ;; esac
         case $PS2 in *'133;B'*) ;; *) PS2=$'%{\e]133;P;k=s\a%}'$PS2$'%{\e]133;B\a%}' ;; esac
-        [[ $precmd_functions[-1] == __appine_precmd ]] ||
-            precmd_functions=(${precmd_functions:#__appine_precmd} __appine_precmd)
+        [[ $precmd_functions[-1] == __kazeterm_precmd ]] ||
+            precmd_functions=(${precmd_functions:#__kazeterm_precmd} __kazeterm_precmd)
     }
     # Before each command: the start of its output (C), then the literal submitted command.
-    __appine_preexec() {
+    __kazeterm_preexec() {
         emulate -L zsh
         printf '\033]133;C\007'
         printf '\033]2;%s\007' "${1//[[:cntrl:]]/?}"
     }
-    precmd_functions=(${precmd_functions:#__appine_precmd} __appine_precmd)
-    preexec_functions=(${preexec_functions:#__appine_preexec} __appine_preexec)
+    precmd_functions=(${precmd_functions:#__kazeterm_precmd} __kazeterm_precmd)
+    preexec_functions=(${preexec_functions:#__kazeterm_preexec} __kazeterm_preexec)
 }

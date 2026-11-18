@@ -19,7 +19,7 @@
   pending messages, and the session-side clear/reset and cursor-setting calls.
 
 Root: `VtSession.kt` and `ConsolePty.kt` in
-`android/app/src/main/java/io/github/mthli/appine/`.
+`android/app/src/main/java/com/kazeterm/`.
 
 Outside the module: `VtNative`, JNI, the pump implementation, terminal ownership and locks,
 protocol parsing, command timing, snapshots, reset semantics and compression (`android/vtcore`);
@@ -210,7 +210,7 @@ login script and prompt-mark producers (`android/setup`).
   every record and a removal of the progress, before libghostty-vt's reset callback (which only
   forgets how the prompt moves its cursor); the app's Reset terminal sends neither, nor calls the
   callback, so vt.c forgets that itself there (android/vtcore's Clearing and resetting).
-- Shell integration lives in the guest (`/etc/profile.d/appine.sh` and the files it has the shells
+- Shell integration lives in the guest (`/etc/profile.d/kazeterm.sh` and the files it has the shells
   read): a tab's behaviour (closing
   without asking, jumps, Select output) follows whatever the shell in it sends, so a user's own
   prompt or shell changes it, and a remote shell over ssh can send marks too.

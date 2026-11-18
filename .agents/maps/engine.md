@@ -18,7 +18,7 @@ under an interpreter or translator, so the engine never jumps to guest code dire
 - **Tier 1** (`dbt.c`, `emit.h`) is a same-ISA dynamic binary translator: most instructions are
   copied verbatim, memory accesses get an inline soft-TLB check, and blocks are linked in a shared
   code cache.
-- The public contract (`include/appine/engine.h`, Rust bindings in `src/lib.rs`): the per-thread
+- The public contract (`include/kazeterm/engine.h`, Rust bindings in `src/lib.rs`): the per-thread
   CPU state, exit reasons, the kick handle, hardware debug slots, the Tier 1 instance API.
 - CPU feature advertisement and ID-register emulation (`features.c`).
 - The host fault guard (`guard.c`), which turns a host fault inside engine code into an exit.
@@ -33,7 +33,7 @@ Tier 1, only CPUID advertised).
 
 ### CPU state and contract
 
-- `struct appine_cpu` / `CpuState` — one per guest thread: X0–X30, SP, PC, NZCV, FPCR, FPSR,
+- `struct kazeterm_cpu` / `CpuState` — one per guest thread: X0–X30, SP, PC, NZCV, FPCR, FPSR,
   TPIDR_EL0, exit and fault information, the `pending` kick flag, the bound page table, the
   exclusive monitor (`excl_addr`, `excl_value`, `excl_size`; size 0 means none), Tier 1 scratch and
   group slots (`dbt_groups[4]`), `ivau_page`, the data TLB (4096) and ITLB (512), V0–V31,
@@ -47,11 +47,11 @@ Tier 1, only CPUID advertised).
 
 ### Tier 1
 
-- `DbtSpace` (`struct appine_dbt`) — one translation instance: 128 MB code cache with the shared
+- `DbtSpace` (`struct kazeterm_dbt`) — one translation instance: 128 MB code cache with the shared
   routines at its start, the lock-free translation table, block records, saved guest words, per-page
   block buckets, the shared-range list, the register set, the lock, flush state, trust sources, and
   the poisoned flag. Shared by every thread of an address space and by every member of a code group.
-- `Dbt` (`struct appine_dbt_thread`) — one thread's attachment: its tag, 4096-entry jump cache,
+- `Dbt` (`struct kazeterm_dbt_thread`) — one thread's attachment: its tag, 4096-entry jump cache,
   64-entry shadow return stack, statistics, and a private translation workspace.
 - `struct block` — guest pc, entry in the code cache (NULL when dead), saved guest words, parked
   flag, tag.
@@ -75,9 +75,9 @@ Tier 1, only CPUID advertised).
   `written_code_bytes`.
 - **Process-wide**: `install_fault_guard`, `guest_hwcap`, `guest_hwcap2`, `guest_midr`,
   `layout_matches`.
-- **C-internal** (used across engine files): `appine_interp_step`/`appine_interp_exec`,
-  `appine_native_exec`, `appine_simd_dp_decode`, `appine_atomic_exec`, `appine_id_register`,
-  `appine_guard_run`/`hold`/`drop`/`fail`, `appine_map_code`; `appine_guard_selftest` for the unit
+- **C-internal** (used across engine files): `kazeterm_interp_step`/`kazeterm_interp_exec`,
+  `kazeterm_native_exec`, `kazeterm_simd_dp_decode`, `kazeterm_atomic_exec`, `kazeterm_id_register`,
+  `kazeterm_guard_run`/`hold`/`drop`/`fail`, `kazeterm_map_code`; `kazeterm_guard_selftest` for the unit
   test.
 
 ## Data flow / lifecycle
@@ -178,7 +178,7 @@ Tier 1, only CPUID advertised).
   loads.
 - Inserted code never changes NZCV (it uses `cbnz`, `tbnz`, `eor`/`eon` instead of compares).
 - The set is fixed per instance at creation: the loader picks `Go` when the executable carries a Go
-  build-ID note (`APPINE_DBT_REGS=go|default` overrides); routines and templates are generated per
+  build-ID note (`KAZETERM_DBT_REGS=go|default` overrides); routines and templates are generated per
   set.
 
 ### Tier 1 blocks and instruction handling
@@ -286,7 +286,7 @@ Tier 1, only CPUID advertised).
 
 ### Dispatcher
 
-- `appine_dbt_run` runs under the fault guard; a poisoned instance runs Tier 0 for the whole call.
+- `kazeterm_dbt_run` runs under the fault guard; a poisoned instance runs Tier 0 for the whole call.
 - Each iteration: join or perform a pending flush, catch up with the instance's generation (reset
   the return stack, clear the jump cache), return `Kick` if pending, look up the block without a
   lock, revive parked blocks of that page if any, otherwise translate and install, then enter.
@@ -402,7 +402,7 @@ Tier 1, only CPUID advertised).
 
 - `install_fault_guard` installs SIGSEGV, SIGBUS and SIGILL handlers (chained after ART's); the
   machine installs it only when kernel bugs are contained (release builds by default, or
-  `APPINE_ON_BUG`). During a guarded run, a host fault with `si_code > 0` long-jumps back: the host
+  `KAZETERM_ON_BUG`). During a guarded run, a host fault with `si_code > 0` long-jumps back: the host
   FPCR is restored, registered locks are released newest first (the outer four of those held;
   deeper ones are counted so drops still pair), the signal is unblocked, and the run returns
   `HostFault`. The locks taken during a run are registered: the instance lock, the template
@@ -410,11 +410,11 @@ Tier 1, only CPUID advertised).
   holds them (one entry with a release function), the native-stub lock and the perf-map lock. Other faults are reported to stderr and passed to the
   previous handler. If the per-thread guard cannot be allocated, the run proceeds unguarded.
 - Guarded code must not allocate or call back into the kernel layer; the one documented exception
-  is the opt-in perf map (`APPINE_PERF_MAP`), which writes `/tmp/perf-<pid>.map` from `install`.
+  is the opt-in perf map (`KAZETERM_PERF_MAP`), which writes `/tmp/perf-<pid>.map` from `install`.
 - Guest state is not reconstructed from the host context; after a host fault the kernel kills the
   guest process, the Tier 1 instance is poisoned, and the template arena is cleared.
 - Internal overflow checks (native stub length, refill info word, stub/fixup/block words,
-  relocations, a group slot mismatch) call `appine_guard_fail`: under an armed guard the run ends
+  relocations, a group slot mismatch) call `kazeterm_guard_fail`: under an armed guard the run ends
   as after a host fault, recorded as `SIGABRT` with the caller's address (the instance is poisoned
   as for any host fault); with no guard armed (debug builds, unguarded calls) it aborts as before.
   The checks run during translation and stub generation, where only registered locks are held.
@@ -434,7 +434,7 @@ Tier 1, only CPUID advertised).
 
 ### Outbound
 
-- `kernel/mmu` structures: the page table (`appine_mmu_translate`, the PTE layout walked by the
+- `kernel/mmu` structures: the page table (`kazeterm_mmu_translate`, the PTE layout walked by the
   refill routine), the TLB entry layout and `tlb_used`.
 - Host: `getauxval`, `mrs midr_el1`/`fpcr`/`cntvct_el0`/`cntvctss_el0`/`cntfrq_el0`, `msr dit`, `mmap`/`mremap`/
   `madvise`, pthreads (locks, once, TLS), `sigaction`/`sigsetjmp`/`siglongjmp`, instruction-cache
@@ -450,7 +450,7 @@ Tier 1, only CPUID advertised).
   state.
 - While translated code runs, the CPU state does not hold the guest's registers (routines also
   borrow its X0–X4 slots); it is consistent only after an exit.
-- Fields before the TLB in `struct appine_cpu` must stay within immediate reach of Tier 1 loads, and
+- Fields before the TLB in `struct kazeterm_cpu` must stay within immediate reach of Tier 1 loads, and
   the TLB must be 16-byte aligned; the Rust mirror is checked by `layout_matches` (size plus eight
   field offsets, in a unit test).
 - Watched pages never enter the TLB (read half absent for load watchpoints, write half for any),

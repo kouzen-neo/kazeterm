@@ -1,4 +1,4 @@
-# podman run by an ordinary user (rootless) with its overlay storage driver on Appine's overlayfs:
+# podman run by an ordinary user (rootless) with its overlay storage driver on KazeTerm's overlayfs:
 # the kernel's overlay mounted in the user's own user and mount namespaces with `userxattr`, the
 # opaque directories and whiteouts that layer extraction and containers make as that user, an
 # overlay volume (`:O`), diff, commit, a build that deletes what an earlier step made, volumes,
@@ -6,7 +6,7 @@
 # vfs images stay. Uses the podman store:
 #   scripts/survey -s target/survey/podman podman-rootless-overlay
 # Native comparison:
-# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n appine-podman-native podman-rootless-overlay
+# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n kazeterm-podman-native podman-rootless-overlay
 # (there the storage is on a tmpfs: docker's overlay root cannot be an upper layer)
 exec 2>&1
 for p in podman crun shadow-uidmap attr; do
@@ -17,8 +17,8 @@ grep -q '^rl:' /etc/subuid || echo rl:100000:65536 >>/etc/subuid
 grep -q '^rl:' /etc/subgid || echo rl:100000:65536 >>/etc/subgid
 mkdir -p /run/user/1000 && chown rl:rl /run/user/1000 && chmod 700 /run/user/1000
 mkdir -p /etc/containers/containers.rootless.conf.d
-[ -e /etc/containers/containers.rootless.conf.d/appine.conf ] ||
-    printf '[containers]\nnetns = "host"\n' >/etc/containers/containers.rootless.conf.d/appine.conf
+[ -e /etc/containers/containers.rootless.conf.d/kazeterm.conf ] ||
+    printf '[containers]\nnetns = "host"\n' >/etc/containers/containers.rootless.conf.d/kazeterm.conf
 mkdir -p /home/rl/.config/containers
 printf '[engine]\ncgroup_manager = "cgroupfs"\nevents_logger = "file"\n' >/home/rl/.config/containers/containers.conf
 ROOT=/home/rl/.local/share/containers/overlay-survey

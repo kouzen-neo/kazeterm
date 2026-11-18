@@ -580,7 +580,7 @@ C
 gcc -O1 -o relink relink.c && ./relink
 rm -f relink relink.c
 
-# Sysctls Appine only records exist with Linux's modes (values come from the host's kernel on the
+# Sysctls KazeTerm only records exist with Linux's modes (values come from the host's kernel on the
 # native side, so only their form is compared)
 cd /proc/sys
 for f in debug/exception-trace fs/overflowgid fs/overflowuid fs/suid_dumpable \
@@ -594,7 +594,7 @@ for f in debug/exception-trace fs/overflowgid fs/overflowuid fs/suid_dumpable \
     kernel/sched_schedstats kernel/sysrq kernel/tainted vm/dirty_background_bytes \
     vm/dirty_background_ratio vm/dirty_bytes vm/dirty_expire_centisecs vm/dirty_ratio \
     vm/dirty_writeback_centisecs vm/drop_caches vm/mmap_rnd_bits vm/mmap_rnd_compat_bits \
-    vm/overcommit_memory vm/overcommit_ratio vm/page-cluster vm/swappiness \
+    vm/overcommit_memory vm/overcommit_ratio vm/page-cluster vm/swkazetermss \
     vm/watermark_scale_factor; do
     mode=$(stat -c %a $f)
     case $mode in
@@ -607,7 +607,7 @@ cd /tmp
 
 # A signal sent to the process while the thread that would take it is about to block it (stopped
 # by a tracer at the entry of rt_sigprocmask) is taken by another thread that does not block it
-# (Linux's retarget_shared_pending; Linux picks the other thread at once, Appine when the first one
+# (Linux's retarget_shared_pending; Linux picks the other thread at once, KazeTerm when the first one
 # blocks it)
 cat > retarget.c <<'C'
 #define _GNU_SOURCE
@@ -1321,7 +1321,7 @@ int main(void)
     int s = socket(AF_UNIX, SOCK_STREAM, 0);
     show("shutdown of an unconnected socket", shutdown(s, SHUT_RDWR));
     struct sockaddr_un a = {.sun_family = AF_UNIX};
-    strcpy(a.sun_path + 1, "appine-unixzero");
+    strcpy(a.sun_path + 1, "kazeterm-unixzero");
     int l = socket(AF_UNIX, SOCK_STREAM, 0);
     bind(l, (struct sockaddr *)&a, sizeof a);
     listen(l, 1);

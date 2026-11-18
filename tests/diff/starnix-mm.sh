@@ -19,14 +19,14 @@ SKIP="$SKIP:All/AnonInodeTest.*/BpfMap:All/AnonInodeTest.*/Userfaultfd"
 SKIP="$SKIP:All/MlockProtTest.MlockApplied/None_*:MlockProcTest.MlockStopsPopulatingAtProtNoneMapping"
 SKIP="$SKIP:MlockProcTest.MlockAfterForkCopiesPrivatePages"
 SKIP="$SKIP:MlockProcTest.MlockPrefaultsOnlyWritablePrivateAnonymousMappings"
-# io_uring is ENOSYS (docs/starnix.md), so this skips itself on Appine
+# io_uring is ENOSYS (docs/starnix.md), so this skips itself on KazeTerm
 SKIP="$SKIP:PersonalityTest.ReadImpliesExecMmapIoUring"
 # kernel/mm: pagemap reports no frame numbers, not even to CAP_SYS_ADMIN (after that check fails,
 # the fallback test crashes in gtest's own allocation)
 SKIP="$SKIP:ProcTestBase.ProcSelfPagemapMappedAndUnmapped:ProcTestBase.ProcSelfPagemapMultiChunkBoundary"
 SKIP="$SKIP:ProcTestBase.ProcSelfPagemapMultipleMappingsAndHoles"
 SKIP="$SKIP:ProcTestBase.ProcSelfPagemapFallbackBoundary"
-# Cannot be compared on CI: PER_LINUX32 needs AArch32 at EL0, which CI's CPU has and Appine and the
+# Cannot be compared on CI: PER_LINUX32 needs AArch32 at EL0, which CI's CPU has and KazeTerm and the
 # development Macs do not; the mremap test skips itself on kernels 6.17 and newer
 SKIP="$SKIP:PersonalityTest.UnameMachineName:Mremap.RemapMayMoveSpanningMappings"
 sh /tmp/difftest-files/gtest/run.sh starnix "$SKIP" mmap_test aspace_test anon_test mlock_test \

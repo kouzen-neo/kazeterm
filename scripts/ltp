@@ -1,10 +1,10 @@
 #!/bin/sh
-# Runs LTP's syscall tests inside Appine (design doc §13.3 layer 2). Build LTP with
+# Runs LTP's syscall tests inside KazeTerm (design doc §13.3 layer 2). Build LTP with
 # scripts/build-ltp first. Runs on Linux arm64; on macOS through scripts/dev:
 #
 #   scripts/dev scripts/ltp [-a] [-j jobs] [-t tier] [regex matching the whole test name]
 #
-# Each test runs in a new appine-run process; the results go to target/ltp/results.txt, one line
+# Each test runs in a new kazeterm-run process; the results go to target/ltp/results.txt, one line
 # each, "<name> <PASS|CONF|FAIL|TIMEOUT|BUG|SKIP> <exit code> <seconds>", the output to
 # target/ltp/logs/<name>.log, and the previous run's output stays in <name>.prev.log (rerunning a
 # failure alone does not wipe out the failed run). BUG means the kernel layer reported an
@@ -33,7 +33,7 @@ out=$root/target/ltp
 store=$out/store
 [ ! -d /ltp ] || store=/ltp/store
 store=${LTP_STORE:-$store}
-run=${APPINE_RUN:-$root/target/linux-arm64/release/appine-run}
+run=${KAZETERM_RUN:-$root/target/linux-arm64/release/kazeterm-run}
 
 # xargs calls this once per test: scripts/ltp --one <tier> <name> <command line…>
 if [ "${1:-}" = --one ]; then
@@ -44,19 +44,19 @@ if [ "${1:-}" = --one ]; then
     [ -f "$log" ] && mv "$log" "$out/logs/$name.prev.log"
     start=$(date +%s.%N)
     set +e
-    # LTP judges timeouts by its own timer; Appine is slower than native, so allow 5 times as long
+    # LTP judges timeouts by its own timer; KazeTerm is slower than native, so allow 5 times as long
     # (at least 2.5 minutes per test). The factor also multiplies TST_RETRY_FUNC's backoff limit: at
     # 20 times, system calls that always fail (the bpf ones) would be retried for 33 seconds. Race
     # tests that run for a set duration (inotify09, timerfd_settime02 and so on, fuzzy sync) run
     # only a tenth of it: they look for races in Linux itself, and one alone used to take 1–2
     # minutes. Tests that need a device get a loop device over a file in /tmp, as on Linux;
-    # Appine has no disk filesystems, so the device's filesystem is tmpfs (LTP then skips mkfs
+    # KazeTerm has no disk filesystems, so the device's filesystem is tmpfs (LTP then skips mkfs
     # and mounts a tmpfs instead, as Starnix runs LTP), and tests that need a particular one
     # report TCONF
     timeout 900 "$run" --tier "$tier" --rootfs "$store" \
         --env PATH=/opt/ltp/testcases/bin:/usr/sbin:/usr/bin:/sbin:/bin \
         --env LTPROOT=/opt/ltp --env TMPDIR=/tmp --env LTP_TIMEOUT_MUL=5 --env LTP_RUNTIME_MUL=0.1 \
-        --env LTP_COLORIZE_OUTPUT=0 --env KCONFIG_PATH=/opt/ltp/appine.config \
+        --env LTP_COLORIZE_OUTPUT=0 --env KCONFIG_PATH=/opt/ltp/kazeterm.config \
         --env LTP_DEV_FS_TYPE=tmpfs \
         -- /bin/sh -c "cd /tmp && exec $*" </dev/null >"$log" 2>&1
     code=$?
@@ -66,7 +66,7 @@ if [ "${1:-}" = --one ]; then
     124) result=TIMEOUT ;;
     *) result=FAIL ;;
     esac
-    ! grep -q '^appine: internal error' "$log" || result=BUG
+    ! grep -q '^kazeterm: internal error' "$log" || result=BUG
     echo "$name $result $code $(echo "$(date +%s.%N) $start" | awk '{printf "%.1f", $1 - $2}')"
     exit 0
 fi
@@ -91,14 +91,14 @@ if [ -z "$ltp" ] || [ -z "$rootfs" ]; then
     echo "ltp: run scripts/build-ltp and scripts/fetch-rootfs first" >&2
     exit 1
 fi
-# Build the appine-run that is run (an existing one may be older than the source), into the target
-# directory it is run from (scripts/dev's, also outside the container); APPINE_RUN names one to
+# Build the kazeterm-run that is run (an existing one may be older than the source), into the target
+# directory it is run from (scripts/dev's, also outside the container); KAZETERM_RUN names one to
 # use as it is
-if [ -z "${APPINE_RUN:-}" ]; then
-    (cd "$root" && CARGO_TARGET_DIR=$root/target/linux-arm64 cargo build --release -q -p appine-run)
+if [ -z "${KAZETERM_RUN:-}" ]; then
+    (cd "$root" && CARGO_TARGET_DIR=$root/target/linux-arm64 cargo build --release -q -p kazeterm-run)
 fi
 if [ ! -x "$run" ]; then
-    echo "ltp: no appine-run at $run" >&2
+    echo "ltp: no kazeterm-run at $run" >&2
     exit 1
 fi
 
@@ -113,8 +113,8 @@ if [ "$(cat "$store/.ltp" 2>/dev/null)" != "$stamp" ]; then
 fi
 
 # Tests decide whether to run by the kernel configuration (.needs_kconfigs): list the features
-# Appine implements; anything not listed counts as absent
-"$run" --rootfs "$store" -- /bin/sh -c 'cat >/opt/ltp/appine.config' <<'EOF'
+# KazeTerm implements; anything not listed counts as absent
+"$run" --rootfs "$store" -- /bin/sh -c 'cat >/opt/ltp/kazeterm.config' <<'EOF'
 CONFIG_64BIT=y
 CONFIG_ARM64=y
 CONFIG_MMU=y

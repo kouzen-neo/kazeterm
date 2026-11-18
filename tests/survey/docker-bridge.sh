@@ -6,7 +6,7 @@
 # uses. The store is shared with docker.sh:
 #   scripts/survey -s target/survey/docker docker-bridge
 # Native comparison:
-# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n appine-docker-native docker-bridge
+# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n kazeterm-docker-native docker-bridge
 exec 2>&1
 [ -x /usr/bin/dockerd ] || apk add -q docker
 command -v strace >/dev/null || apk add -q strace

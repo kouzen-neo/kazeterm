@@ -7,7 +7,7 @@
 
 use std::ptr::NonNull;
 
-use appine_engine::{Access, Cpu, Exit, FaultKind, Mmu, PAGE_SIZE, hwcap, hwcap2, prot};
+use kazeterm_engine::{Access, Cpu, Exit, FaultKind, Mmu, PAGE_SIZE, hwcap, hwcap2, prot};
 
 #[repr(C, align(4096))]
 struct Page([u8; 4096]);
@@ -370,7 +370,7 @@ fn contiguous_vectors_wrap_and_probe_before_writeback() {
     g.set_x(1, addr);
     g.cpu
         .state_mut()
-        .set_hw_debug(&[], &[(end - 1, end, appine_engine::WATCH_STORE)]);
+        .set_hw_debug(&[], &[(end - 1, end, kazeterm_engine::WATCH_STORE)]);
     g.cpu.state_mut().v[31] = [3, 4];
     assert_eq!(
         g.cpu.exec_insn(ST1_POST),
@@ -412,7 +412,7 @@ fn id_registers_match_hwcap() {
     let mut g = Guest::new();
     g.step(0xd5380600); // mrs x0, id_aa64isar0_el1
     let isar0 = g.x(0);
-    let caps = appine_engine::guest_hwcap();
+    let caps = kazeterm_engine::guest_hwcap();
     assert_eq!(caps & hwcap::CRC32 != 0, (isar0 >> 16) & 0xf == 1);
     assert_eq!(caps & hwcap::ATOMICS != 0, (isar0 >> 20) & 0xf == 2);
     let sha2 = if caps & hwcap::SHA512 != 0 { 2 } else { 1 };
@@ -421,7 +421,7 @@ fn id_registers_match_hwcap() {
     assert_eq!(caps & hwcap::ASIMDDP != 0, (isar0 >> 44) & 0xf == 1);
     assert_eq!(caps & hwcap::ASIMDRDM != 0, (isar0 >> 28) & 0xf == 1);
     assert_eq!(caps & hwcap::ASIMDFHM != 0, (isar0 >> 48) & 0xf == 1);
-    let caps2 = appine_engine::guest_hwcap2();
+    let caps2 = kazeterm_engine::guest_hwcap2();
     let ts = match (caps & hwcap::FLAGM != 0, caps2 & hwcap2::FLAGM2 != 0) {
         (_, true) => 2,
         (true, false) => 1,
@@ -436,7 +436,7 @@ fn id_registers_match_hwcap() {
     // SHA3 and SHA512 are advertised only together
     assert_eq!(caps & hwcap::SHA3 != 0, caps & hwcap::SHA512 != 0);
     g.step(0xd5380620); // mrs x0, id_aa64isar1_el1
-    let i8mm = appine_engine::guest_hwcap2() & hwcap2::I8MM != 0;
+    let i8mm = kazeterm_engine::guest_hwcap2() & hwcap2::I8MM != 0;
     assert_eq!(i8mm, (g.x(0) >> 52) & 0xf == 1);
     let lrcpc = match (caps & hwcap::LRCPC != 0, caps & hwcap::ILRCPC != 0) {
         (_, true) => 2,
@@ -446,7 +446,7 @@ fn id_registers_match_hwcap() {
     assert_eq!((g.x(0) >> 20) & 0xf, lrcpc);
     assert_eq!(caps & hwcap::JSCVT != 0, (g.x(0) >> 12) & 0xf == 1);
     assert_eq!(caps & hwcap::FCMA != 0, (g.x(0) >> 16) & 0xf == 1);
-    let bf16 = appine_engine::guest_hwcap2() & hwcap2::BF16 != 0;
+    let bf16 = kazeterm_engine::guest_hwcap2() & hwcap2::BF16 != 0;
     assert_eq!(bf16, (g.x(0) >> 44) & 0xf == 1);
     let dpb = match (caps & hwcap::DCPOP != 0, caps2 & hwcap2::DCPODP != 0) {
         (_, true) => 2,
@@ -472,7 +472,7 @@ fn id_registers_match_hwcap() {
 fn ldapr_follows_the_feature_set() {
     let mut g = Guest::new();
     let ldapr = 0xf8bfc020; // ldapr x0, [x1]
-    if appine_engine::guest_hwcap() & hwcap::LRCPC == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::LRCPC == 0 {
         assert_eq!(
             g.cpu.exec_insn(ldapr),
             Some(Exit::Undefined { insn: ldapr })
@@ -507,7 +507,7 @@ fn ldapr_follows_the_feature_set() {
 fn lrcpc2_follows_the_feature_set() {
     let mut g = Guest::new();
     let ldapur = 0x99404020; // ldapur w0, [x1, #4]
-    if appine_engine::guest_hwcap() & hwcap::ILRCPC == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::ILRCPC == 0 {
         assert_eq!(
             g.cpu.exec_insn(ldapur),
             Some(Exit::Undefined { insn: ldapur })
@@ -545,7 +545,7 @@ fn sha3_and_i8mm_follow_the_feature_set() {
     let mut g = Guest::new();
     let eor3 = 0xce020c20; // eor3 v0.16b, v1.16b, v2.16b, v3.16b
     let smmla = 0x4e85a483; // smmla v3.4s, v4.16b, v5.16b
-    if appine_engine::guest_hwcap() & hwcap::SHA3 == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::SHA3 == 0 {
         assert_eq!(g.cpu.exec_insn(eor3), Some(Exit::Undefined { insn: eor3 }));
     } else {
         let s = g.cpu.state_mut();
@@ -561,7 +561,7 @@ fn sha3_and_i8mm_follow_the_feature_set() {
             ]
         );
     }
-    if appine_engine::guest_hwcap2() & hwcap2::I8MM == 0 {
+    if kazeterm_engine::guest_hwcap2() & hwcap2::I8MM == 0 {
         assert_eq!(
             g.cpu.exec_insn(smmla),
             Some(Exit::Undefined { insn: smmla })
@@ -594,7 +594,7 @@ fn dot_product_follows_the_feature_set() {
     }
     let mut g = Guest::new();
     let sdot = 0x4e829420; // sdot v0.4s, v1.16b, v2.16b
-    if appine_engine::guest_hwcap() & hwcap::ASIMDDP == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::ASIMDDP == 0 {
         assert_eq!(g.cpu.exec_insn(sdot), Some(Exit::Undefined { insn: sdot }));
         return;
     }
@@ -641,7 +641,7 @@ fn half_precision_follows_the_feature_set() {
     let fadd = 0x1ee22820; // fadd h0, h1, h2
     let fmla = 0x4e420c20; // fmla v0.8h, v1.8h, v2.8h
     let fmov = 0x4f03fe00; // fmov v0.8h, #1.0
-    if appine_engine::guest_hwcap() & hwcap::FPHP == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::FPHP == 0 {
         for insn in [fadd, fmla, fmov] {
             assert_eq!(g.cpu.exec_insn(insn), Some(Exit::Undefined { insn }));
         }
@@ -673,8 +673,8 @@ fn half_precision_follows_the_feature_set() {
 #[test]
 fn flagm_sb_dpb_follow_the_feature_set() {
     let mut g = Guest::new();
-    let caps = appine_engine::guest_hwcap();
-    let caps2 = appine_engine::guest_hwcap2();
+    let caps = kazeterm_engine::guest_hwcap();
+    let caps2 = kazeterm_engine::guest_hwcap2();
     let flagm = caps & hwcap::FLAGM != 0;
     let flagm2 = caps2 & hwcap2::FLAGM2 != 0;
     let nzcv = |n: u64, z: u64, c: u64, v: u64| n << 31 | z << 30 | c << 29 | v << 28;
@@ -773,13 +773,13 @@ fn dit_follows_the_feature_set() {
     let mrs = 0xd53b42a0; // mrs x0, dit
     let msr = 0xd51b42a1; // msr dit, x1
     let imm = |crm: u32| 0xd503405f | crm << 8; // msr dit, #crm
-    if appine_engine::guest_hwcap() & hwcap::DIT == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::DIT == 0 {
         for insn in [mrs, msr, imm(1)] {
             assert_eq!(g.cpu.exec_insn(insn), Some(Exit::Undefined { insn }));
         }
         return;
     }
-    // The host thread's DIT follows the guest's (appine_sync_dit)
+    // The host thread's DIT follows the guest's (kazeterm_sync_dit)
     #[cfg(target_arch = "aarch64")]
     let host = || {
         let v: u64;
@@ -820,7 +820,7 @@ fn frintts_follows_the_feature_set() {
     let frint32z = 0x1e284020; // frint32z s0, s1
     let frint64x = 0x1e69c020; // frint64x d0, d1
     let vfrint32x = 0x6e21e820; // frint32x v0.4s, v1.4s
-    if appine_engine::guest_hwcap2() & hwcap2::FRINT == 0 {
+    if kazeterm_engine::guest_hwcap2() & hwcap2::FRINT == 0 {
         for insn in [frint32z, frint64x, vfrint32x] {
             assert_eq!(g.cpu.exec_insn(insn), Some(Exit::Undefined { insn }));
         }
@@ -857,7 +857,7 @@ fn rdm_fcma_fhm_bf16_follow_the_feature_set() {
         return;
     }
     let mut g = Guest::new();
-    let caps = appine_engine::guest_hwcap();
+    let caps = kazeterm_engine::guest_hwcap();
     let sqrdmlah = 0x6e428420; // sqrdmlah v0.8h, v1.8h, v2.8h
     let fcadd = 0x6ec2f420; // fcadd v0.2d, v1.2d, v2.2d, #270
     let fmlal = 0x4e22ec20; // fmlal v0.4s, v1.4h, v2.4h
@@ -867,8 +867,8 @@ fn rdm_fcma_fhm_bf16_follow_the_feature_set() {
         (caps & hwcap::ASIMDRDM != 0, sqrdmlah),
         (caps & hwcap::FCMA != 0, fcadd),
         (caps & hwcap::ASIMDFHM != 0, fmlal),
-        (appine_engine::guest_hwcap2() & hwcap2::BF16 != 0, bfdot),
-        (appine_engine::guest_hwcap2() & hwcap2::BF16 != 0, bfcvt),
+        (kazeterm_engine::guest_hwcap2() & hwcap2::BF16 != 0, bfdot),
+        (kazeterm_engine::guest_hwcap2() & hwcap2::BF16 != 0, bfcvt),
     ];
     for (on, insn) in cases {
         if !on {
@@ -928,7 +928,7 @@ fn javascript_conversion_follows_the_feature_set() {
     }
     let mut g = Guest::new();
     let fjcvtzs = 0x1e7e0020; // fjcvtzs w0, d1
-    if appine_engine::guest_hwcap() & hwcap::JSCVT == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::JSCVT == 0 {
         assert_eq!(
             g.cpu.exec_insn(fjcvtzs),
             Some(Exit::Undefined { insn: fjcvtzs })
@@ -1109,5 +1109,5 @@ fn run_stops_at_a_breakpoint_on_the_current_page() {
 /// faithfully; see the engine map).
 fn has_simd() -> bool {
     let need = hwcap::FP | hwcap::ASIMD;
-    appine_engine::guest_hwcap() & need == need
+    kazeterm_engine::guest_hwcap() & need == need
 }

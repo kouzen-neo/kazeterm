@@ -10,7 +10,7 @@
 // around every call, so the terminal, the render state and the buffers below are only used by one
 // thread at a time.
 //
-// Frame format (little-endian), written by appine_vt_frame and read by VtFrame.kt; the two change
+// Frame format (little-endian), written by kazeterm_vt_frame and read by VtFrame.kt; the two change
 // together:
 //
 //   header, 64 bytes:
@@ -53,7 +53,7 @@
 //     u32 animation_ms     when to draw again for the next frame of an animated image, 0 when
 //                          none plays
 //   image_count image placements (Kitty graphics), in drawing order, 56 bytes each:
-//     u32 image_id         the image to draw, whose pixels appine_vt_image gives
+//     u32 image_id         the image to draw, whose pixels kazeterm_vt_image gives
 //     u8  layer            0 below the cell backgrounds, 1 below the text, 2 above it
 //                          (GhosttyImageLayer)
 //     u8  reserved[3]
@@ -133,7 +133,7 @@
 // The frame's cursor style while the console reads a password, after GhosttyCursorStyle's four
 #define CURSOR_LOCK 4
 
-// A cell's search mark (AppineVt.marks), shifted into its attrs at bit 14
+// A cell's search mark (KazeTermVt.marks), shifted into its attrs at bit 14
 #define MARK_NONE 0
 #define MARK_MATCH 1
 #define MARK_SELECTED 2
@@ -181,7 +181,7 @@ static const GhosttyColorRgb DEFAULT_BACKGROUND = {.r = 0, .g = 0, .b = 0};
 // What a notification (OSC 9, OSC 777) keeps of its title and body
 #define NOTIFICATION_MAX ((size_t)4096)
 
-// How much of an OSC string's start appine_vt_feed keeps to find clipboard reads (OSC 52 with "?"
+// How much of an OSC string's start kazeterm_vt_feed keeps to find clipboard reads (OSC 52 with "?"
 // for data: "52;", the clipboards, ";?", which fit with all eight clipboards named) and how the
 // shell moves its cursor (OSC 133;A with its options: Ghostty's bash integration sends
 // "133;A;redraw=last;cl=line;aid=" and the shell's pid)
@@ -190,13 +190,13 @@ static const GhosttyColorRgb DEFAULT_BACKGROUND = {.r = 0, .g = 0, .b = 0};
 // tmux's control mode (tmux -CC) wraps everything it prints in a DCS string with this header, for
 // terminals that turn it into windows and tabs (iTerm2's). libghostty-vt built for apps leaves
 // tmux control mode out with Oniguruma, so it swallows the string as an unknown DCS: the tab would
-// show nothing until tmux left control mode, while keys reached tmux as commands. appine_vt_feed
+// show nothing until tmux left control mode, while keys reached tmux as commands. kazeterm_vt_feed
 // keeps the first DCS_HEAD bytes of a DCS string to find it
 #define TMUX_CONTROL "1000p"
 #define DCS_HEAD 5
 
 // How a tap on the input typed at the shell's prompt moves its cursor there
-// (appine_vt_prompt_click), as the last prompt's start (OSC 133;A) declared: not at all; with left
+// (kazeterm_vt_prompt_click), as the last prompt's start (OSC 133;A) declared: not at all; with left
 // and right arrows within the input's line (cl=line, and cl=m, v and w, which Ghostty treats as
 // line too); or with a mouse press the shell places the cursor by itself (Kitty's click_events=1,
 // its row counted from the screen's top, =2 from the prompt's first row)
@@ -206,19 +206,19 @@ static const GhosttyColorRgb DEFAULT_BACKGROUND = {.r = 0, .g = 0, .b = 0};
 #define PROMPT_CLICK_RELATIVE 3
 
 // The option by which a prompt (OSC 133;A or P) says that its shell marks no output start and
-// breaks the lines of a long command itself, as busybox ash does (appine_vt_feed's line feeds):
+// breaks the lines of a long command itself, as busybox ash does (kazeterm_vt_feed's line feeds):
 // the profile's ash prompts carry it (android/setup's ashrc.sh)
-#define PROMPT_LF_OPTION "appine_lf"
+#define PROMPT_LF_OPTION "kazeterm_lf"
 #define PROMPT_LF_OUTPUT "output"
 
-// The output start (OSC 133;C) appine_vt_feed marks for such a shell
+// The output start (OSC 133;C) kazeterm_vt_feed marks for such a shell
 #define OUTPUT_START "\x1b]133;C\x1b\\"
-// The marks appine_vt_feed puts after another writer's output at such a shell's prompt: a
+// The marks kazeterm_vt_feed puts after another writer's output at such a shell's prompt: a
 // continuation prompt with no text (OSC 133;P;k=s) and the input's start (OSC 133;B), so what is
 // typed from there on is input again
 #define INPUT_RESUMED "\x1b]133;P;k=s\x1b\\\x1b]133;B\x1b\\"
 
-// Rows above the cursor searched for the first row of the prompt it is at (appine_vt_prompt_click)
+// Rows above the cursor searched for the first row of the prompt it is at (kazeterm_vt_prompt_click)
 #define PROMPT_ROWS 64
 
 // The memory each screen's Kitty images may take, decoded; beyond it libghostty-vt deletes the
@@ -227,7 +227,7 @@ static const GhosttyColorRgb DEFAULT_BACKGROUND = {.r = 0, .g = 0, .b = 0};
 #define KITTY_STORAGE ((uint64_t)32 << 20)
 
 // What each screen's Kitty images are cut down to when the app trims its memory under pressure, in
-// tabs not shown (appine_vt_drop_images): about one image the size of a phone's screen
+// tabs not shown (kazeterm_vt_drop_images): about one image the size of a phone's screen
 #define KITTY_TRIMMED ((uint64_t)4 << 20)
 
 // The shortest wait between two frames of an animated image (about 120 Hz)
@@ -248,13 +248,13 @@ static const GhosttyColorRgb DEFAULT_BACKGROUND = {.r = 0, .g = 0, .b = 0};
 // Ghostty's own entry either way
 static const char TERMINFO_NAME[] = "xterm-256color";
 
-// What appine_vt_compress_step asks of vt.rs: nothing until the terminal changes again, another
+// What kazeterm_vt_compress_step asks of vt.rs: nothing until the terminal changes again, another
 // step soon, or another idle interval first (the terminal changed since the last look)
-#define APPINE_COMPRESS_DONE 0
-#define APPINE_COMPRESS_STEP 1
-#define APPINE_COMPRESS_WAIT 2
+#define KAZETERM_COMPRESS_DONE 0
+#define KAZETERM_COMPRESS_STEP 1
+#define KAZETERM_COMPRESS_WAIT 2
 
-// The text buffer (AppineVt.text) a finished compression pass leaves allocated: a transcript or a
+// The text buffer (KazeTermVt.text) a finished compression pass leaves allocated: a transcript or a
 // large copy grows it to their size, and it is not needed again until the next one
 #define TEXT_KEEP ((size_t)64 * 1024)
 
@@ -264,18 +264,18 @@ static const char TERMINFO_NAME[] = "xterm-256color";
 // only a save that falls inside a longer one finds none
 #define CONTINUATION_MAX ((size_t)64 * 1024)
 
-// The largest snapshot kept for a tab (appine_vt_snapshot): a full scrollback of coloured output
+// The largest snapshot kept for a tab (kazeterm_vt_snapshot): a full scrollback of coloured output
 // takes about 1.5 MB, so beyond this it is mostly Kitty images' pixels, and the tab comes back from
 // its plain transcript instead
 #define SNAPSHOT_MAX ((size_t)16 << 20)
 
-// The state of a tab's snapshot (AppineVt.snapshot): the terminal changed since the last one, the
+// The state of a tab's snapshot (KazeTermVt.snapshot): the terminal changed since the last one, the
 // last one is still the terminal's, or none could be taken of the terminal as it is
 #define SNAPSHOT_STALE 0
 #define SNAPSHOT_TAKEN 1
 #define SNAPSHOT_NONE 2
 
-// A program status report (OSC 7501) as appine_vt_take_effects queues it for vt.rs, which reads the
+// A program status report (OSC 7501) as kazeterm_vt_take_effects queues it for vt.rs, which reads the
 // same layout: u8 state (GhosttyProgramStatusState), u8 kind (GhosttyProgramStatusKind), i8 progress
 // (0-100, -1 for none), u8 id length, u8 title length, u16 message length, then the id, title and
 // message bytes. The specification's limits (id 128, title 192, message 2048 bytes) fit the fields
@@ -333,10 +333,10 @@ static int64_t now_ns(void) {
   return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
-// What appine_vt_take_effects reports (vt.rs's `Effects` has the same layout)
-#define APPINE_CLIPBOARD_NONE 0
-#define APPINE_CLIPBOARD_TEXT 1
-#define APPINE_CLIPBOARD_CLEAR 2
+// What kazeterm_vt_take_effects reports (vt.rs's `Effects` has the same layout)
+#define KAZETERM_CLIPBOARD_NONE 0
+#define KAZETERM_CLIPBOARD_TEXT 1
+#define KAZETERM_CLIPBOARD_CLEAR 2
 
 typedef struct {
   uint32_t bells;
@@ -366,7 +366,7 @@ typedef struct {
   uint64_t command_ms;
   // tmux's control mode, which the app detached (tmux_started), ended
   bool tmux_detached;
-} AppineVtEffects;
+} KazeTermVtEffects;
 
 // One image placement of a frame (see the format above), with what puts it in drawing order and
 // joins the rows of a virtual placement (images_changed)
@@ -389,7 +389,7 @@ typedef struct {
   uint32_t image_height;
 } Placement;
 
-typedef struct AppineVt {
+typedef struct KazeTermVt {
   GhosttyTerminal term;
   GhosttyRenderState state;
   GhosttyRenderStateRowIterator rows;
@@ -414,9 +414,9 @@ typedef struct AppineVt {
   // The last text handed out (copy, title, transcript), valid until the next such call or the end
   // of a compression pass, which frees it when large (release_text)
   Buf text;
-  // A program set the title (OSC 0/2) since appine_vt_take_title_changed
+  // A program set the title (OSC 0/2) since kazeterm_vt_take_title_changed
   bool title_changed;
-  // Effects for the app since appine_vt_take_effects: bells rung (BEL), the last clipboard write
+  // Effects for the app since kazeterm_vt_take_effects: bells rung (BEL), the last clipboard write
   // (OSC 52: text, or a request to clear), the last notification (OSC 9, OSC 777), the last
   // progress report (OSC 9;4; progress_state -1 for none) and the program status reports (OSC 7501)
   uint32_t bells;
@@ -428,26 +428,26 @@ typedef struct AppineVt {
   int32_t progress_state;
   int32_t progress;
   Buf statuses;
-  // Clipboard reads (OSC 52 "?") since appine_vt_take_effects, and the clipboard of the last
+  // Clipboard reads (OSC 52 "?") since kazeterm_vt_take_effects, and the clipboard of the last
   uint32_t clipboard_reads;
   uint8_t clipboard_read_kind;
   // Commands as the prompt marks tell (on_semantic_prompt): when the one running started (0 for
   // none), whether the cursor was at the prompt after the last feed, and the last one finished
-  // since appine_vt_take_effects
+  // since kazeterm_vt_take_effects
   int64_t command_start;
   bool was_at_prompt;
   bool command_finished;
   bool command_has_exit;
   int32_t command_exit;
   uint64_t command_ms;
-  // The OSC string the output is in (appine_vt_feed): its first OSC_HEAD bytes, and its length so
+  // The OSC string the output is in (kazeterm_vt_feed): its first OSC_HEAD bytes, and its length so
   // far (which may be larger)
   bool osc_open;
   uint8_t osc_head[OSC_HEAD];
   size_t osc_len;
-  // The DCS string the output is in (appine_vt_feed): its first DCS_HEAD bytes and its length so
+  // The DCS string the output is in (kazeterm_vt_feed): its first DCS_HEAD bytes and its length so
   // far; whether it is tmux's control mode, which the app detached (tmux_started), and whether one
-  // ended since appine_vt_take_effects
+  // ended since kazeterm_vt_take_effects
   bool dcs_open;
   uint8_t dcs_head[DCS_HEAD];
   size_t dcs_len;
@@ -465,19 +465,19 @@ typedef struct AppineVt {
   bool lf_armed;
   bool lf_marking;
   uint8_t lf_returns;
-  // The fixed end of a selection being dragged by a handle (appine_vt_select_to): the end opposite
+  // The fixed end of a selection being dragged by a handle (kazeterm_vt_select_to): the end opposite
   // the handle, or a whole output selected; tracked, so output does not move it
   GhosttyTrackedGridRef anchor_start;
   GhosttyTrackedGridRef anchor_end;
-  // A press that selected a word or a line and the drag after it (appine_vt_gesture_*), or a
-  // mouse's clicks and drags (appine_vt_mouse_*): libghostty-vt's selection gesture, which tracks
+  // A press that selected a word or a line and the drag after it (kazeterm_vt_gesture_*), or a
+  // mouse's clicks and drags (kazeterm_vt_mouse_*): libghostty-vt's selection gesture, which tracks
   // the pressed cell, and its reusable events (a mouse's presses are timed, a finger's not)
   GhosttySelectionGesture gesture;
   GhosttySelectionGestureEvent gesture_press;
   GhosttySelectionGestureEvent gesture_drag;
   GhosttySelectionGestureEvent mouse_press;
   GhosttySelectionGestureEvent mouse_release;
-  // A cell in a command's output that a long press found (appine_vt_output_at), for the menu's
+  // A cell in a command's output that a long press found (kazeterm_vt_output_at), for the menu's
   // Select output; tracked, so output does not move it. NULL when none
   GhosttyTrackedGridRef output_at;
   // Synchronized output: the render state was captured when the hold began and is not updated
@@ -488,20 +488,20 @@ typedef struct AppineVt {
   // the program redraws; a nonempty feed starts the quiet period, not an immediate release.
   bool resize_pending;
   int64_t resize_output_at;
-  // The console reads a password (appine_vt_set_password_input): frames give the cursor as a lock
+  // The console reads a password (kazeterm_vt_set_password_input): frames give the cursor as a lock
   bool password_input;
   // The cell of the last mouse event reported, to report motion once per cell rather than for
   // every pixel a drag or hover moves: the encoder's own deduplication forgets the cell whenever
-  // its options are set, which appine_vt_mouse does for every event
+  // its options are set, which kazeterm_vt_mouse does for every event
   int mouse_x;
   int mouse_y;
-  // The search (appine_vt_search), NULL while none runs. Frames drive it: each one catches it up
+  // The search (kazeterm_vt_search), NULL while none runs. Frames drive it: each one catches it up
   // with the terminal and marks its matches in the viewport
   GhosttySearch search;
   // Scratch for the matches on the viewport's pages
   GhosttySelection *matches;
   size_t matches_cap;
-  // Scratch for all the search's matches and the rows they start on (appine_vt_search_rows),
+  // Scratch for all the search's matches and the rows they start on (kazeterm_vt_search_rows),
   // freed when the search ends
   GhosttySelection *all_matches;
   size_t all_matches_cap;
@@ -528,13 +528,13 @@ typedef struct AppineVt {
   size_t placed_len;
   size_t placed_cap;
   uint64_t images_generation;
-} AppineVt;
+} KazeTermVt;
 
 // ---- Effects (called inside ghostty_terminal_vt_write, under vt.rs's lock) ----
 
 static void on_write_pty(GhosttyTerminal t, void *userdata, const uint8_t *data, size_t len) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   if (!buf_reserve(&vt->replies, len)) return;
   memcpy(vt->replies.ptr + vt->replies.len, data, len);
   vt->replies.len += len;
@@ -542,7 +542,7 @@ static void on_write_pty(GhosttyTerminal t, void *userdata, const uint8_t *data,
 
 static bool on_size(GhosttyTerminal t, void *userdata, GhosttySizeReportSize *out) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   out->columns = vt->cols;
   out->rows = vt->height;
   out->cell_width = vt->cell_width;
@@ -579,19 +579,19 @@ static bool on_device_attributes(GhosttyTerminal t, void *userdata, GhosttyDevic
 static GhosttyString on_xtversion(GhosttyTerminal t, void *userdata) {
   (void)t;
   (void)userdata;
-  static const char name[] = "appine";
+  static const char name[] = "kazeterm";
   return (GhosttyString){.ptr = (const uint8_t *)name, .len = sizeof(name) - 1};
 }
 
 static void on_title_changed(GhosttyTerminal t, void *userdata) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   vt->title_changed = true;
 }
 
 static void on_bell(GhosttyTerminal t, void *userdata) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   vt->bells++;
 }
 
@@ -613,17 +613,17 @@ static bool is_text(GhosttyString mime) {
 // clipboard-write = allow). Android has one clipboard, so every location goes there; only text is
 // taken, up to CLIPBOARD_MAX. Reads have no callback: libghostty-vt asks for the answer to one
 // within the callback, while the app asks the user first, so OSC 52 reads are found and answered
-// apart (appine_vt_feed), and OSC 5522 reads are refused
+// apart (kazeterm_vt_feed), and OSC 5522 reads are refused
 static void on_clipboard_write(GhosttyTerminal t, void *userdata, const GhosttyClipboardWrite *w) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   GhosttyClipboardWriteReply reply = {.size = sizeof(reply)};
   const GhosttyClipboardContent *text = NULL;
   for (size_t i = 0; i < w->contents_len && text == NULL; i++) {
     if (is_text(w->contents[i].mime)) text = &w->contents[i];
   }
   if (w->contents_len == 0) {
-    vt->clipboard = APPINE_CLIPBOARD_CLEAR;
+    vt->clipboard = KAZETERM_CLIPBOARD_CLEAR;
     reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_SUCCESS;
   } else if (text == NULL) {
     reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_UNSUPPORTED;
@@ -632,7 +632,7 @@ static void on_clipboard_write(GhosttyTerminal t, void *userdata, const GhosttyC
   } else if (!keep(&vt->clip, text->data, CLIPBOARD_MAX)) {
     reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_IO_ERROR;
   } else {
-    vt->clipboard = APPINE_CLIPBOARD_TEXT;
+    vt->clipboard = KAZETERM_CLIPBOARD_TEXT;
     reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_SUCCESS;
   }
   w->reply(w, &reply);
@@ -642,7 +642,7 @@ static void on_clipboard_write(GhosttyTerminal t, void *userdata, const GhosttyC
 static void on_notification(GhosttyTerminal t, void *userdata,
                             const GhosttyTerminalDesktopNotification *n) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   if (keep(&vt->note_title, n->title, NOTIFICATION_MAX) &&
       keep(&vt->note_body, n->body, NOTIFICATION_MAX)) {
     vt->notified = true;
@@ -653,7 +653,7 @@ static void on_notification(GhosttyTerminal t, void *userdata,
 // reports a removal
 static void on_progress(GhosttyTerminal t, void *userdata, const GhosttyTerminalProgressReport *r) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   vt->progress_state = (int32_t)r->state;
   vt->progress = r->progress;
 }
@@ -667,7 +667,7 @@ static size_t at_most(size_t len, size_t max) {
 static void on_program_status(GhosttyTerminal t, void *userdata,
                               const GhosttyTerminalProgramStatus *s) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   size_t id = at_most(s->id.len, UINT8_MAX);
   size_t title = at_most(s->title.len, UINT8_MAX);
   size_t message = at_most(s->message.len, UINT16_MAX);
@@ -687,9 +687,9 @@ static void on_program_status(GhosttyTerminal t, void *userdata,
 }
 
 // OSC 133: a command starts when the shell marks its output's start (bash's PS0, zsh's preexec)
-// or, as busybox ash marks none (its input ends at a line feed, where appine_vt_feed marks the
+// or, as busybox ash marks none (its input ends at a line feed, where kazeterm_vt_feed marks the
 // output's start for it), when a feed ends with the cursor no longer at the prompt
-// (appine_vt_feed; output of a background job at the prompt ends no input and so starts none,
+// (kazeterm_vt_feed; output of a background job at the prompt ends no input and so starts none,
 // except with an edited profile's older marks, whose input ends with its line); it finishes at
 // the command end the next prompt reports, with the exit code (every marked shell sends it). Only
 // a command that started is reported: a prompt drawn again (after a resize, or Ctrl-C at the
@@ -697,10 +697,10 @@ static void on_program_status(GhosttyTerminal t, void *userdata,
 static void on_semantic_prompt(GhosttyTerminal t, void *userdata,
                                const GhosttyTerminalSemanticPrompt *e) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   switch (e->kind) {
     case GHOSTTY_SEMANTIC_PROMPT_OUTPUT_START:
-      // The mark is the command's start, whatever left the prompt before it; one appine_vt_feed
+      // The mark is the command's start, whatever left the prompt before it; one kazeterm_vt_feed
       // made at a line feed is not the shell's word that a command runs (the line feed may begin
       // a list of completions or follow Ctrl-C), so the cursor leaving the prompt decides there
       if (!vt->lf_marking) vt->command_start = now_ns();
@@ -724,7 +724,7 @@ static void on_semantic_prompt(GhosttyTerminal t, void *userdata,
 
 // A hold began: capture the screen now, which is the frame the program wants to keep showing
 static void on_render_hold(GhosttyTerminal t, void *userdata, bool held) {
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   if (held) {
     ghostty_render_state_update(vt->state, t);
     vt->held = true;
@@ -737,7 +737,7 @@ static void on_render_hold(GhosttyTerminal t, void *userdata, bool held) {
 // A program's full reset (RIS): the screen forgets how its shell's prompt moves the cursor
 static void on_reset(GhosttyTerminal t, void *userdata) {
   (void)t;
-  AppineVt *vt = userdata;
+  KazeTermVt *vt = userdata;
   vt->prompt_click = PROMPT_CLICK_NONE;
   vt->lf_output = false;
   vt->lf_armed = false;
@@ -865,25 +865,25 @@ static void install_sys(void) {
 
 // ---- Lifecycle ----
 
-void appine_vt_free(AppineVt *vt);
+void kazeterm_vt_free(KazeTermVt *vt);
 
-static AppineVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32_t cell_width,
+static KazeTermVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32_t cell_width,
                       uint32_t cell_height);
 static void settle(GhosttyTerminal term);
 
 // A new terminal of cols × rows cells, each cell_width × cell_height pixels
-AppineVt *appine_vt_new(uint16_t cols, uint16_t rows, uint32_t cell_width, uint32_t cell_height) {
+KazeTermVt *kazeterm_vt_new(uint16_t cols, uint16_t rows, uint32_t cell_width, uint32_t cell_height) {
   GhosttyTerminal term = NULL;
   if (ghostty_terminal_new(NULL, &term, cols, rows) != GHOSTTY_SUCCESS) return NULL;
   return wrap(term, cols, rows, cell_width, cell_height);
 }
 
-// The terminal a snapshot (appine_vt_snapshot) holds, on a grid of cols × rows cells: its screens,
+// The terminal a snapshot (kazeterm_vt_snapshot) holds, on a grid of cols × rows cells: its screens,
 // scrollback (compressed as it is restored), images, colours and title, without what the programs
 // that ran in it had set up for themselves (settle). NULL when the snapshot cannot be decoded,
 // which a snapshot from another version of libghostty-vt may well be: the format carries no
 // compatibility guarantee yet.
-AppineVt *appine_vt_restore(const uint8_t *data, size_t len, uint16_t cols, uint16_t rows,
+KazeTermVt *kazeterm_vt_restore(const uint8_t *data, size_t len, uint16_t cols, uint16_t rows,
                             uint32_t cell_width, uint32_t cell_height) {
   GhosttySnapshotDecoder decoder = NULL;
   if (ghostty_snapshot_decoder_new_buf(NULL, &decoder, data, len) != GHOSTTY_SUCCESS) return NULL;
@@ -907,7 +907,7 @@ AppineVt *appine_vt_restore(const uint8_t *data, size_t len, uint16_t cols, uint
 // shape (GhosttyCursorStyle: bar, block or underline) and whether it blinks. Shown at once unless a
 // program chose a cursor of its own (DECSCUSR), and what DECSCUSR's default (CSI 0 q), DECSTR and a
 // full reset bring back; a full reset keeps the setting.
-void appine_vt_set_cursor(AppineVt *vt, int style, bool blink) {
+void kazeterm_vt_set_cursor(KazeTermVt *vt, int style, bool blink) {
   GhosttyCursorStyle shape = (GhosttyCursorStyle)style;
   ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_STYLE, &shape);
   ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_BLINK, &blink);
@@ -964,12 +964,12 @@ static void settle(GhosttyTerminal term) {
   ghostty_terminal_scroll_viewport(term, bottom);
 }
 
-// Makes an AppineVt around a terminal, new or restored (freed with it on failure), on a grid of
+// Makes an KazeTermVt around a terminal, new or restored (freed with it on failure), on a grid of
 // cols × rows cells, and sets what libghostty-vt asks the app through and the options a snapshot
 // does not carry
-static AppineVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32_t cell_width,
+static KazeTermVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32_t cell_width,
                       uint32_t cell_height) {
-  AppineVt *vt = calloc(1, sizeof(*vt));
+  KazeTermVt *vt = calloc(1, sizeof(*vt));
   if (vt == NULL) {
     ghostty_terminal_free(term);
     return NULL;
@@ -1000,7 +1000,7 @@ static AppineVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32
       ghostty_selection_gesture_event_new(NULL, &vt->mouse_release,
                                           GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_RELEASE) !=
           GHOSTTY_SUCCESS) {
-    appine_vt_free(vt);
+    kazeterm_vt_free(vt);
     return NULL;
   }
   pthread_once(&sys_once, install_sys);
@@ -1058,7 +1058,7 @@ static AppineVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32
   ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_MODE_DEFAULT, &graphemes);
   ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_MODE, &graphemes);
   // A blinking block by default, as in Ghostty without cursor-style-blink (libghostty-vt's default
-  // is steady), until the app sets the user's (appine_vt_set_cursor): DECSCUSR's default
+  // is steady), until the app sets the user's (kazeterm_vt_set_cursor): DECSCUSR's default
   // (CSI 0 q), DECSTR and RIS bring the blinking back, and programs can still stop it with DECSCUSR
   // or mode 12. Applied at once unless a program chose a style
   bool blink = true;
@@ -1085,10 +1085,10 @@ static AppineVt *wrap(GhosttyTerminal term, uint16_t cols, uint16_t rows, uint32
   return vt;
 }
 
-static void drop_anchor(AppineVt *vt);
-static void drop_output(AppineVt *vt);
+static void drop_anchor(KazeTermVt *vt);
+static void drop_output(KazeTermVt *vt);
 
-void appine_vt_free(AppineVt *vt) {
+void kazeterm_vt_free(KazeTermVt *vt) {
   if (vt == NULL) return;
   drop_anchor(vt);
   drop_output(vt);
@@ -1129,21 +1129,21 @@ void appine_vt_free(AppineVt *vt) {
 // ---- Output from the console ----
 
 // The terminal changed what a transcript or a snapshot of it holds
-static void changed(AppineVt *vt) {
+static void changed(KazeTermVt *vt) {
   vt->transcribed = false;
   vt->snapshot = SNAPSHOT_STALE;
 }
 
-static void osc_ended(AppineVt *vt);
-static bool is_alternate(AppineVt *vt);
-bool appine_vt_at_prompt(AppineVt *vt);
+static void osc_ended(KazeTermVt *vt);
+static bool is_alternate(KazeTermVt *vt);
+bool kazeterm_vt_at_prompt(KazeTermVt *vt);
 
-static void tmux_started(AppineVt *vt);
+static void tmux_started(KazeTermVt *vt);
 
 // Feeds console output to the terminal. It stops at the ends of OSC strings to find clipboard reads
 // (OSC 52 with "?" for data), which libghostty-vt answers only from a callback that must answer at
 // once and so without asking the user, as Ghostty's clipboard-read = ask does: they are counted
-// for the app (appine_vt_take_effects), which asks and answers itself, as Ghostty's own app does.
+// for the app (kazeterm_vt_take_effects), which asks and answers itself, as Ghostty's own app does.
 // It also stops at the starts and ends of DCS strings to find tmux's control mode (TMUX_CONTROL).
 //
 // For a shell whose prompt asked for it (PROMPT_LF_OPTION: busybox ash, which runs nothing before
@@ -1158,13 +1158,13 @@ static void tmux_started(AppineVt *vt);
 // not read so: they end no input. At the prompt they are marked as output themselves, between an
 // output start before them and INPUT_RESUMED after them, so the cursor stays at the prompt, what
 // is typed after them is still input, and they are selected with the output around them.
-void appine_vt_feed(AppineVt *vt, const uint8_t *data, size_t len, bool background) {
+void kazeterm_vt_feed(KazeTermVt *vt, const uint8_t *data, size_t len, bool background) {
   uint32_t want = GHOSTTY_TERMINAL_BOUNDARY_OSC_START | GHOSTTY_TERMINAL_BOUNDARY_OSC_END |
                   GHOSTTY_TERMINAL_BOUNDARY_DCS_START | GHOSTTY_TERMINAL_BOUNDARY_DCS_END;
   size_t off = 0;
   // Strings cut in two by another writer are left alone
   bool aside = background && vt->lf_armed && len > 0 && !vt->osc_open && !vt->dcs_open &&
-               appine_vt_at_prompt(vt);
+               kazeterm_vt_at_prompt(vt);
   if (aside) {
     vt->lf_marking = true;
     ghostty_terminal_vt_write(vt->term, (const uint8_t *)OUTPUT_START, sizeof(OUTPUT_START) - 1);
@@ -1180,7 +1180,7 @@ void appine_vt_feed(AppineVt *vt, const uint8_t *data, size_t len, bool backgrou
         for (; i > 0 && data[i - 1] == '\r'; i--) returns++;
         if (i == 0) returns += vt->lf_returns;
         bool ends = returns < 2;
-        bool input = ends && appine_vt_at_prompt(vt);
+        bool input = ends && kazeterm_vt_at_prompt(vt);
         ghostty_terminal_vt_write(vt->term, data + off, 1);
         if (input) {
           vt->lf_marking = true;
@@ -1270,7 +1270,7 @@ void appine_vt_feed(AppineVt *vt, const uint8_t *data, size_t len, bool backgrou
     vt->lf_returns = (uint8_t)returns;
   }
   // A command's start for a shell that does not mark it (on_semantic_prompt): the input ended
-  bool at_prompt = appine_vt_at_prompt(vt);
+  bool at_prompt = kazeterm_vt_at_prompt(vt);
   if (vt->was_at_prompt && !at_prompt && vt->command_start == 0) vt->command_start = now_ns();
   vt->was_at_prompt = at_prompt;
   if (len > 0 && vt->resize_pending) vt->resize_output_at = now_ns();
@@ -1281,21 +1281,21 @@ void appine_vt_feed(AppineVt *vt, const uint8_t *data, size_t len, bool backgrou
 // once, as the user's Enter would, leaving its session running (tmux attach brings it back in the
 // tab), and the string's end tells the app to say so (tmux_detached). The line goes out with the
 // replies the pump writes before reading again
-static void tmux_started(AppineVt *vt) {
+static void tmux_started(KazeTermVt *vt) {
   vt->tmux_control = true;
   if (!buf_reserve(&vt->replies, 1)) return;
   vt->replies.ptr[vt->replies.len++] = '\r';
 }
 
-static void prompt_started(AppineVt *vt, const uint8_t *options, size_t len);
-static void prompt_line_feeds(AppineVt *vt, const uint8_t *options, size_t len, bool primary);
+static void prompt_started(KazeTermVt *vt, const uint8_t *options, size_t len);
+static void prompt_line_feeds(KazeTermVt *vt, const uint8_t *options, size_t len, bool primary);
 
 // An OSC string ended: a prompt's start (OSC 133;A) on the primary screen tells how a tap moves
 // the shell's cursor, and it or a prompt (OSC 133;P) whether the shell's line feeds are read
 // (PROMPT_LF_OPTION); a clipboard read (OSC 52 ; clipboards ; ?) is counted, with the clipboard it
 // names first ('c' for the standard one, also when it names none; 'p' primary, 's' selection), which
 // the answer names as Ghostty's does
-static void osc_ended(AppineVt *vt) {
+static void osc_ended(KazeTermVt *vt) {
   const uint8_t *s = vt->osc_head;
   size_t n = vt->osc_len;
   if (n > OSC_HEAD) return;
@@ -1338,7 +1338,7 @@ static const uint8_t *prompt_option(const uint8_t *s, size_t n, const char *key,
 // A prompt started (OSC 133;A, with what follows the A): its options say how a tap moves the
 // cursor, read as libghostty-vt reads them: Kitty's click_events first, then cl, a value it does not
 // know counting as none; with neither, the way the last prompt declared stays
-static void prompt_started(AppineVt *vt, const uint8_t *options, size_t len) {
+static void prompt_started(KazeTermVt *vt, const uint8_t *options, size_t len) {
   size_t n = 0;
   const uint8_t *v = prompt_option(options, len, "click_events", &n);
   if (v != NULL && n == 1 && (v[0] == '1' || v[0] == '2')) {
@@ -1353,9 +1353,9 @@ static void prompt_started(AppineVt *vt, const uint8_t *options, size_t len) {
 }
 
 // A prompt started (OSC 133;A, primary) or one was marked (OSC 133;P, as ash's secondary prompt
-// is): with PROMPT_LF_OPTION its line feeds are read from here on (appine_vt_feed); a prompt start
+// is): with PROMPT_LF_OPTION its line feeds are read from here on (kazeterm_vt_feed); a prompt start
 // without it is another shell's, whose line feeds are not
-static void prompt_line_feeds(AppineVt *vt, const uint8_t *options, size_t len, bool primary) {
+static void prompt_line_feeds(KazeTermVt *vt, const uint8_t *options, size_t len, bool primary) {
   size_t n = 0;
   const uint8_t *v = prompt_option(options, len, PROMPT_LF_OPTION, &n);
   bool asked = v != NULL && n == sizeof(PROMPT_LF_OUTPUT) - 1 && memcmp(v, PROMPT_LF_OUTPUT, n) == 0;
@@ -1365,7 +1365,7 @@ static void prompt_line_feeds(AppineVt *vt, const uint8_t *options, size_t len, 
 }
 
 // The answers collected since the last call; valid until the next feed
-const uint8_t *appine_vt_take_replies(AppineVt *vt, size_t *len) {
+const uint8_t *kazeterm_vt_take_replies(KazeTermVt *vt, size_t *len) {
   *len = vt->replies.len;
   vt->replies.len = 0;
   return vt->replies.ptr;
@@ -1374,13 +1374,13 @@ const uint8_t *appine_vt_take_replies(AppineVt *vt, size_t *len) {
 // Whether the console reads lines without echoing them (ICANON on, ECHO off, which the kernel
 // tells), as programs read passwords: frames then give the cursor as a lock, as Ghostty draws it at
 // password prompts (the C API cannot set libghostty-vt's own flag for it)
-void appine_vt_set_password_input(AppineVt *vt, bool on) { vt->password_input = on; }
+void kazeterm_vt_set_password_input(KazeTermVt *vt, bool on) { vt->password_input = on; }
 
-static void search_reselect(AppineVt *vt, size_t index);
+static void search_reselect(KazeTermVt *vt, size_t index);
 
 // Resizes the terminal. A search keeps its selected match: libghostty-vt drops it on a resize,
 // which here comes with every keyboard shown or hidden
-void appine_vt_resize(AppineVt *vt, uint16_t cols, uint16_t rows, uint32_t cell_width,
+void kazeterm_vt_resize(KazeTermVt *vt, uint16_t cols, uint16_t rows, uint32_t cell_width,
                       uint32_t cell_height) {
   if (cols != vt->cols || rows != vt->height) {
     vt->resize_pending = true;
@@ -1402,7 +1402,7 @@ void appine_vt_resize(AppineVt *vt, uint16_t cols, uint16_t rows, uint32_t cell_
 // Selects the match index places from the newest again, after a resize: the search has to catch
 // up first (a resize restarts it, the matches are the same text), then steps from the newest
 // without scrolling, but for the last step, which brings the match into view if it is not
-static void search_reselect(AppineVt *vt, size_t index) {
+static void search_reselect(KazeTermVt *vt, size_t index) {
   if (ghostty_search_run(vt->search) != GHOSTTY_SUCCESS) return;
   GhosttySearchScroll quiet = GHOSTTY_SEARCH_SCROLL_NONE;
   ghostty_search_set(vt->search, GHOSTTY_SEARCH_OPT_SELECT_SCROLL, &quiet);
@@ -1414,7 +1414,7 @@ static void search_reselect(AppineVt *vt, size_t index) {
 }
 
 // Scrolls the viewport by delta rows (negative: back into the scrollback); 0 goes to the bottom
-void appine_vt_scroll(AppineVt *vt, int32_t delta) {
+void kazeterm_vt_scroll(KazeTermVt *vt, int32_t delta) {
   GhosttyTerminalScrollViewport s = {0};
   if (delta == 0) {
     s.tag = GHOSTTY_TERMINAL_SCROLL_VIEWPORT_BOTTOM;
@@ -1427,7 +1427,7 @@ void appine_vt_scroll(AppineVt *vt, int32_t delta) {
 
 // ---- Shell integration ----
 //
-// The shells' prompt marks (OSC 133, sent for bash, busybox ash and zsh by /etc/profile.d/appine.sh
+// The shells' prompt marks (OSC 133, sent for bash, busybox ash and zsh by /etc/profile.d/kazeterm.sh
 // and the files it has them read) tell libghostty-vt which rows are prompts and which cells are a
 // prompt, the input typed at it or a command's output. Without them there are no prompts: the
 // cursor is never at one, there is nothing to scroll to, and no output to select.
@@ -1435,7 +1435,7 @@ void appine_vt_scroll(AppineVt *vt, int32_t delta) {
 // Whether the cursor is at the shell's prompt or in the input typed at it, on the primary screen:
 // no command runs in the foreground, as far as the marks tell (closing the tab then ends nothing
 // the user is waiting for). False without the marks.
-bool appine_vt_at_prompt(AppineVt *vt) {
+bool kazeterm_vt_at_prompt(KazeTermVt *vt) {
   bool at = false;
   return ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_CURSOR_AT_PROMPT, &at) ==
              GHOSTTY_SUCCESS &&
@@ -1444,7 +1444,7 @@ bool appine_vt_at_prompt(AppineVt *vt) {
 
 // Scrolls the viewport to the prompt delta prompts above (negative) or below its top, or as far as
 // there are prompts; nothing when there are none
-void appine_vt_jump_prompt(AppineVt *vt, int32_t delta) {
+void kazeterm_vt_jump_prompt(KazeTermVt *vt, int32_t delta) {
   GhosttyTerminalScrollViewport s = {0};
   s.tag = GHOSTTY_TERMINAL_SCROLL_VIEWPORT_DELTA_PROMPT;
   s.value.delta_prompt = delta;
@@ -1454,7 +1454,7 @@ void appine_vt_jump_prompt(AppineVt *vt, int32_t delta) {
   ghostty_terminal_scroll_viewport(vt->term, s);
 }
 
-static bool mode_on(AppineVt *vt, GhosttyMode mode) {
+static bool mode_on(KazeTermVt *vt, GhosttyMode mode) {
   GhosttyTerminalModeConfig m = {.mode = mode};
   return ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_MODE, &m) == GHOSTTY_SUCCESS &&
          m.value;
@@ -1464,7 +1464,7 @@ static bool mode_on(AppineVt *vt, GhosttyMode mode) {
 
 // Writes the row the iterator is on as row y of the frame; marks is the row's search marks (NULL
 // for none)
-static bool put_row(AppineVt *vt, uint16_t y, const uint8_t *marks) {
+static bool put_row(KazeTermVt *vt, uint16_t y, const uint8_t *marks) {
   if (ghostty_render_state_row_get(vt->rows, GHOSTTY_RENDER_STATE_ROW_DATA_CELLS, &vt->cells) !=
       GHOSTTY_SUCCESS) {
     return false;
@@ -1573,7 +1573,7 @@ static bool put_row(AppineVt *vt, uint16_t y, const uint8_t *marks) {
 
 // Writes a grid reference's viewport coordinates, or 0xffff for both when it is not in the
 // viewport
-static void put_viewport(AppineVt *vt, uint8_t *p, const GhosttyGridRef *ref) {
+static void put_viewport(KazeTermVt *vt, uint8_t *p, const GhosttyGridRef *ref) {
   GhosttyPointCoordinate c;
   if (ghostty_terminal_point_from_grid_ref(vt->term, ref, GHOSTTY_POINT_TAG_VIEWPORT, &c) ==
           GHOSTTY_SUCCESS &&
@@ -1586,14 +1586,14 @@ static void put_viewport(AppineVt *vt, uint8_t *p, const GhosttyGridRef *ref) {
   }
 }
 
-static bool search_catch_up(AppineVt *vt);
-static bool mark_matches(AppineVt *vt);
-static uint32_t tick_animations(AppineVt *vt);
-static bool images_changed(AppineVt *vt);
+static bool search_catch_up(KazeTermVt *vt);
+static bool mark_matches(KazeTermVt *vt);
+static uint32_t tick_animations(KazeTermVt *vt);
+static bool images_changed(KazeTermVt *vt);
 
 // Captures the screen and writes a frame with the rows that changed since the last frame (all of
 // them when full is set); the result is valid until the next call. NULL when out of memory.
-const uint8_t *appine_vt_frame(AppineVt *vt, bool full, size_t *len) {
+const uint8_t *kazeterm_vt_frame(KazeTermVt *vt, bool full, size_t *len) {
   *len = 0;
   if (vt->held && now_ns() - vt->held_since > HOLD_LIMIT_NS) {
     GhosttyTerminalModeConfig sync = {.mode = GHOSTTY_MODE_SYNCHRONIZED_OUTPUT, .value = false};
@@ -1762,7 +1762,7 @@ const uint8_t *appine_vt_frame(AppineVt *vt, bool full, size_t *len) {
 // Shows the frames of animated Kitty images that are due now (libghostty-vt keeps no timer of its
 // own); the milliseconds until the next one is due, 0 when nothing plays. A program starting an
 // animation writes to the terminal, which brings a frame that starts the ticking
-static uint32_t tick_animations(AppineVt *vt) {
+static uint32_t tick_animations(KazeTermVt *vt) {
   GhosttyKittyGraphics graphics = NULL;
   if (ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_KITTY_GRAPHICS, &graphics) !=
           GHOSTTY_SUCCESS ||
@@ -1831,7 +1831,7 @@ static size_t join_rows(Placement *placed, size_t len) {
 // storage no longer has (a held frame's), are left out; without memory the list ends early. True
 // when placements changed while some were or are on the screen, so every row has to be painted
 // again.
-static bool images_changed(AppineVt *vt) {
+static bool images_changed(KazeTermVt *vt) {
   uint64_t generation = 0;
   ghostty_render_state_get(vt->state, GHOSTTY_RENDER_STATE_DATA_IMAGE_PLACEMENTS_GENERATION,
                            &generation);
@@ -1910,7 +1910,7 @@ static bool images_changed(AppineVt *vt) {
 // stride bytes apart, as an Android bitmap holds them). False when the image is gone, its pixels
 // have not all arrived, or it is not of this generation and size any more: the frame that named
 // it is stale, and the next one names its new generation.
-bool appine_vt_image(AppineVt *vt, uint32_t id, uint64_t generation, uint8_t *out, uint32_t width,
+bool kazeterm_vt_image(KazeTermVt *vt, uint32_t id, uint64_t generation, uint8_t *out, uint32_t width,
                      uint32_t height, size_t stride) {
   GhosttyKittyGraphics graphics = NULL;
   if (ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_KITTY_GRAPHICS, &graphics) !=
@@ -1996,7 +1996,7 @@ bool appine_vt_image(AppineVt *vt, uint32_t id, uint64_t generation, uint8_t *ou
 
 // Catches the search up with the terminal: feeds it what changed and works through what it has,
 // for at most SEARCH_BUDGET_NS. True once it is caught up, false when it needs more frames.
-static bool search_catch_up(AppineVt *vt) {
+static bool search_catch_up(KazeTermVt *vt) {
   int64_t start = now_ns();
   for (;;) {
     if (ghostty_search_feed(vt->search) != GHOSTTY_SUCCESS) return true;
@@ -2010,13 +2010,13 @@ static bool search_catch_up(AppineVt *vt) {
   }
 }
 
-static bool viewport_ref(AppineVt *vt, uint16_t x, uint16_t y, GhosttyGridRef *out);
-static bool screen_point(AppineVt *vt, const GhosttyGridRef *ref, GhosttyPointCoordinate *out);
+static bool viewport_ref(KazeTermVt *vt, uint16_t x, uint16_t y, GhosttyGridRef *out);
+static bool screen_point(KazeTermVt *vt, const GhosttyGridRef *ref, GhosttyPointCoordinate *out);
 
 // Marks the viewport cells match covers with mark (over any mark there before); top is the
 // viewport's first row in screen coordinates. Screen coordinates, unlike viewport ones, exist for a
 // match that begins above the viewport or ends below it, so it is cut to the rows shown.
-static void mark_match(AppineVt *vt, const GhosttySelection *match, uint32_t top, uint8_t mark) {
+static void mark_match(KazeTermVt *vt, const GhosttySelection *match, uint32_t top, uint8_t mark) {
   GhosttySelection ordered = {0};
   GhosttyPointCoordinate start, end;
   if (ghostty_terminal_selection_ordered(vt->term, match, GHOSTTY_SELECTION_ORDER_FORWARD,
@@ -2036,7 +2036,7 @@ static void mark_match(AppineVt *vt, const GhosttySelection *match, uint32_t top
 
 // Fills vt->marks for this frame: the search's matches in the viewport and its selected match,
 // none without a search. False when the marks cannot be allocated.
-static bool mark_matches(AppineVt *vt) {
+static bool mark_matches(KazeTermVt *vt) {
   size_t cells = (size_t)vt->cols * vt->height;
   if (cells != vt->marks_cells) {
     // A new grid: its first frame is a full one, and every row is sent
@@ -2087,7 +2087,7 @@ static bool mark_matches(AppineVt *vt) {
 // is the character the key types without Ctrl and Alt (NULL for none), unshifted the key's
 // character without Shift (0 for none). A key or action libghostty-vt does not know fails too:
 // its setters then leave the event as it was, the previous key.
-ptrdiff_t appine_vt_key(AppineVt *vt, int key, uint16_t mods, uint16_t consumed, int action,
+ptrdiff_t kazeterm_vt_key(KazeTermVt *vt, int key, uint16_t mods, uint16_t consumed, int action,
                         const uint8_t *text, size_t text_len, uint32_t unshifted, uint8_t *out,
                         size_t cap) {
   ghostty_key_encoder_set_from_terminal(vt->encoder, vt->term);
@@ -2124,7 +2124,7 @@ static bool paste_read(void *userdata, GhosttyString mime, GhosttyWriter writer)
 // are left in the replies. Returns 0 when pasted, 1 when refused because the text could run
 // commands (a line break without bracketed paste, or the bracketed paste terminator) and
 // allow_unsafe is false, -1 on failure. Nothing is written unless it returns 0.
-int appine_vt_paste(AppineVt *vt, const uint8_t *data, size_t len, bool allow_unsafe) {
+int kazeterm_vt_paste(KazeTermVt *vt, const uint8_t *data, size_t len, bool allow_unsafe) {
   static const char plain[] = "text/plain";
   GhosttyString mime = {.ptr = (const uint8_t *)plain, .len = sizeof(plain) - 1};
   PasteText text = {.ptr = data, .len = len};
@@ -2147,7 +2147,7 @@ int appine_vt_paste(AppineVt *vt, const uint8_t *data, size_t len, bool allow_un
 // did not ask for), -1 when it does not fit. action 0 press, 1 release, 2 motion; button 0 none
 // (motion with no button held), 1 left, 2 right, 3 middle, 4 and 5 the wheel up and down, 6 and 7
 // left and right.
-ptrdiff_t appine_vt_mouse(AppineVt *vt, int action, int button, uint16_t mods, float x, float y,
+ptrdiff_t kazeterm_vt_mouse(KazeTermVt *vt, int action, int button, uint16_t mods, float x, float y,
                           bool pressed, uint8_t *out, size_t cap) {
   // The cell as the encoder takes it (clamped to the grid); SGR-Pixels reports every pixel
   int cx = x < 0 ? 0 : (int)(x / (float)vt->cell_width);
@@ -2191,7 +2191,7 @@ ptrdiff_t appine_vt_mouse(AppineVt *vt, int action, int button, uint16_t mods, f
 
 // Encodes focus gained or lost when the program asked for focus events (mode 1004); returns the
 // length, 0 when it did not ask, -1 when it does not fit.
-ptrdiff_t appine_vt_focus(AppineVt *vt, bool gained, uint8_t *out, size_t cap) {
+ptrdiff_t kazeterm_vt_focus(KazeTermVt *vt, bool gained, uint8_t *out, size_t cap) {
   if (!mode_on(vt, GHOSTTY_MODE_FOCUS_EVENT)) return 0;
   size_t len = 0;
   if (ghostty_focus_encode(gained ? GHOSTTY_FOCUS_GAINED : GHOSTTY_FOCUS_LOST, out, cap, &len) !=
@@ -2203,7 +2203,7 @@ ptrdiff_t appine_vt_focus(AppineVt *vt, bool gained, uint8_t *out, size_t cap) {
 
 // Copies text allocated by libghostty-vt into vt->text and frees it; NULL with len 0 when empty
 // or out of memory
-static const uint8_t *keep_text(AppineVt *vt, uint8_t *data, size_t data_len, size_t *len) {
+static const uint8_t *keep_text(KazeTermVt *vt, uint8_t *data, size_t data_len, size_t *len) {
   vt->text.len = 0;
   bool ok = data_len > 0 && buf_reserve(&vt->text, data_len);
   if (ok) {
@@ -2221,7 +2221,7 @@ static const uint8_t *keep_text(AppineVt *vt, uint8_t *data, size_t data_len, si
 // through output and scrolling, and frames report it. Grid references from the API are only
 // valid until the terminal changes, so every function takes fresh ones.
 
-static bool viewport_ref(AppineVt *vt, uint16_t x, uint16_t y, GhosttyGridRef *out) {
+static bool viewport_ref(KazeTermVt *vt, uint16_t x, uint16_t y, GhosttyGridRef *out) {
   if (x >= vt->cols) x = vt->cols - 1;
   if (y >= vt->height) y = vt->height - 1;
   GhosttyPoint p = {.tag = GHOSTTY_POINT_TAG_VIEWPORT, .value.coordinate = {.x = x, .y = y}};
@@ -2229,7 +2229,7 @@ static bool viewport_ref(AppineVt *vt, uint16_t x, uint16_t y, GhosttyGridRef *o
   return ghostty_terminal_grid_ref(vt->term, p, out) == GHOSTTY_SUCCESS;
 }
 
-static void drop_anchor(AppineVt *vt) {
+static void drop_anchor(KazeTermVt *vt) {
   if (vt->anchor_start) ghostty_tracked_grid_ref_free(vt->anchor_start);
   if (vt->anchor_end) ghostty_tracked_grid_ref_free(vt->anchor_end);
   vt->anchor_start = NULL;
@@ -2237,7 +2237,7 @@ static void drop_anchor(AppineVt *vt) {
 }
 
 // Tracks the cells at the screen coordinates (start, end) as the anchor
-static bool set_anchor(AppineVt *vt, GhosttyPointCoordinate start, GhosttyPointCoordinate end) {
+static bool set_anchor(KazeTermVt *vt, GhosttyPointCoordinate start, GhosttyPointCoordinate end) {
   drop_anchor(vt);
   GhosttyPoint a = {.tag = GHOSTTY_POINT_TAG_SCREEN, .value.coordinate = start};
   GhosttyPoint b = {.tag = GHOSTTY_POINT_TAG_SCREEN, .value.coordinate = end};
@@ -2249,12 +2249,12 @@ static bool set_anchor(AppineVt *vt, GhosttyPointCoordinate start, GhosttyPointC
   return true;
 }
 
-static bool screen_point(AppineVt *vt, const GhosttyGridRef *ref, GhosttyPointCoordinate *out) {
+static bool screen_point(KazeTermVt *vt, const GhosttyGridRef *ref, GhosttyPointCoordinate *out) {
   return ghostty_terminal_point_from_grid_ref(vt->term, ref, GHOSTTY_POINT_TAG_SCREEN, out) ==
          GHOSTTY_SUCCESS;
 }
 
-static bool set_selection(AppineVt *vt, GhosttyGridRef start, GhosttyGridRef end, bool rectangle) {
+static bool set_selection(KazeTermVt *vt, GhosttyGridRef start, GhosttyGridRef end, bool rectangle) {
   GhosttySelection sel = {0};
   sel.start = start;
   sel.end = end;
@@ -2264,7 +2264,7 @@ static bool set_selection(AppineVt *vt, GhosttyGridRef start, GhosttyGridRef end
 
 // Installs a selection libghostty-vt derived (a command's output) and anchors later drags to it;
 // false when it cannot be anchored.
-static bool select_anchored(AppineVt *vt, const GhosttySelection *derived) {
+static bool select_anchored(KazeTermVt *vt, const GhosttySelection *derived) {
   GhosttySelection ordered = {0};
   GhosttyPointCoordinate start, end;
   if (ghostty_terminal_selection_ordered(vt->term, derived, GHOSTTY_SELECTION_ORDER_FORWARD,
@@ -2289,7 +2289,7 @@ static bool select_anchored(AppineVt *vt, const GhosttySelection *derived) {
 // always a click (a finger drag scrolls), so each press is given to the gesture untimed, which
 // makes it a first click, with the behaviour the view asks for as a first click's.
 
-void appine_vt_select_clear(AppineVt *vt);
+void kazeterm_vt_select_clear(KazeTermVt *vt);
 
 // Starts a gesture at viewport cell (x, y), at pixel (px, py) from the grid's corner: selects the
 // word (behavior GHOSTTY_SELECTION_GESTURE_BEHAVIOR_WORD) or the line (_LINE) there. A line is
@@ -2297,9 +2297,9 @@ void appine_vt_select_clear(AppineVt *vt);
 // trimmed, stopping where a prompt mark (OSC 133) starts or ends a part of it, so a command is
 // selected without its prompt. False when there is none there (blank cells), with any earlier
 // selection cleared and the gesture ended.
-bool appine_vt_gesture_press(AppineVt *vt, int behavior, uint16_t x, uint16_t y, double px,
+bool kazeterm_vt_gesture_press(KazeTermVt *vt, int behavior, uint16_t x, uint16_t y, double px,
                              double py) {
-  appine_vt_select_clear(vt);
+  kazeterm_vt_select_clear(vt);
   GhosttySelectionGestureBehavior b = (GhosttySelectionGestureBehavior)behavior;
   GhosttySelectionGestureBehaviors behaviors = {.single_click = b, .double_click = b,
                                                 .triple_click = b};
@@ -2327,7 +2327,7 @@ bool appine_vt_gesture_press(AppineVt *vt, int behavior, uint16_t x, uint16_t y,
 // Applies a drag of the gesture to viewport cell (x, y), at pixel (px, py) from the grid's corner,
 // making the selection a rectangle when asked (a cell drag's only); the selection it makes goes to
 // sel, not yet installed. GHOSTTY_NO_VALUE when it makes none.
-static GhosttyResult gesture_drag(AppineVt *vt, uint16_t x, uint16_t y, double px, double py,
+static GhosttyResult gesture_drag(KazeTermVt *vt, uint16_t x, uint16_t y, double px, double py,
                                   bool rectangle, GhosttySelection *sel) {
   GhosttySelectionGestureGeometry geometry = {
       .columns = vt->cols,
@@ -2359,7 +2359,7 @@ static GhosttyResult gesture_drag(AppineVt *vt, uint16_t x, uint16_t y, double p
 // blanks and punctuation, a word drag stays on the last word reached; a line drag takes in blank
 // lines too). False, leaving the selection as it was, without a gesture, or when there is nothing
 // to select towards the cell or the pressed cell has gone (its screen changed).
-bool appine_vt_gesture_drag(AppineVt *vt, uint16_t x, uint16_t y, double px, double py) {
+bool kazeterm_vt_gesture_drag(KazeTermVt *vt, uint16_t x, uint16_t y, double px, double py) {
   GhosttySelection sel = {0};
   return gesture_drag(vt, x, y, px, py, false, &sel) == GHOSTTY_SUCCESS &&
          ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_SELECTION, &sel) == GHOSTTY_SUCCESS;
@@ -2367,7 +2367,7 @@ bool appine_vt_gesture_drag(AppineVt *vt, uint16_t x, uint16_t y, double px, dou
 
 // Ends the gesture (the finger lifted), keeping its selection and releasing the pressed cell's
 // tracking.
-void appine_vt_gesture_end(AppineVt *vt) { ghostty_selection_gesture_reset(vt->gesture, vt->term); }
+void kazeterm_vt_gesture_end(KazeTermVt *vt) { ghostty_selection_gesture_reset(vt->gesture, vt->term); }
 
 // A mouse's (or touchpad's) left button selects as Ghostty's does, through the same gesture, its
 // presses timed so that libghostty-vt counts the clicks: a first click clears the selection and a
@@ -2382,7 +2382,7 @@ void appine_vt_gesture_end(AppineVt *vt) { ghostty_selection_gesture_reset(vt->g
 // counting as its next click. Installs the click's selection (none after a first click, which
 // clears it; a second or third on blanks leaves the selection as it was) and returns the click
 // count (1 to 3), or 0 when the press could not be applied (the gesture is then reset).
-int appine_vt_mouse_press(AppineVt *vt, uint16_t x, uint16_t y, double px, double py,
+int kazeterm_vt_mouse_press(KazeTermVt *vt, uint16_t x, uint16_t y, double px, double py,
                           uint64_t time_ns, uint64_t interval_ns, bool output) {
   drop_anchor(vt);
   drop_output(vt);
@@ -2423,7 +2423,7 @@ int appine_vt_mouse_press(AppineVt *vt, uint16_t x, uint16_t y, double px, doubl
                                     GHOSTTY_SELECTION_GESTURE_DATA_CLICK_COUNT,
                                     &count) != GHOSTTY_SUCCESS ||
       count == 0) {
-    appine_vt_select_clear(vt);
+    kazeterm_vt_select_clear(vt);
     return 0;
   }
   if (r == GHOSTTY_SUCCESS) {
@@ -2442,7 +2442,7 @@ int appine_vt_mouse_press(AppineVt *vt, uint16_t x, uint16_t y, double px, doubl
 // its threshold), as Ghostty installs it. Returns 1 with a selection, 0 without, and -1, changing
 // nothing, when no press is under way (none was made, the gesture was reset, or the pressed cell's
 // screen has gone).
-int appine_vt_mouse_drag(AppineVt *vt, uint16_t x, uint16_t y, double px, double py,
+int kazeterm_vt_mouse_drag(KazeTermVt *vt, uint16_t x, uint16_t y, double px, double py,
                          bool rectangle) {
   uint8_t count = 0;
   GhosttyGridRef anchor = {0};
@@ -2472,7 +2472,7 @@ int appine_vt_mouse_drag(AppineVt *vt, uint16_t x, uint16_t y, double px, double
 // Releases the left button at viewport cell (x, y), or outside the grid (x or y negative or past
 // it, which counts as having moved away). Returns the click count, negated when the press moved
 // from its cell or its drag selected (no click then), or 0 without a press under way.
-int appine_vt_mouse_release(AppineVt *vt, int x, int y) {
+int kazeterm_vt_mouse_release(KazeTermVt *vt, int x, int y) {
   GhosttyGridRef ref;
   bool inside = x >= 0 && y >= 0 && x < vt->cols && y < vt->height &&
                 viewport_ref(vt, (uint16_t)x, (uint16_t)y, &ref);
@@ -2496,7 +2496,7 @@ int appine_vt_mouse_release(AppineVt *vt, int x, int y) {
 // A right-click at viewport cell (x, y), as Ghostty's for its context menu: a selection holding
 // the cell stays; otherwise the word there is selected (on a written space, the run of spaces),
 // and on empty cells the selection stays as it was. True when there is a selection afterwards.
-bool appine_vt_select_context(AppineVt *vt, uint16_t x, uint16_t y) {
+bool kazeterm_vt_select_context(KazeTermVt *vt, uint16_t x, uint16_t y) {
   GhosttySelection sel = {0};
   bool has = ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_SELECTION, &sel) ==
              GHOSTTY_SUCCESS;
@@ -2525,7 +2525,7 @@ bool appine_vt_select_context(AppineVt *vt, uint16_t x, uint16_t y) {
 
 // Starts dragging a selection handle: the other end becomes the anchor. end is the handle of the
 // selection's last cell, else its first. False when there is no selection.
-bool appine_vt_select_grab(AppineVt *vt, bool end) {
+bool kazeterm_vt_select_grab(KazeTermVt *vt, bool end) {
   GhosttySelection sel = {0};
   GhosttySelection ordered = {0};
   GhosttyPointCoordinate fixed;
@@ -2538,7 +2538,7 @@ bool appine_vt_select_grab(AppineVt *vt, bool end) {
   return set_anchor(vt, fixed, fixed);
 }
 
-static bool rectangular(AppineVt *vt) {
+static bool rectangular(KazeTermVt *vt) {
   GhosttySelection sel = {0};
   return ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_SELECTION, &sel) ==
              GHOSTTY_SUCCESS &&
@@ -2548,7 +2548,7 @@ static bool rectangular(AppineVt *vt) {
 // Extends the selection from the anchor to viewport cell (x, y): the anchor stays selected
 // whole, and the selection runs from its far side to the cell; a rectangle stays one, with the
 // anchor and the cell at opposite corners. False without an anchor.
-bool appine_vt_select_to(AppineVt *vt, uint16_t x, uint16_t y) {
+bool kazeterm_vt_select_to(KazeTermVt *vt, uint16_t x, uint16_t y) {
   if (vt->anchor_start == NULL || vt->anchor_end == NULL) return false;
   GhosttyGridRef start = {0};
   GhosttyGridRef end = {0};
@@ -2574,7 +2574,7 @@ bool appine_vt_select_to(AppineVt *vt, uint16_t x, uint16_t y) {
 // Turns the selection into a rectangle (on) with its first and last cells as opposite corners, or
 // back into a linear selection from the rectangle's top left to its bottom right corner. False
 // when there is no selection.
-bool appine_vt_select_rectangle(AppineVt *vt, bool on) {
+bool kazeterm_vt_select_rectangle(KazeTermVt *vt, bool on) {
   drop_anchor(vt);
   GhosttySelection sel = {0};
   GhosttySelection ordered = {0};
@@ -2587,7 +2587,7 @@ bool appine_vt_select_rectangle(AppineVt *vt, bool on) {
 }
 
 // Selects everything, scrollback included; false when there is nothing to select.
-bool appine_vt_select_all(AppineVt *vt) {
+bool kazeterm_vt_select_all(KazeTermVt *vt) {
   drop_anchor(vt);
   // Finding the first and last non-blank cells reads the oldest and newest pages
   vt->compress_touched = true;
@@ -2596,15 +2596,15 @@ bool appine_vt_select_all(AppineVt *vt) {
          ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_SELECTION, &sel) == GHOSTTY_SUCCESS;
 }
 
-static void drop_output(AppineVt *vt) {
+static void drop_output(KazeTermVt *vt) {
   if (vt->output_at) ghostty_tracked_grid_ref_free(vt->output_at);
   vt->output_at = NULL;
 }
 
 // Whether viewport cell (x, y) is in a command's output, between the prompt marks of the command
 // and of the next one (see Shell integration), or above the first prompt; if so, the cell is
-// tracked for appine_vt_select_output, which the menu after a long press there offers.
-bool appine_vt_output_at(AppineVt *vt, uint16_t x, uint16_t y) {
+// tracked for kazeterm_vt_select_output, which the menu after a long press there offers.
+bool kazeterm_vt_output_at(KazeTermVt *vt, uint16_t x, uint16_t y) {
   drop_output(vt);
   // Finding the output's ends reads the pages above and below the cell
   vt->compress_touched = true;
@@ -2624,10 +2624,10 @@ bool appine_vt_output_at(AppineVt *vt, uint16_t x, uint16_t y) {
   return true;
 }
 
-// Selects the whole output appine_vt_output_at found, as it is now (a command still running may
+// Selects the whole output kazeterm_vt_output_at found, as it is now (a command still running may
 // have added to it), and anchors drags to it; false, leaving the selection alone, when its cell
 // has left the scrollback or is no longer output (a full reset).
-bool appine_vt_select_output(AppineVt *vt) {
+bool kazeterm_vt_select_output(KazeTermVt *vt) {
   if (vt->output_at == NULL) return false;
   vt->compress_touched = true;
   GhosttyGridRef ref = {0};
@@ -2641,7 +2641,7 @@ bool appine_vt_select_output(AppineVt *vt) {
   return selected;
 }
 
-void appine_vt_select_clear(AppineVt *vt) {
+void kazeterm_vt_select_clear(KazeTermVt *vt) {
   drop_anchor(vt);
   drop_output(vt);
   ghostty_selection_gesture_reset(vt->gesture, vt->term);
@@ -2651,7 +2651,7 @@ void appine_vt_select_clear(AppineVt *vt) {
 // Moves the selection's end as Ghostty's adjust_selection does (GhosttySelectionAdjust: to the
 // next or previous non-blank cell, a row or a page up or down, the screen's start or end) and
 // scrolls the viewport to show it, as Ghostty does; false without a selection.
-bool appine_vt_select_adjust(AppineVt *vt, int adjustment) {
+bool kazeterm_vt_select_adjust(KazeTermVt *vt, int adjustment) {
   GhosttySelection sel = {0};
   if (ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_SELECTION, &sel) != GHOSTTY_SUCCESS) {
     return false;
@@ -2690,7 +2690,7 @@ bool appine_vt_select_adjust(AppineVt *vt, int adjustment) {
 // Formats the selection, or the active screen with its scrollback when sel is NULL, as plain text
 // with soft-wrapped lines joined and trailing blanks trimmed, as Ghostty copies text: *data is
 // allocated by libghostty-vt (ghostty_free). False on failure.
-static bool format_plain(AppineVt *vt, const GhosttySelection *sel, uint8_t **data, size_t *len) {
+static bool format_plain(KazeTermVt *vt, const GhosttySelection *sel, uint8_t **data, size_t *len) {
   GhosttyFormatter formatter = NULL;
   if (ghostty_formatter_terminal_new(NULL, &formatter, vt->term) != GHOSTTY_SUCCESS) return false;
   GhosttyFormatterFormat emit = GHOSTTY_FORMATTER_FORMAT_PLAIN;
@@ -2709,7 +2709,7 @@ static bool format_plain(AppineVt *vt, const GhosttySelection *sel, uint8_t **da
 // The selection as plain text, soft-wrapped lines joined and trailing blanks trimmed (as
 // Ghostty copies); NULL with len 0 when there is no selection or it is empty. Valid until the
 // next call.
-const uint8_t *appine_vt_copy(AppineVt *vt, size_t *len) {
+const uint8_t *kazeterm_vt_copy(KazeTermVt *vt, size_t *len) {
   *len = 0;
   GhosttySelection sel = {0};
   if (ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_SELECTION, &sel) != GHOSTTY_SUCCESS) {
@@ -2733,14 +2733,14 @@ const uint8_t *appine_vt_copy(AppineVt *vt, size_t *len) {
 // Rows of a soft-wrapped line read above and below the tapped one, bounding a tap's work
 #define LINK_ROWS 64
 
-static bool screen_ref(AppineVt *vt, uint16_t x, uint32_t y, GhosttyGridRef *out) {
+static bool screen_ref(KazeTermVt *vt, uint16_t x, uint32_t y, GhosttyGridRef *out) {
   GhosttyPoint p = {.tag = GHOSTTY_POINT_TAG_SCREEN, .value.coordinate = {.x = x, .y = y}};
   *out = (GhosttyGridRef){0};
   return ghostty_terminal_grid_ref(vt->term, p, out) == GHOSTTY_SUCCESS;
 }
 
 // Whether screen row y is soft-wrapped onto the next one
-static bool row_wraps(AppineVt *vt, uint32_t y) {
+static bool row_wraps(KazeTermVt *vt, uint32_t y) {
   GhosttyGridRef ref;
   GhosttyRow row;
   bool wrap = false;
@@ -2802,7 +2802,7 @@ static bool find_url(const uint32_t *cps, size_t count, size_t at, size_t *start
 
 // The link at viewport cell (x, y): its OSC 8 URI, else an http or https URL in the text there;
 // NULL with len 0 when there is none. Valid until the next text call.
-const uint8_t *appine_vt_link(AppineVt *vt, uint16_t x, uint16_t y, size_t *len) {
+const uint8_t *kazeterm_vt_link(KazeTermVt *vt, uint16_t x, uint16_t y, size_t *len) {
   *len = 0;
   vt->text.len = 0;
   GhosttyGridRef ref;
@@ -2877,7 +2877,7 @@ const uint8_t *appine_vt_link(AppineVt *vt, uint16_t x, uint16_t y, size_t *len)
 
 // Screen row y's prompt state (GHOSTTY_ROW_SEMANTIC_*) and whether it is a soft-wrapped row's
 // continuation and wraps onto the next row
-static bool prompt_row(AppineVt *vt, uint32_t y, GhosttyRowSemanticPrompt *prompt, bool *continues,
+static bool prompt_row(KazeTermVt *vt, uint32_t y, GhosttyRowSemanticPrompt *prompt, bool *continues,
                        bool *wraps) {
   GhosttyGridRef ref;
   GhosttyRow row;
@@ -2891,7 +2891,7 @@ static bool prompt_row(AppineVt *vt, uint32_t y, GhosttyRowSemanticPrompt *promp
 }
 
 // Whether screen cell (x, y) is input typed at a prompt, and its width (*wide)
-static bool input_cell(AppineVt *vt, uint16_t x, uint32_t y, GhosttyCellWide *wide) {
+static bool input_cell(KazeTermVt *vt, uint16_t x, uint32_t y, GhosttyCellWide *wide) {
   GhosttyGridRef ref;
   GhosttyCell cell;
   GhosttyCellSemanticContent content = GHOSTTY_CELL_SEMANTIC_OUTPUT;
@@ -2904,16 +2904,16 @@ static bool input_cell(AppineVt *vt, uint16_t x, uint32_t y, GhosttyCellWide *wi
 
 // Whether the cursor stops at screen cell (x, y) when the shell moves it by one character: input,
 // and not the second half of a wide character or the blank one leaves at a row's end
-static bool input_stop(AppineVt *vt, uint16_t x, uint32_t y) {
+static bool input_stop(KazeTermVt *vt, uint16_t x, uint32_t y) {
   GhosttyCellWide wide;
   return input_cell(vt, x, y, &wide) &&
          (wide == GHOSTTY_CELL_WIDE_NARROW || wide == GHOSTTY_CELL_WIDE_WIDE);
 }
 
 // Whether screen row y goes on the line of the row above it, which the shell broke there itself
-// (lf_output: busybox ash, appine_vt_feed): a continuation row of the prompt that is no soft wrap
+// (lf_output: busybox ash, kazeterm_vt_feed): a continuation row of the prompt that is no soft wrap
 // and does not start with a secondary prompt
-static bool shell_broken(AppineVt *vt, uint32_t y) {
+static bool shell_broken(KazeTermVt *vt, uint32_t y) {
   GhosttyRowSemanticPrompt prompt;
   bool continues, wraps;
   GhosttyGridRef ref;
@@ -2930,7 +2930,7 @@ static bool shell_broken(AppineVt *vt, uint32_t y) {
 // up: the nearest prompt row at or above it, or the first of the continuation rows that lead up to
 // it when no prompt row begins them (it left the scrollback). False when there is none within
 // PROMPT_ROWS.
-static bool prompt_top(AppineVt *vt, uint32_t from, uint32_t *top) {
+static bool prompt_top(KazeTermVt *vt, uint32_t from, uint32_t *top) {
   bool found = false;
   for (uint32_t n = 0; n < PROMPT_ROWS && n <= from; n++) {
     uint32_t y = from - n;
@@ -2955,7 +2955,7 @@ static bool prompt_top(AppineVt *vt, uint32_t from, uint32_t *top) {
 // cursor up to and including that cell, over the rows that soft-wrap on from the cursor's (or go on
 // after the shell's own break, shell_broken) and continue its prompt; a cell past the line's input moves to the end of it (one more arrow when
 // the cursor is on input, to the cell after the last).
-static size_t moves_right(AppineVt *vt, GhosttyPointCoordinate cursor,
+static size_t moves_right(KazeTermVt *vt, GhosttyPointCoordinate cursor,
                           GhosttyPointCoordinate click) {
   size_t count = 0;
   for (uint32_t y = cursor.y; y <= click.y; y++) {
@@ -2980,7 +2980,7 @@ static size_t moves_right(AppineVt *vt, GhosttyPointCoordinate cursor,
 // Left arrows from the cursor to a cell before it: the input before the cursor down to and
 // including that cell, over the rows of the cursor's line above its row; a cell before the line's
 // input moves to the start of it.
-static size_t moves_left(AppineVt *vt, GhosttyPointCoordinate cursor,
+static size_t moves_left(KazeTermVt *vt, GhosttyPointCoordinate cursor,
                          GhosttyPointCoordinate click) {
   size_t count = 0;
   for (uint32_t y = cursor.y;; y--) {
@@ -3003,8 +3003,8 @@ static size_t moves_left(AppineVt *vt, GhosttyPointCoordinate cursor,
 // cursor is at the prompt and the cell is not above the prompt's first row, the bytes that move the
 // cursor there are left in the replies (none when it is already there or no input lies between)
 // and it returns true; otherwise false, and the tap is no prompt's.
-bool appine_vt_prompt_click(AppineVt *vt, uint16_t x, uint16_t y) {
-  if (vt->prompt_click == PROMPT_CLICK_NONE || !appine_vt_at_prompt(vt)) return false;
+bool kazeterm_vt_prompt_click(KazeTermVt *vt, uint16_t x, uint16_t y) {
+  if (vt->prompt_click == PROMPT_CLICK_NONE || !kazeterm_vt_at_prompt(vt)) return false;
   if (x >= vt->cols) x = vt->cols - 1;
   if (y >= vt->height) y = vt->height - 1;
   uint16_t cx = 0;
@@ -3063,7 +3063,7 @@ bool appine_vt_prompt_click(AppineVt *vt, uint16_t x, uint16_t y) {
 // Searches for needle (UTF-8; ASCII letters match either case, all else exactly), restarting the
 // search when it changed; an empty needle leaves nothing found. The next frames find its matches,
 // none of them selected. False when the search cannot be made.
-bool appine_vt_search(AppineVt *vt, const uint8_t *needle, size_t len) {
+bool kazeterm_vt_search(KazeTermVt *vt, const uint8_t *needle, size_t len) {
   if (vt->search == NULL) {
     if (len == 0) return true;
     if (ghostty_search_new(NULL, &vt->search, vt->term) != GHOSTTY_SUCCESS) {
@@ -3079,7 +3079,7 @@ bool appine_vt_search(AppineVt *vt, const uint8_t *needle, size_t len) {
 // Selects the next match towards older output (older; the first call selects the newest match)
 // or towards newer output, going round at either end, and scrolls the viewport to it unless it is
 // shown already. False when there is no match (or no search).
-bool appine_vt_search_select(AppineVt *vt, bool older) {
+bool kazeterm_vt_search_select(KazeTermVt *vt, bool older) {
   if (vt->search == NULL) return false;
   GhosttyResult r =
       older ? ghostty_search_select_next(vt->search) : ghostty_search_select_prev(vt->search);
@@ -3092,7 +3092,7 @@ bool appine_vt_search_select(AppineVt *vt, bool older) {
 // search's end. Rows are counted per page, whose rows follow one another, so only a page's first
 // row is looked up (counting the rows of the pages above it, which reads no compressed page),
 // not each match's.
-const uint32_t *appine_vt_search_rows(AppineVt *vt, size_t *len, int64_t *selected) {
+const uint32_t *kazeterm_vt_search_rows(KazeTermVt *vt, size_t *len, int64_t *selected) {
   *len = 0;
   *selected = -1;
   if (vt->search == NULL) return NULL;
@@ -3146,7 +3146,7 @@ const uint32_t *appine_vt_search_rows(AppineVt *vt, size_t *len, int64_t *select
 }
 
 // Ends the search; the next frame sends the rows its marks were on again.
-void appine_vt_search_end(AppineVt *vt) {
+void kazeterm_vt_search_end(KazeTermVt *vt) {
   if (vt->search) ghostty_search_free(vt->search);
   vt->search = NULL;
   free(vt->all_matches);
@@ -3159,12 +3159,12 @@ void appine_vt_search_end(AppineVt *vt) {
 
 // ---- Clearing and resetting ----
 
-static bool is_alternate(AppineVt *vt);
+static bool is_alternate(KazeTermVt *vt);
 
 // Writes the app's own sequences into the terminal as if the console had sent them, after a CAN
 // when the parser is inside a sequence a program left unfinished (which would take them for its
 // payload); they ask for no answer, so the console's replies stay as they were
-static void write_own(AppineVt *vt, const Buf *seq) {
+static void write_own(KazeTermVt *vt, const Buf *seq) {
   bool ground = true;
   if (ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_VT_GROUND, &ground) == GHOSTTY_SUCCESS &&
       !ground) {
@@ -3186,10 +3186,10 @@ static void write_own(AppineVt *vt, const Buf *seq) {
 // it, and the screen's images. Returns 1 when cleared at the prompt, 0 when cleared elsewhere, and
 // -1 on the alternate screen, where nothing is done: a full-screen program would go on drawing on a
 // screen it no longer knows.
-int appine_vt_clear(AppineVt *vt) {
+int kazeterm_vt_clear(KazeTermVt *vt) {
   if (is_alternate(vt)) return -1;
-  appine_vt_select_clear(vt);
-  bool prompt = appine_vt_at_prompt(vt);
+  kazeterm_vt_select_clear(vt);
+  bool prompt = kazeterm_vt_at_prompt(vt);
   Buf seq = {0};
   if (prompt) {
     // At a prompt, erasing the display (ED 2) moves the screen into the scrollback, as for a
@@ -3212,7 +3212,7 @@ int appine_vt_clear(AppineVt *vt) {
   }
   write_own(vt, &seq);
   free(seq.ptr);
-  appine_vt_scroll(vt, 0);
+  kazeterm_vt_scroll(vt, 0);
   return prompt ? 1 : 0;
 }
 
@@ -3220,9 +3220,9 @@ int appine_vt_clear(AppineVt *vt) {
 // modes, colours programs set (but OSC 10, 11 and 12's), the title and images; the app's own
 // settings (default colours, limits, grapheme clustering) stay. Returns whether the shell was at
 // its prompt, which the caller then sends a form feed (^L) to draw it again on the empty screen.
-bool appine_vt_reset(AppineVt *vt) {
-  bool prompt = appine_vt_at_prompt(vt);
-  appine_vt_select_clear(vt);
+bool kazeterm_vt_reset(KazeTermVt *vt) {
+  bool prompt = kazeterm_vt_at_prompt(vt);
+  kazeterm_vt_select_clear(vt);
   ghostty_terminal_reset(vt->term);
   // A synchronized output hold ends with the modes, and the prompt's way of moving the cursor
   // with the screen's prompt state (on_reset hears only a program's reset)
@@ -3237,7 +3237,7 @@ bool appine_vt_reset(AppineVt *vt) {
 // ---- Title, effects, messages, transcript ----
 
 // Whether a program set the title since the last call
-bool appine_vt_take_title_changed(AppineVt *vt) {
+bool kazeterm_vt_take_title_changed(KazeTermVt *vt) {
   bool changed = vt->title_changed;
   vt->title_changed = false;
   return changed;
@@ -3246,11 +3246,11 @@ bool appine_vt_take_title_changed(AppineVt *vt) {
 // The bells, clipboard write, notification, progress and status reports, clipboard reads, the
 // last command finished and a detached tmux control mode since the last call (vt.rs's `Effects`);
 // the text stays valid until the next feed
-void appine_vt_take_effects(AppineVt *vt, AppineVtEffects *out) {
+void kazeterm_vt_take_effects(KazeTermVt *vt, KazeTermVtEffects *out) {
   out->bells = vt->bells;
   out->clipboard = vt->clipboard;
   out->clip = vt->clip.ptr;
-  out->clip_len = vt->clipboard == APPINE_CLIPBOARD_TEXT ? vt->clip.len : 0;
+  out->clip_len = vt->clipboard == KAZETERM_CLIPBOARD_TEXT ? vt->clip.len : 0;
   out->notified = vt->notified;
   out->title = vt->note_title.ptr;
   out->title_len = vt->notified ? vt->note_title.len : 0;
@@ -3271,14 +3271,14 @@ void appine_vt_take_effects(AppineVt *vt, AppineVtEffects *out) {
   vt->command_finished = false;
   vt->clipboard_reads = 0;
   vt->bells = 0;
-  vt->clipboard = APPINE_CLIPBOARD_NONE;
+  vt->clipboard = KAZETERM_CLIPBOARD_NONE;
   vt->notified = false;
   vt->progress_state = -1;
   vt->statuses.len = 0;
 }
 
 // The title set by the program (OSC 0/2), empty when none; valid until the next text call
-const uint8_t *appine_vt_title(AppineVt *vt, size_t *len) {
+const uint8_t *kazeterm_vt_title(KazeTermVt *vt, size_t *len) {
   *len = 0;
   GhosttyString title = {0};
   if (ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_TITLE, &title) != GHOSTTY_SUCCESS ||
@@ -3291,7 +3291,7 @@ const uint8_t *appine_vt_title(AppineVt *vt, size_t *len) {
   return vt->text.ptr;
 }
 
-static bool is_alternate(AppineVt *vt) {
+static bool is_alternate(KazeTermVt *vt) {
   GhosttyTerminalScreen screen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
   ghostty_terminal_get(vt->term, GHOSTTY_TERMINAL_DATA_ACTIVE_SCREEN, &screen);
   return screen == GHOSTTY_TERMINAL_SCREEN_ALTERNATE;
@@ -3321,7 +3321,7 @@ static size_t utf8_width(const uint8_t *s, size_t len) {
 // restore the cursor and move it down. The prompt and a half-typed command move down with it and
 // the shell's line editing is unaffected. False on the alternate screen (a full-screen program),
 // where nothing is written.
-bool appine_vt_message(AppineVt *vt, const uint8_t *text, size_t len) {
+bool kazeterm_vt_message(KazeTermVt *vt, const uint8_t *text, size_t len) {
   if (is_alternate(vt)) return false;
   size_t width = utf8_width(text, len);
   size_t rows = (width + vt->cols - 1) / vt->cols;
@@ -3354,7 +3354,7 @@ bool appine_vt_message(AppineVt *vt, const uint8_t *text, size_t len) {
 // trimmed (saving tabs); valid until the next text call. NULL on the alternate screen, whose text
 // is not what the tab should come back with, when the last transcript is still the screen's text
 // (the caller keeps it: formatting restores every compressed page), and on failure.
-const uint8_t *appine_vt_transcript(AppineVt *vt, size_t *len) {
+const uint8_t *kazeterm_vt_transcript(KazeTermVt *vt, size_t *len) {
   *len = 0;
   if (is_alternate(vt) || vt->transcribed) return NULL;
   vt->compress_touched = true;
@@ -3373,12 +3373,12 @@ const uint8_t *appine_vt_transcript(AppineVt *vt, size_t *len) {
   return text;
 }
 
-// A snapshot of the whole terminal for saving the tab, which appine_vt_restore brings back: 1 with
-// its bytes in *out (freed with appine_vt_free_snapshot), 0 when nothing changed since the last
+// A snapshot of the whole terminal for saving the tab, which kazeterm_vt_restore brings back: 1 with
+// its bytes in *out (freed with kazeterm_vt_free_snapshot), 0 when nothing changed since the last
 // one (the caller keeps that), -1 when there is none of the terminal as it is: libghostty-vt
 // failed (output stopped inside a sequence longer than CONTINUATION_MAX), or the snapshot is
 // larger than SNAPSHOT_MAX. Not taken again until the terminal changes.
-int appine_vt_snapshot(AppineVt *vt, uint8_t **out, size_t *len) {
+int kazeterm_vt_snapshot(KazeTermVt *vt, uint8_t **out, size_t *len) {
   *out = NULL;
   *len = 0;
   if (vt->snapshot == SNAPSHOT_TAKEN) return 0;
@@ -3401,13 +3401,13 @@ int appine_vt_snapshot(AppineVt *vt, uint8_t **out, size_t *len) {
   return 1;
 }
 
-void appine_vt_free_snapshot(uint8_t *data, size_t len) {
+void kazeterm_vt_free_snapshot(uint8_t *data, size_t len) {
   ghostty_free(NULL, data, len);
 }
 
 // libghostty-vt's version, which the tabs' saved snapshots are recorded with: another version may
 // not read them
-const uint8_t *appine_vt_version(size_t *len) {
+const uint8_t *kazeterm_vt_version(size_t *len) {
   GhosttyString version = {0};
   if (ghostty_build_info(GHOSTTY_BUILD_INFO_VERSION_STRING, &version) != GHOSTTY_SUCCESS) {
     *len = 0;
@@ -3430,7 +3430,7 @@ const uint8_t *appine_vt_version(size_t *len) {
 // transcripts and copies, select all, a link's line) mark the terminal touched. Drawing reads only
 // the viewport's pages, and searching keeps pages as they are.
 
-static uint64_t compression_activity(AppineVt *vt) {
+static uint64_t compression_activity(KazeTermVt *vt) {
   uint64_t activity = 0;
   ghostty_terminal_compression_activity(vt->term, &activity);
   return activity;
@@ -3438,7 +3438,7 @@ static uint64_t compression_activity(AppineVt *vt) {
 
 // Frees the text buffer once a transcript or a large copy has grown it past TEXT_KEEP; whatever
 // it held was handed out under an earlier lock and is no longer read
-static void release_text(AppineVt *vt) {
+static void release_text(KazeTermVt *vt) {
   if (vt->text.cap <= TEXT_KEEP) return;
   free(vt->text.ptr);
   vt->text = (Buf){0};
@@ -3446,8 +3446,8 @@ static void release_text(AppineVt *vt) {
 
 // Whether vt.rs should schedule a pass now: the terminal changed or a read restored pages since
 // the last pass, and none is scheduled yet. Marks it scheduled; vt.rs then calls
-// appine_vt_compress_step once the idle interval has passed.
-bool appine_vt_compress_wanted(AppineVt *vt) {
+// kazeterm_vt_compress_step once the idle interval has passed.
+bool kazeterm_vt_compress_wanted(KazeTermVt *vt) {
   if (vt->compress_scheduled) return false;
   uint64_t activity = compression_activity(vt);
   if (activity == vt->compress_seen && !vt->compress_touched) return false;
@@ -3456,30 +3456,30 @@ bool appine_vt_compress_wanted(AppineVt *vt) {
   return true;
 }
 
-// One step of the scheduled pass (APPINE_COMPRESS_*): a bounded amount of work, unless the
+// One step of the scheduled pass (KAZETERM_COMPRESS_*): a bounded amount of work, unless the
 // terminal changed since the last look and the pass may still wait (may_wait), which postpones it
 // by another idle interval. The last step ends the pass and frees a large text buffer.
-int appine_vt_compress_step(AppineVt *vt, bool may_wait) {
+int kazeterm_vt_compress_step(KazeTermVt *vt, bool may_wait) {
   uint64_t activity = compression_activity(vt);
   if (activity != vt->compress_seen) {
     vt->compress_seen = activity;
-    if (may_wait) return APPINE_COMPRESS_WAIT;
+    if (may_wait) return KAZETERM_COMPRESS_WAIT;
   }
   GhosttyTerminalCompressionResult result = GHOSTTY_TERMINAL_COMPRESSION_RESULT_COMPLETE;
   if (ghostty_terminal_compress(vt->term, GHOSTTY_TERMINAL_COMPRESSION_MODE_INCREMENTAL,
                                 &result) == GHOSTTY_SUCCESS &&
       result == GHOSTTY_TERMINAL_COMPRESSION_RESULT_PENDING) {
-    return APPINE_COMPRESS_STEP;
+    return KAZETERM_COMPRESS_STEP;
   }
   vt->compress_scheduled = false;
   vt->compress_touched = false;
   release_text(vt);
-  return APPINE_COMPRESS_DONE;
+  return KAZETERM_COMPRESS_DONE;
 }
 
 // Compresses every cold page at once, idle or not (the app trimming its memory), and frees a large
 // text buffer. A scheduled pass goes on as it was.
-void appine_vt_compress_all(AppineVt *vt) {
+void kazeterm_vt_compress_all(KazeTermVt *vt) {
   GhosttyTerminalCompressionResult result;
   ghostty_terminal_compress(vt->term, GHOSTTY_TERMINAL_COMPRESSION_MODE_FULL, &result);
   if (!vt->compress_scheduled) {
@@ -3495,7 +3495,7 @@ void appine_vt_compress_all(AppineVt *vt) {
 // placements, those no placement shows first, then the oldest sent, so images shown in the
 // scrollback or on the screen can go. The last snapshot is left as it was (it still has them): a new
 // one would read, and so decompress, every page of the scrollback; the next change takes one.
-void appine_vt_drop_images(AppineVt *vt) {
+void kazeterm_vt_drop_images(KazeTermVt *vt) {
   uint64_t limit = KITTY_TRIMMED;
   ghostty_terminal_set(vt->term, GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT, &limit);
   limit = KITTY_STORAGE;

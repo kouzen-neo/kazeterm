@@ -7,7 +7,7 @@
 //! requests a wake and waiters check again; when the object is removed during the wait, EIDRM is
 //! returned.
 
-use appine_engine::{PAGE_SIZE, prot};
+use kazeterm_engine::{PAGE_SIZE, prot};
 
 use super::{SysResult, get, put, read_timespec};
 use crate::cred::{Cred, UserNs, cap};

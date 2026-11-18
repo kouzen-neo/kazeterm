@@ -30,7 +30,7 @@ SKIP="$SKIP:SysctlTest/SysctlNodeTest.*/net_core_rmem_max:SysctlTest/SysctlNodeT
 SKIP="$SKIP:SysctlTest/SysctlTestReadBack.ReadBack/core_rmem_max_*"
 SKIP="$SKIP:SysctlTest/SysctlTestReadBack.ReadBack/core_wmem_max_*"
 # Cannot be compared: pid 2 is kthreadd only on a whole system; docker's pid namespace has no pid 2
-# and Appine gives it to an ordinary process
+# and KazeTerm gives it to an ordinary process
 SKIP="$SKIP:ProcTaskDirTest.Kthread*"
 # kernel/vfs: no O_TMPFILE (EISDIR; docker's overlay root on 6.8 refuses it too, CI's newer kernel
 # supports it)

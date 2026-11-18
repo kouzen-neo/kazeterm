@@ -7,7 +7,7 @@
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 compile_error!(
-    "appine runs only on Linux and Android hosts; on macOS, build and test in scripts/dev"
+    "kazeterm runs only on Linux and Android hosts; on macOS, build and test in scripts/dev"
 );
 
 pub mod net;
@@ -1767,7 +1767,7 @@ mod tests {
 
     #[test]
     fn counts_written_pages_as_cached() {
-        let path = std::env::temp_dir().join(format!("appine-cachestat-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("kazeterm-cachestat-{}", std::process::id()));
         let mut f = std::fs::File::options()
             .read(true)
             .write(true)

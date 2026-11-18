@@ -386,7 +386,7 @@ pipes, FIFOs and splice (`kernel/pipe`); FUSE opens and I/O (`kernel/fuse`); sto
 - Credentials (`permission`, `owns`, `capable_wrt`, `new_owner`, `FileCaps`),
   `pidns`; signals (`SIGPIPE`, `SIGIO`, `SIGXFSZ`, `F_SETSIG`);
   `kernel/signal`'s `stub` for unimplemented fcntl commands and ioctls.
-- `appine_hal` (pread, pwrite, poll, lseek, fsync, `copy_file`, fallocate, `sync_file_range`,
+- `kazeterm_hal` (pread, pwrite, poll, lseek, fsync, `copy_file`, fallocate, `sync_file_range`,
   `cachestat`, `fill_random`); the kernel's wake objects and `Cx::unlocked`.
 
 ## Invariants and gotchas

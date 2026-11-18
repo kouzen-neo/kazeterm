@@ -15,7 +15,7 @@ and handles keys, the IME, pastes, gestures, pixel scrolling, selection by touch
 search, zoom and the uses of prompt marks (jumping, selecting output and moving the cursor by taps).
 `VtKeys` maps Android key codes to libghostty-vt's key numbers.
 
-Root: `VtView.kt` and `VtKeys.kt` in `android/app/src/main/java/io/github/mthli/appine/`, and the
+Root: `VtView.kt` and `VtKeys.kt` in `android/app/src/main/java/com/kazeterm/`, and the
 Input, Paste, Mouse and focus, Selection, Links, Taps on the prompt and Search sections of
 `hosts/android/src/vt.c`.
 
@@ -437,7 +437,7 @@ select a command's output and move the cursor by taps:
   that text unexpectedly. All committed IME entry points must use the same paste safety checks;
   `performContextMenuAction` also needs an override because the base implementation does nothing.
 - libghostty-vt's mouse encoder deduplicates motion only when asked (off by default) and forgets
-  its last cell whenever `set_from_terminal` or the size option is set, which `appine_vt_mouse`
+  its last cell whenever `set_from_terminal` or the size option is set, which `kazeterm_vt_mouse`
   does for every event; so vt.c keeps the last cell itself, updated only when an event was encoded.
 - `GestureDetector` with a double-tap listener (any `SimpleOnGestureListener`) gives the second
   tap of a double tap to that listener: `onSingleTapUp` never sees it and a drag starting there
@@ -470,7 +470,7 @@ select a command's output and move the cursor by taps:
   for such events (a stylus keeps the system's). A pointer set while the view handles a hover
   event shows only at the next one.
 - The selection gesture is one per terminal, shared by touch and mouse: a mouse's click count
-  survives its releases, but vt.c's own clearing (`appine_vt_select_clear`: the view's
+  survives its releases, but vt.c's own clearing (`kazeterm_vt_select_clear`: the view's
   `clearSelection`, typing, Clear screen, Reset terminal), a finger's word or line press and the
   finger lifting from its drag, a right-click that selects a word, a failed mouse press and
   attaching another tab during a drag reset it; selecting all, a rectangle, an output or a

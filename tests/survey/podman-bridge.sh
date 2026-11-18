@@ -7,7 +7,7 @@
 # podman.sh:
 #   scripts/survey -s target/survey/podman podman-bridge
 # Native comparison:
-# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n appine-podman-native podman-bridge
+# SURVEY_DOCKER_OPTS=--privileged scripts/survey -n kazeterm-podman-native podman-bridge
 exec 2>&1
 command -v strace >/dev/null || apk add -q strace
 command -v nft >/dev/null || apk add -q nftables

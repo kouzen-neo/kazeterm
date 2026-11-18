@@ -548,7 +548,7 @@ static void sibling_do(char c)
         read(sibling_done[0], &c, 1);
 }
 
-/* System calls on the no-BKL fast path (Appine's syscall::fast) must also go through the
+/* System calls on the no-BKL fast path (KazeTerm's syscall::fast) must also go through the
    filters; reading the clock in the vDSO does not enter the kernel, so filters cannot see it */
 static void fast_path(void)
 {
@@ -611,7 +611,7 @@ static void fast_path(void)
 
     /* The per-number cache (Linux's seccomp_cache) records only numbers that always return
        ALLOW: those that look at arguments, that an earlier filter does not allow, or that return
-       other actions must run the program. In Appine these numbers take the fast path as usual */
+       other actions must run the program. In KazeTerm these numbers take the fast path as usual */
     pid_t pid = fork();
     if (pid == 0) {
         prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);

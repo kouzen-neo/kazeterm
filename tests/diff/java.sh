@@ -160,10 +160,10 @@ public class Main {
 
         // crypto, zip, CRC32 (all have instruction intrinsics on aarch64)
         MessageDigest md = MessageDigest.getInstance("SHA-256");
-        System.out.println("sha256 " + HexFormat.of().formatHex(md.digest("appine".getBytes(StandardCharsets.UTF_8))));
+        System.out.println("sha256 " + HexFormat.of().formatHex(md.digest("kazeterm".getBytes(StandardCharsets.UTF_8))));
         Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
         c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(new byte[16], "AES"), new GCMParameterSpec(128, new byte[12]));
-        System.out.println("aes " + HexFormat.of().formatHex(c.doFinal("appine".getBytes(StandardCharsets.UTF_8))));
+        System.out.println("aes " + HexFormat.of().formatHex(c.doFinal("kazeterm".getBytes(StandardCharsets.UTF_8))));
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
         kpg.initialize(256);
         KeyPair kp = kpg.generateKeyPair();

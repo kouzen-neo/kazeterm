@@ -7,7 +7,7 @@
 
 ## Responsibilities
 
-`harness/diff` owns native-vs-Appine differential runs, case inputs/normalization and
+`harness/diff` owns native-vs-KazeTerm differential runs, case inputs/normalization and
 Starnix/gVisor suite builds. Root: `scripts/difftest`, `tests/diff/`, `scripts/build-starnix-tests`,
 `tests/starnix/`, `scripts/build-gvisor-tests` and `tests/gvisor/`.
 
@@ -17,11 +17,11 @@ benchmarks, surveys and crash testing remain `harness`.
 ## Key types
 
 - difftest's per-case directives, matched on any line: `# docker-run-options:`,
-  `# appine-options:` and `# difftest-files:`; outputs `target/difftest/<case>.{native,appine,
-  appine.err}`, failure copies `failed/<time>-t<tier>-<case>.*`, timings
+  `# kazeterm-options:` and `# difftest-files:`; outputs `target/difftest/<case>.{native,kazeterm,
+  kazeterm.err}`, failure copies `failed/<time>-t<tier>-<case>.*`, timings
   `durations-t<tier>.txt` (`<case> <seconds>`), the run lock `.lock` (a symbolic link naming the
   run's pid), lane claims
-  `.slot-<n>`, lane stores `<store>-w<n>` (marked `.cloned`); the image `appine-difftest`,
+  `.slot-<n>`, lane stores `<store>-w<n>` (marked `.cloned`); the image `kazeterm-difftest`,
   labelled with the exported directory list.
 - Suite tarballs: `target/starnix-tests/starnix-tests-<commit12>.tar` and
   `target/gvisor-tests/gvisor-tests-<commit12>-<list hash>.tar`, each with `bin/`, `BUILT.txt`,
@@ -43,14 +43,14 @@ benchmarks, surveys and crash testing remain `harness`.
   lock directory, with or without its pid file) by moving it aside first, so that of two waiters
   finding the same dead run the one that moved away the other's new lock puts it back, and
   removes it on exit; its lanes run under it.
-- On aarch64 Linux `appine-run` runs inside a container (`APPINE_IMAGE`, default
+- On aarch64 Linux `kazeterm-run` runs inside a container (`KAZETERM_IMAGE`, default
   `debian:trixie-slim`, the caller's uid, seccomp unconfined, the repository at its own path) for
   the store import, the tool check, the export and the cases, while the store's package and suite
   installs run it on the host; elsewhere
   everything goes through `scripts/dev`. The binary is a prebuilt one, which difftest never
-  builds: on aarch64 Linux `APPINE_RUN`, else `target/linux-arm64/release/appine-run`, falling
-  back to `target/release/appine-run` when the chosen one is not executable; elsewhere always
-  `target/linux-arm64/release/appine-run`. Only `APPINE_DBT_REGS` is passed through.
+  builds: on aarch64 Linux `KAZETERM_RUN`, else `target/linux-arm64/release/kazeterm-run`, falling
+  back to `target/release/kazeterm-run` when the chosen one is not executable; elsewhere always
+  `target/linux-arm64/release/kazeterm-run`. Only `KAZETERM_DBT_REGS` is passed through.
 - A store (`target/difftest/store`, inside the work tree, since both containers mount only the
   repository) is imported once and gets 22 packages (fuse3, fuse-overlayfs, sshfs, rclone and
   openssh-sftp-server among them, for the `fuse` and `fuse-tools` cases, whose native side needs
@@ -60,17 +60,17 @@ benchmarks, surveys and crash testing remain `harness`.
   at `/usr/lib/<suite>-tests` when its `VERSION` differs from the store's.
 - The store's top-level directories `bin etc home lib media mnt opt run sbin srv tmp usr var`
   (those that exist, `/tmp` and `/var/tmp` empty; docker provides `/dev`, `/proc` and `/sys`, and
-  each case makes `/root`) are exported from inside Appine and imported as the docker image
-  `appine-difftest`, labelled with that list, replacing the previous image: on the first run, with
+  each case makes `/root`) are exported from inside KazeTerm and imported as the docker image
+  `kazeterm-difftest`, labelled with that list, replacing the previous image: on the first run, with
   `-r`, after a package or suite install, when the image is missing, when its label changed or
   when its suite versions differ from the store's (which also remakes the lane clones).
 - Each case script runs with stderr merged into stdout on both sides, after `/root` (`$HOME`) and
   `/tmp` are removed and made again empty (modes 700 and 1777), so caches and files earlier runs
   left in the store do not make the sides differ: natively with `docker run` (seccomp unconfined,
   `PATH`, `HOME=/root`) plus the case's `# docker-run-options:` (62 of the 93 cases, 40 of them
-  `--privileged`), and as `/bin/sh -c` under `appine-run` plus its `# appine-options:` (two
+  `--privileged`), and as `/bin/sh -c` under `kazeterm-run` plus its `# kazeterm-options:` (two
   cases); an `exit N` line is appended to each output. A case passes when the two outputs are
-  byte-identical and `appine-run`'s own stderr has no `appine: internal error` line; scripts
+  byte-identical and `kazeterm-run`'s own stderr has no `kazeterm: internal error` line; scripts
   normalise varying output themselves. A script of 128 KB or more (prefix and packed files
   included) fails, which is why `compat` is split into `compat` to `compat9`.
 - `# difftest-files: <dir>` ships `tests/diff/<dir>` with the script: a ustar archive, gzipped and
@@ -143,7 +143,7 @@ benchmarks, surveys and crash testing remain `harness`.
   (it fails on the native side because of docker, the VM or a newer kernel, answers differently
   only on CI's runner, depends on timing, or hangs on both sides), or a gVisor test that sleeps
   10 s or more by design (left out for CI time). The runner's header lists the programs in no case and why: those that would reboot,
-  suspend or set the clock of the VM, features Appine does not have (bpf maps and other program
+  suspend or set the clock of the VM, features KazeTerm does not have (bpf maps and other program
   types, perf, userfaultfd, tun), devices neither side has, and two with nothing to compare.
 
 ## Dependencies (inbound / outbound)
@@ -154,7 +154,7 @@ benchmarks, surveys and crash testing remain `harness`.
 
 ### Outbound
 
-- `harness/cli` supplies a prebuilt appine-run; this runner never builds it.
+- `harness/cli` supplies a prebuilt kazeterm-run; this runner never builds it.
 - `harness` supplies scripts/dev off aarch64 Linux and CI orchestration.
 - `android/setup` fetches rootfs artifacts; Docker/colima run native containers.
 - Network package installs, Fuchsia/Google/GitHub suite sources and pinned build dependencies.
@@ -163,7 +163,7 @@ benchmarks, surveys and crash testing remain `harness`.
 
 - Difftest compares the two sides only with each other: a failure identical on both sides passes.
 - CI's native side is not the development VM's: a 7.x kernel (overlayfs defaulting to
-  `redirect_dir=on`, Linux 5d39580f68e6's `CAP_NET_ADMIN` check that `appine-run`'s host sockets
+  `redirect_dir=on`, Linux 5d39580f68e6's `CAP_NET_ADMIN` check that `kazeterm-run`'s host sockets
   then fail), a CPU with SVE and AArch32 at EL0, and runner settings (`rmem_default` and `rmem_max`
   of 1 MiB, `fs.suid_dumpable` 2, docker's stack limit). Cases print only what both kernels give
   (relations instead of such values, explicit mount options), the suite cases skip the rest, and
@@ -180,14 +180,14 @@ benchmarks, surveys and crash testing remain `harness`.
   natively and moves the VM's clock until its time sync corrects it (Starnix's
   `timerfd_mutable_test` and `time_test` call settimeofday), so such tests must stay out of cases.
 - The development VM's Ubuntu 6.8 kernel oopses in AppArmor (`aa_inet_bind_perm`) on an inet bind
-  with `AF_UNSPEC` from a confined container. Appine no longer passes such a bind to the host (the
+  with `AF_UNSPEC` from a confined container. KazeTerm no longer passes such a bind to the host (the
   kernel/net map), but a case whose native side makes one must run unconfined (`--privileged`, or
   `--security-opt apparmor=unconfined` as `inet-bind` does).
 - busybox's `timeout` sends `SIGTERM` by default: a test that ignores it, or a child that keeps the
   output pipe open, makes `$(timeout …)` wait forever on either side. `timeout -s KILL` with the
   output written to a file avoids both. Output that goes through `grep` inside the guest is
-  block-buffered, so a running case's `.appine` file shows no progress.
-- Kernel bugs are detected from `appine: internal error` on appine-run's stderr, independently
+  block-buffered, so a running case's `.kazeterm` file shows no progress.
+- Kernel bugs are detected from `kazeterm: internal error` on kazeterm-run's stderr, independently
   of matching guest outputs.
 - Store and lane clones persist outside `/root` and `/tmp`, while native containers start fresh;
   `-r` re-exports the image and remakes clones but installs no packages.
@@ -200,7 +200,7 @@ benchmarks, surveys and crash testing remain `harness`.
 
 ## Open questions
 
-- Should difftest pass `APPINE_ON_BUG` and `APPINE_LOG` through, as it does `APPINE_DBT_REGS`?
+- Should difftest pass `KAZETERM_ON_BUG` and `KAZETERM_LOG` through, as it does `KAZETERM_DBT_REGS`?
 
 ## To verify
 

@@ -4,7 +4,7 @@
  * leaf entries are a host page address | permission bits. The tree is walked only on a TLB miss.
  *
  * Entries are built on demand: the kernel layer builds them in advance only for small mappings,
- * and large ones get a whole leaf table filled at the guest's first access (appine_mmu_fill), so
+ * and large ones get a whole leaf table filled at the guest's first access (kazeterm_mmu_fill), so
  * the page table grows with the memory touched, not with the mapping size. A walk over a range
  * skips a missing intermediate table by the whole span of the missing level (one entry covers
  * 2 MB, 1 GB or 512 GB).
@@ -24,11 +24,11 @@
 #define LEVEL_BITS MMU_LEVEL_BITS
 #define LEVEL_ENTRIES (1u << LEVEL_BITS)
 /* Bytes covered by one leaf table */
-#define LEAF_SPAN ((uint64_t)APPINE_PAGE_SIZE << LEVEL_BITS)
+#define LEAF_SPAN ((uint64_t)KAZETERM_PAGE_SIZE << LEVEL_BITS)
 
 static unsigned level_shift(int level)
 {
-    return APPINE_PAGE_SHIFT + LEVEL_BITS * (LEVELS - 1 - level);
+    return KAZETERM_PAGE_SHIFT + LEVEL_BITS * (LEVELS - 1 - level);
 }
 
 static unsigned level_index(uint64_t gva, int level)
@@ -68,7 +68,7 @@ static void free_table(uintptr_t *table, int level)
  * entries at all (aligned to the missing level, at most 2^48). With alloc, a failed allocation
  * also returns NULL
  */
-static uintptr_t *leaf_table(const struct appine_mmu *mmu, uint64_t gva, bool alloc,
+static uintptr_t *leaf_table(const struct kazeterm_mmu *mmu, uint64_t gva, bool alloc,
                              uint64_t *hole_end)
 {
     uintptr_t *table = mmu->root;
@@ -101,13 +101,13 @@ static uint64_t leaf_end(uint64_t gva, uint64_t end)
 
 static bool range_ok(uint64_t gva, uint64_t len)
 {
-    uint64_t limit = UINT64_C(1) << APPINE_VA_BITS;
+    uint64_t limit = UINT64_C(1) << KAZETERM_VA_BITS;
     return (gva & PAGE_MASK) == 0 && (len & PAGE_MASK) == 0 && gva <= limit && len <= limit - gva;
 }
 
-struct appine_mmu *appine_mmu_new(void)
+struct kazeterm_mmu *kazeterm_mmu_new(void)
 {
-    struct appine_mmu *mmu = calloc(1, sizeof(*mmu));
+    struct kazeterm_mmu *mmu = calloc(1, sizeof(*mmu));
     if (!mmu)
         return NULL;
     mmu->root = new_table();
@@ -118,7 +118,7 @@ struct appine_mmu *appine_mmu_new(void)
     return mmu;
 }
 
-void appine_mmu_free(struct appine_mmu *mmu)
+void kazeterm_mmu_free(struct kazeterm_mmu *mmu)
 {
     if (!mmu)
         return;
@@ -128,80 +128,80 @@ void appine_mmu_free(struct appine_mmu *mmu)
 
 /* map and fill: with only_empty, existing entries (including ones with permission 0) stay as they
  * are */
-static int store_range(struct appine_mmu *mmu, uint64_t gva, void *host, uint64_t len,
+static int store_range(struct kazeterm_mmu *mmu, uint64_t gva, void *host, uint64_t len,
                        uint32_t prot, bool only_empty)
 {
     uintptr_t h = (uintptr_t)host;
     if (!range_ok(gva, len) || (h & PAGE_MASK) || !h || (prot & ~PTE_PROT_MASK))
-        return APPINE_EINVAL;
+        return KAZETERM_EINVAL;
     uint64_t end = gva + len;
     for (uint64_t va = gva; va < end;) {
         uintptr_t *table = leaf_table(mmu, va, true, NULL);
         if (!table)
-            return APPINE_ENOMEM;
-        for (uint64_t stop = leaf_end(va, end); va < stop; va += APPINE_PAGE_SIZE) {
+            return KAZETERM_ENOMEM;
+        for (uint64_t stop = leaf_end(va, end); va < stop; va += KAZETERM_PAGE_SIZE) {
             uintptr_t *slot = &table[level_index(va, LEVELS - 1)];
             if (!only_empty || !load_entry(slot))
                 store_entry(slot, (h + (va - gva)) | prot);
         }
     }
-    return APPINE_OK;
+    return KAZETERM_OK;
 }
 
-int appine_mmu_map(struct appine_mmu *mmu, uint64_t gva, void *host, uint64_t len, uint32_t prot)
+int kazeterm_mmu_map(struct kazeterm_mmu *mmu, uint64_t gva, void *host, uint64_t len, uint32_t prot)
 {
     return store_range(mmu, gva, host, len, prot, false);
 }
 
-int appine_mmu_fill(struct appine_mmu *mmu, uint64_t gva, void *host, uint64_t len, uint32_t prot)
+int kazeterm_mmu_fill(struct kazeterm_mmu *mmu, uint64_t gva, void *host, uint64_t len, uint32_t prot)
 {
     return store_range(mmu, gva, host, len, prot, true);
 }
 
-int appine_mmu_unmap(struct appine_mmu *mmu, uint64_t gva, uint64_t len)
+int kazeterm_mmu_unmap(struct kazeterm_mmu *mmu, uint64_t gva, uint64_t len)
 {
     if (!range_ok(gva, len))
-        return APPINE_EINVAL;
+        return KAZETERM_EINVAL;
     uint64_t end = gva + len;
     for (uint64_t va = gva; va < end;) {
         uintptr_t *table = leaf_table(mmu, va, false, &va);
         if (!table)
             continue;
-        for (uint64_t stop = leaf_end(va, end); va < stop; va += APPINE_PAGE_SIZE)
+        for (uint64_t stop = leaf_end(va, end); va < stop; va += KAZETERM_PAGE_SIZE)
             store_entry(&table[level_index(va, LEVELS - 1)], 0);
     }
-    return APPINE_OK;
+    return KAZETERM_OK;
 }
 
-int appine_mmu_protect(struct appine_mmu *mmu, uint64_t gva, uint64_t len, uint32_t prot)
+int kazeterm_mmu_protect(struct kazeterm_mmu *mmu, uint64_t gva, uint64_t len, uint32_t prot)
 {
     if (!range_ok(gva, len) || (prot & ~PTE_PROT_MASK))
-        return APPINE_EINVAL;
+        return KAZETERM_EINVAL;
     uint64_t end = gva + len;
     for (uint64_t va = gva; va < end;) {
         uintptr_t *table = leaf_table(mmu, va, false, &va);
         if (!table)
             continue;
-        for (uint64_t stop = leaf_end(va, end); va < stop; va += APPINE_PAGE_SIZE) {
+        for (uint64_t stop = leaf_end(va, end); va < stop; va += KAZETERM_PAGE_SIZE) {
             uintptr_t *slot = &table[level_index(va, LEVELS - 1)];
             uintptr_t old = load_entry(slot);
             if (old)
                 store_entry(slot, (old & ~(uintptr_t)PTE_PROT_MASK) | prot);
         }
     }
-    return APPINE_OK;
+    return KAZETERM_OK;
 }
 
-int appine_mmu_move(struct appine_mmu *mmu, uint64_t from, uint64_t to, uint64_t len)
+int kazeterm_mmu_move(struct kazeterm_mmu *mmu, uint64_t from, uint64_t to, uint64_t len)
 {
     if (!range_ok(from, len) || !range_ok(to, len) || (from < to + len && to < from + len))
-        return APPINE_EINVAL;
+        return KAZETERM_EINVAL;
     uint64_t end = from + len;
     for (uint64_t va = from; va < end;) {
         uintptr_t *table = leaf_table(mmu, va, false, &va);
         if (!table)
             continue;
-        for (uint64_t stop = leaf_end(va, end); va < stop; va += APPINE_PAGE_SIZE) {
+        for (uint64_t stop = leaf_end(va, end); va < stop; va += KAZETERM_PAGE_SIZE) {
             uintptr_t *slot = &table[level_index(va, LEVELS - 1)];
             uintptr_t v = load_entry(slot);
             if (!v)
@@ -209,24 +209,24 @@ int appine_mmu_move(struct appine_mmu *mmu, uint64_t from, uint64_t to, uint64_t
             uint64_t dst = to + (va - from), unused;
             uintptr_t *target = leaf_table(mmu, dst, true, &unused);
             if (!target)
-                return APPINE_ENOMEM;
+                return KAZETERM_ENOMEM;
             store_entry(&target[level_index(dst, LEVELS - 1)], v);
             store_entry(slot, 0);
         }
     }
-    return APPINE_OK;
+    return KAZETERM_OK;
 }
 
-uint64_t appine_mmu_next_present(const struct appine_mmu *mmu, uint64_t gva, uint64_t end)
+uint64_t kazeterm_mmu_next_present(const struct kazeterm_mmu *mmu, uint64_t gva, uint64_t end)
 {
-    uint64_t limit = UINT64_C(1) << APPINE_VA_BITS;
+    uint64_t limit = UINT64_C(1) << KAZETERM_VA_BITS;
     if (end > limit)
         end = limit;
     for (uint64_t va = gva & ~(uint64_t)PAGE_MASK; va < end;) {
         uintptr_t *table = leaf_table(mmu, va, false, &va);
         if (!table)
             continue;
-        for (uint64_t stop = leaf_end(va, end); va < stop; va += APPINE_PAGE_SIZE) {
+        for (uint64_t stop = leaf_end(va, end); va < stop; va += KAZETERM_PAGE_SIZE) {
             if (load_entry(&table[level_index(va, LEVELS - 1)]))
                 return va;
         }
@@ -234,9 +234,9 @@ uint64_t appine_mmu_next_present(const struct appine_mmu *mmu, uint64_t gva, uin
     return end;
 }
 
-uintptr_t appine_mmu_lookup_pte(const struct appine_mmu *mmu, uint64_t gva)
+uintptr_t kazeterm_mmu_lookup_pte(const struct kazeterm_mmu *mmu, uint64_t gva)
 {
-    if (!mmu || (gva >> APPINE_VA_BITS))
+    if (!mmu || (gva >> KAZETERM_VA_BITS))
         return 0;
     const uintptr_t *table = mmu->root;
     for (int level = 0; level < LEVELS - 1; level++) {
@@ -248,9 +248,9 @@ uintptr_t appine_mmu_lookup_pte(const struct appine_mmu *mmu, uint64_t gva)
     return load_entry(&table[level_index(gva, LEVELS - 1)]);
 }
 
-void *appine_mmu_translate(const struct appine_mmu *mmu, uint64_t gva, uint32_t required_prot)
+void *kazeterm_mmu_translate(const struct kazeterm_mmu *mmu, uint64_t gva, uint32_t required_prot)
 {
-    uintptr_t pte = appine_mmu_lookup_pte(mmu, gva);
+    uintptr_t pte = kazeterm_mmu_lookup_pte(mmu, gva);
     /* An entry with permission 0 (a PROT_NONE page keeping its host page) cannot be accessed, and
      * does not count as mapped even when 0 is passed */
     if (!(pte & PTE_PROT_MASK) || (pte & required_prot) != required_prot)

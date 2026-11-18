@@ -218,9 +218,9 @@ mount trees (`kernel/mount`), network namespaces (`kernel/netns`), cgroups (`ker
 
 ### Kernel bugs and kill reports
 
-- Containment (`bug::contain`) is on with `APPINE_ON_BUG=kill`, off with `abort`, and otherwise on
+- Containment (`bug::contain`) is on with `KAZETERM_ON_BUG=kill`, off with `abort`, and otherwise on
   in release builds and off in debug builds. `catch` runs kernel code under `catch_unwind`; with
-  containment off a panic aborts the host process (`appine: internal error, aborting`).
+  containment off a panic aborts the host process (`kazeterm: internal error, aborting`).
 - Where a panic is caught and what it ends: every entry of a guest thread into the kernel, thread
   start and each step of thread exit end that thread's process; each step of process finish is
   only reported and the next step goes on; the timer thread's handling of one process's timers
@@ -241,7 +241,7 @@ mount trees (`kernel/mount`), network namespaces (`kernel/netns`), cgroups (`ker
   unimplemented paths from `stub::top`) or `OutOfMemory` (from the OOM killer, `kernel/oom`). The
   host takes them with `Machine::take_kills` (`android/service`).
 - Test hooks exist only in debug builds and with the `test-hooks` feature, and answer `ENOSYS`
-  unless `APPINE_TEST_HOOKS=1`. Syscall 0xa991 with `what` 1 to 14 panics at once, points a page
+  unless `KAZETERM_TEST_HOOKS=1`. Syscall 0xa991 with `what` 1 to 14 panics at once, points a page
   at an inaccessible host page so the engine faults on the host, or plants a panic that fires once
   (`trap`) at the thread's exit, the next thread start, the next timer handling, the next host
   call, a step of process finish, right after releasing the BKL, the next no-BKL syscall or a futex
@@ -334,7 +334,7 @@ mount trees (`kernel/mount`), network namespaces (`kernel/netns`), cgroups (`ker
   `block`/`block_for` directly; they hold no kernel objects while the BKL is released.
 - Borrow checks: the kernel's `RefCell` counts borrows per thread; every `block_for` (also the
   timer thread's and host waits) and `Cx::unlocked` assert the count is zero. Always on in debug
-  builds; in release builds with the `borrow-check` feature (enabled for `appine-run` and the debug
+  builds; in release builds with the `borrow-check` feature (enabled for `kazeterm-run` and the debug
   app). The inode store also checks that its owning kernel's BKL is held.
 
 ### Fast path (`syscall::fast`)
@@ -408,7 +408,7 @@ mount trees (`kernel/mount`), network namespaces (`kernel/netns`), cgroups (`ker
   when the host thread finishes the guest thread. Threads running no guest thread (the timer
   thread, host calls, the watchdog) record none.
 - `Machine::start` starts a host thread "bkl-watchdog" that never takes the BKL to look: every
-  fifth of the threshold (10 s; `APPINE_BKL_WATCHDOG` in seconds, 0 turns it off) it samples
+  fifth of the threshold (10 s; `KAZETERM_BKL_WATCHDOG` in seconds, 0 turns it off) it samples
   `Hold`; the same sample (count, host tid, entry) seen for the threshold is one hold that lasted
   too long. A sample torn by a new holder differs and only looks like another hold.
 - On reaching the threshold, without the BKL: one line on stderr naming the guest process (pid and
@@ -495,7 +495,7 @@ mount trees (`kernel/mount`), network namespaces (`kernel/netns`), cgroups (`ker
 - `kernel/time`: clocks, sleep and timer handlers, deadline helpers and the periodic-check
   idle handshake; `kernel/boot`: virtual init as the fallback reaper, with general process
   exit and adoption still implemented here.
-- `appine_hal`: `poll`, `Event`, thread CPU clocks and system time, host thread
+- `kazeterm_hal`: `poll`, `Event`, thread CPU clocks and system time, host thread
   nice/affinity/ioprio, host thread activity (watchdog reports), host CPUs, random
   bytes; `std::thread`, `std::sync::Mutex`.
 

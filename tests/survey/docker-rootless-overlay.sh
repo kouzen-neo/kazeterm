@@ -1,10 +1,10 @@
 # docker run by an ordinary user (rootless: dockerd in RootlessKit) with containerd's
-# overlayfs snapshotter on Appine's overlayfs, which containerd mounts with `userxattr` in the
+# overlayfs snapshotter on KazeTerm's overlayfs, which containerd mounts with `userxattr` in the
 # user's namespaces and extracts layers through. RootlessKit's host network (slirp4netns and
-# pasta need a TUN device Appine lacks, and dockerd-rootless itself refuses the host network), no
+# pasta need a TUN device KazeTerm lacks, and dockerd-rootless itself refuses the host network), no
 # bridge, no iptables. Uses the docker store:
 #   scripts/survey -s target/survey/docker docker-rootless-overlay
-# Native comparison: SURVEY_DOCKER_OPTS=--privileged scripts/survey -n appine-docker-native
+# Native comparison: SURVEY_DOCKER_OPTS=--privileged scripts/survey -n kazeterm-docker-native
 # docker-rootless-overlay (there the data root is on a tmpfs: docker's overlay root cannot be an
 # upper layer)
 exec 2>&1

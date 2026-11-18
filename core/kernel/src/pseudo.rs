@@ -13,7 +13,7 @@ use std::ops::Range;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use appine_engine::PAGE_SIZE;
+use kazeterm_engine::PAGE_SIZE;
 
 use crate::cell::RefCell;
 use crate::cred::{Cred, cap};
@@ -417,7 +417,7 @@ const STATIC: [&[u8]; 129] = [
     b"sys/vm/overcommit_memory",
     b"sys/vm/overcommit_ratio",
     b"sys/vm/page-cluster",
-    b"sys/vm/swappiness",
+    b"sys/vm/swkazetermss",
     b"sys/vm/watermark_scale_factor",
     b"sysvipc/",
     b"sysvipc/msg",
@@ -430,7 +430,7 @@ const STATIC: [&[u8]; 129] = [
 /// being that of Linux 6.1's handler (any int for `proc_dointvec`). A write keeps the value in
 /// `Kernel::sysctls` and changes nothing else, except `debug.exception-trace`, which
 /// crate::signal reads ([`recorded_value`]); `kernel.randomize_va_space` starts at 0 because
-/// Appine places mappings at fixed addresses, and `debug.exception-trace` at arm64's 0
+/// KazeTerm places mappings at fixed addresses, and `debug.exception-trace` at arm64's 0
 /// (`show_unhandled_signals`; x86 starts at 1).
 pub(crate) const RECORDED: [(&[u8], u32, i64, i64, i64); 40] = {
     const INT_MIN: i64 = i32::MIN as i64;
@@ -539,7 +539,7 @@ pub(crate) const RECORDED: [(&[u8], u32, i64, i64, i64); 40] = {
         (b"sys/vm/mmap_rnd_compat_bits", 0o600, 11, 11, 16),
         (b"sys/vm/overcommit_ratio", 0o644, 50, INT_MIN, INT_MAX),
         (b"sys/vm/page-cluster", 0o644, 3, 0, 31),
-        (b"sys/vm/swappiness", 0o644, 60, 0, 200),
+        (b"sys/vm/swkazetermss", 0o644, 60, 0, 200),
         (b"sys/vm/watermark_scale_factor", 0o644, 10, 1, 3000),
     ]
 };
@@ -1002,7 +1002,7 @@ impl<'a> View<'a> {
 
     /// The interface with index `index` in the reader's network namespace (the host's or lo, and
     /// virtual devices).
-    fn interface(&self, index: u32) -> Option<appine_hal::net::Interface> {
+    fn interface(&self, index: u32) -> Option<kazeterm_hal::net::Interface> {
         crate::netdev::interfaces(&self.ns().net)
             .into_iter()
             .find(|i| i.index == index)
@@ -1400,7 +1400,7 @@ impl Pseudo for View<'_> {
                     FileKind::Pipe(_) => mode::S_IFIFO,
                     FileKind::Socket(_) => mode::S_IFSOCK,
                     FileKind::Host(fd) => {
-                        appine_hal::fstat(*fd).map_err(Errno)?.st_mode as u32 & mode::S_IFMT
+                        kazeterm_hal::fstat(*fd).map_err(Errno)?.st_mode as u32 & mode::S_IFMT
                     }
                     _ => mode::S_IFREG,
                 }
@@ -2332,11 +2332,11 @@ pub(crate) fn content(ps: &View<'_>, mnt: MountId, node: &PseudoNode) -> Result<
             self::Global::Cpuinfo => cpuinfo(),
             self::Global::Meminfo => meminfo(),
             self::Global::Vmstat => {
-                vmstat(appine_hal::host_vmstat(), &appine_hal::host_meminfo())
+                vmstat(kazeterm_hal::host_vmstat(), &kazeterm_hal::host_meminfo())
             }
             // Like meminfo's swap lines, the host's (a container sees its host's); the guest cannot
             // swap on anything itself. Linux's swap_show header alone when the host hides it
-            self::Global::Swaps => appine_hal::host_swaps().unwrap_or_else(|| {
+            self::Global::Swaps => kazeterm_hal::host_swaps().unwrap_or_else(|| {
                 "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority\n".to_owned()
             }),
             self::Global::Locks => crate::locks::proc_locks(ps.k, ps.vfs, &ns),
@@ -2353,13 +2353,13 @@ pub(crate) fn content(ps: &View<'_>, mnt: MountId, node: &PseudoNode) -> Result<
             }
             self::Global::Loadavg => crate::loadavg::proc_loadavg(ps.k, ps.last_pid()),
             self::Global::Version => {
-                "Linux version 6.1.0-appine (appine@localhost) #1 SMP PREEMPT appine\n".to_owned()
+                "Linux version 6.1.0-kazeterm (kazeterm@localhost) #1 SMP PREEMPT kazeterm\n".to_owned()
             }
             self::Global::Filesystems => {
                 "nodev\tsysfs\nnodev\ttmpfs\n\text4\nnodev\tproc\nnodev\tdevpts\nnodev\tcgroup2\nnodev\tmqueue\nnodev\toverlay\nnodev\tfuse\n"
                     .to_owned()
             }
-            self::Global::Cmdline => "appine\n".to_owned(),
+            self::Global::Cmdline => "kazeterm\n".to_owned(),
             self::Global::Cgroups => crate::cgroup::proc_cgroups(ps.k),
             self::Global::Kmsg => String::new(),
             self::Global::Mounts | self::Global::Net => return Err(Errno::EINVAL),
@@ -2503,7 +2503,7 @@ pub(crate) fn content(ps: &View<'_>, mnt: MountId, node: &PseudoNode) -> Result<
             b"sys/kernel/ns_last_pid" => format!("{}\n", ps.last_pid()),
             b"sys/kernel/seccomp/actions_avail" => crate::seccomp::actions_avail(),
             b"sys/kernel/seccomp/actions_logged" => crate::seccomp::actions_logged(ps.k),
-            b"sys/kernel/osrelease" => "6.1.0-appine\n".to_owned(),
+            b"sys/kernel/osrelease" => "6.1.0-kazeterm\n".to_owned(),
             b"sys/kernel/ostype" => "Linux\n".to_owned(),
             b"sys/kernel/pid_max" => "4194304\n".to_owned(),
             b"sys/kernel/dmesg_restrict" => format!("{}\n", ps.k.dmesg_restrict as u8),
@@ -2533,7 +2533,7 @@ pub(crate) fn content(ps: &View<'_>, mnt: MountId, node: &PseudoNode) -> Result<
                 format!("{}\n", crate::syscall::ENTROPY)
             }
             b"sys/kernel/random/uuid" => format!("{}\n", random_uuid()),
-            b"sys/kernel/version" => "#1 SMP PREEMPT appine\n".to_owned(),
+            b"sys/kernel/version" => "#1 SMP PREEMPT kazeterm\n".to_owned(),
             b"sys/vm/overcommit_memory" => {
                 format!(
                     "{}\n",
@@ -2971,7 +2971,7 @@ fn pid_status(ps: &View<'_>, ns: &PidNs, pid: Tid, tid: Option<Tid>) -> Result<V
     // Each time a host thread goes to sleep (waits) is one voluntary switch: a thread that has
     // not been woken does not change
     let (vol, nonvol) = task.as_ref().map_or((0, 0), |t| {
-        let (v, n) = appine_hal::thread_ctxt_switches(t.host_tid.get()).unwrap_or((0, 0));
+        let (v, n) = kazeterm_hal::thread_ctxt_switches(t.host_tid.get()).unwrap_or((0, 0));
         let (bv, bn) = t.ctxt_base.get();
         (v.saturating_sub(bv), n.saturating_sub(bn))
     });
@@ -3711,10 +3711,10 @@ fn cpuinfo() -> String {
             .filter(move |(i, _)| caps & (1 << i) != 0)
             .map(|(_, n)| *n)
     };
-    let features: Vec<&str> = named(&HWCAP_NAMES, appine_engine::guest_hwcap())
-        .chain(named(&HWCAP2_NAMES, appine_engine::guest_hwcap2()))
+    let features: Vec<&str> = named(&HWCAP_NAMES, kazeterm_engine::guest_hwcap())
+        .chain(named(&HWCAP2_NAMES, kazeterm_engine::guest_hwcap2()))
         .collect();
-    let midr = appine_engine::guest_midr();
+    let midr = kazeterm_engine::guest_midr();
     let mut s = String::new();
     for cpu in 0..cpus() {
         writeln!(s, "processor\t: {cpu}\nBogoMIPS\t: 100.00").unwrap();
@@ -3732,7 +3732,7 @@ fn cpuinfo() -> String {
 /// use, see the cgroup's `memory.max`. It used to be computed from sysinfo, with `MemAvailable`
 /// equal to `MemFree` and all page cache counted as used.
 fn meminfo() -> String {
-    let m = appine_hal::host_meminfo();
+    let m = kazeterm_hal::host_meminfo();
     let mut s = String::new();
     for (name, bytes) in [
         ("MemTotal", m.total),
@@ -3760,7 +3760,7 @@ fn meminfo() -> String {
 /// `/proc/vmstat`: like `meminfo`, the host's figures (as a container sees its host's) when the
 /// host lets the app read them; otherwise the page counts `meminfo` gives and the event counters
 /// at 0, in Linux's order, so procps' vmstat and memory monitors still find the file.
-fn vmstat(host: Option<String>, m: &appine_hal::MemInfo) -> String {
+fn vmstat(host: Option<String>, m: &kazeterm_hal::MemInfo) -> String {
     if let Some(text) = host {
         return text;
     }
@@ -3808,7 +3808,7 @@ fn global_stat(ps: &View<'_>) -> String {
     // from /proc/<pid>/stat is the wall-clock start in any namespace (ps -o lstart). Truncating
     // both clocks to seconds before subtracting made btime alternate between two seconds.
     let now =
-        appine_hal::clock_gettime(0).map_or(0, |(s, ns)| s as i128 * 1_000_000_000 + ns as i128);
+        kazeterm_hal::clock_gettime(0).map_or(0, |(s, ns)| s as i128 * 1_000_000_000 + ns as i128);
     let btime = ((now - ps.with_boot_offset(uptime_ns()) as i128) / 1_000_000_000).max(0);
     let mut s = String::new();
     writeln!(s, "cpu  {user} 0 {system} {idle} 0 0 0 0 0 0").unwrap();
@@ -3841,14 +3841,14 @@ fn ticks(ns: u64) -> u64 {
 
 /// Nanoseconds since boot (CLOCK_BOOTTIME).
 pub(crate) fn uptime_ns() -> u64 {
-    appine_hal::clock_gettime(appine_hal::CLOCK_BOOTTIME)
+    kazeterm_hal::clock_gettime(kazeterm_hal::CLOCK_BOOTTIME)
         .map(|(s, ns)| s as u64 * 1_000_000_000 + ns as u64)
         .unwrap_or(0)
 }
 
 fn random_uuid() -> String {
     let mut b = [0u8; 16];
-    let _ = appine_hal::fill_random(&mut b);
+    let _ = kazeterm_hal::fill_random(&mut b);
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
     format_uuid(&b)
@@ -3919,7 +3919,7 @@ fn socket_net(s: &crate::net::Socket) -> u64 {
 /// `/proc/net/dev`: interfaces `ifaces` with counters for the guest's own traffic
 /// ([`crate::traffic`]; all 0 when `counted` is false), in the same format as Linux's
 /// `dev_seq_printf_stats`.
-fn net_dev(k: &Kernel, ifaces: &[appine_hal::net::Interface], counted: bool) -> String {
+fn net_dev(k: &Kernel, ifaces: &[kazeterm_hal::net::Interface], counted: bool) -> String {
     let mut s = String::from(
         "Inter-|   Receive                                                |  Transmit\n \
          face |bytes    packets errs drop fifo frame compressed multicast|\
@@ -3963,7 +3963,7 @@ fn net_dev(k: &Kernel, ifaces: &[appine_hal::net::Interface], counted: bool) -> 
 /// turns IPv6 off entirely when the file is missing or empty. The scope comes from the address,
 /// as in Linux's `ipv6_addr_scope`; the flags are `IFA_F_PERMANENT`, as in the netlink replies
 /// (getifaddrs cannot tell temporary addresses apart).
-fn net_if_inet6(ifaces: &[appine_hal::net::Interface]) -> String {
+fn net_if_inet6(ifaces: &[kazeterm_hal::net::Interface]) -> String {
     let mut s = String::new();
     for i in ifaces {
         for (_, addr, prefix) in i.addrs.iter().filter(|(f, ..)| *f == AF_INET6) {
@@ -4078,7 +4078,7 @@ fn net_file(
         .to_owned(),
         b"tx_queue_len" => format!(
             "{}\n",
-            appine_hal::net::tx_queue_len(&i.name).unwrap_or(1000)
+            kazeterm_hal::net::tx_queue_len(&i.name).unwrap_or(1000)
         ),
         b"type" => format!("{}\n", if loopback { 772 } else { 1 }),
         b"statistics/rx_bytes" => format!("{}\n", st.rx_bytes),
@@ -4097,7 +4097,7 @@ fn cpu_file(n: usize, path: &[u8]) -> Result<String, Errno> {
     let me = n..n + 1;
     Ok(match path {
         b"online" => "1\n".to_owned(),
-        b"regs/identification/midr_el1" => format!("0x{:016x}\n", appine_engine::guest_midr()),
+        b"regs/identification/midr_el1" => format!("0x{:016x}\n", kazeterm_engine::guest_midr()),
         b"regs/identification/revidr_el1" => format!("0x{:016x}\n", 0),
         b"topology/cluster_id" => "-1\n".to_owned(),
         b"topology/core_id" => format!("{n}\n"),
@@ -4131,11 +4131,11 @@ fn cpu_mask(set: Range<usize>) -> String {
 fn host_cpu_file(n: usize, path: &[u8]) -> Result<String, Errno> {
     let rel = String::from_utf8_lossy(path).into_owned();
     let raw = host_cpu(n as u32)
-        .and_then(|h| appine_hal::cpu_sysfs(h, &rel))
+        .and_then(|h| kazeterm_hal::cpu_sysfs(h, &rel))
         .ok_or(Errno::ENOENT)?;
     let text = String::from_utf8_lossy(&raw).into_owned();
     let guest = |host: Vec<usize>| -> Vec<usize> {
-        let cpus = appine_hal::host_cpus();
+        let cpus = kazeterm_hal::host_cpus();
         (0..cpus.len())
             .filter(|&i| host.contains(&cpus[i]))
             .collect()
@@ -4227,12 +4227,12 @@ fn cpu_mask_of(cpus: &[usize]) -> String {
 /// `cpu<n>`, directories ending in `/`).
 fn host_cpu_has(n: u32, path: &[u8]) -> bool {
     let rel = String::from_utf8_lossy(path.strip_suffix(b"/").unwrap_or(path)).into_owned();
-    host_cpu(n).is_some_and(|h| appine_hal::cpu_sysfs(h, &rel).is_some())
+    host_cpu(n).is_some_and(|h| kazeterm_hal::cpu_sysfs(h, &rel).is_some())
 }
 
 /// The host CPU corresponding to guest CPU `n`.
 fn host_cpu(n: u32) -> Option<usize> {
-    appine_hal::host_cpus().get(n as usize).copied()
+    kazeterm_hal::host_cpus().get(n as usize).copied()
 }
 
 // ---- Writing ----
@@ -4759,8 +4759,8 @@ fn write_timens_offsets(k: &Kernel, cred: &Cred, pid: Tid, data: &[u8]) -> Resul
         return Err(Errno::EPERM);
     }
     for &(index, (sec, nsec)) in &offsets {
-        let clock = [1, appine_hal::CLOCK_BOOTTIME][index];
-        let (now, now_ns) = appine_hal::clock_gettime(clock).map_err(Errno)?;
+        let clock = [1, kazeterm_hal::CLOCK_BOOTTIME][index];
+        let (now, now_ns) = kazeterm_hal::clock_gettime(clock).map_err(Errno)?;
         if !(-KTIME_SEC_MAX..=KTIME_SEC_MAX).contains(&sec) {
             return Err(Errno::ERANGE);
         }
@@ -4837,7 +4837,7 @@ pub(crate) fn group_of(k: &Kernel, pid: Tid) -> Option<&Rc<RefCell<ThreadGroup>>
 }
 
 fn cpus() -> usize {
-    appine_hal::host_cpus().len()
+    kazeterm_hal::host_cpus().len()
 }
 
 /// The entry named `name` under directory `dir` (empty for the tree root) in a fixed directory
@@ -4881,7 +4881,7 @@ mod tests {
     /// ERANGE.
     #[test]
     fn vmstat_without_the_host_file() {
-        let m = appine_hal::MemInfo {
+        let m = kazeterm_hal::MemInfo {
             free: 8192 * 4096,
             slab: 30 * 4096,
             sreclaimable: 10 * 4096,

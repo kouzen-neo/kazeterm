@@ -4,7 +4,7 @@
  * an exiting thread drops an Rc weak reference outside the BKL, it changes the same count as
  * another thread's Rc::downgrade on start, and within a few seconds the host heap is corrupted
  * (docs/rounds/71-thread-exit-race.md). Build with musl-gcc -static and run directly in
- * appine-run. When all is well it prints "all ok" at the end.
+ * kazeterm-run. When all is well it prints "all ok" at the end.
  */
 #include <pthread.h>
 #include <stdatomic.h>

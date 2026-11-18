@@ -1,6 +1,6 @@
 /*
  * Guest test program for sockets and I/O multiplexing (M4): build with musl-gcc -static and run
- * directly in appine-run (no rootfs and no outside network needed). Each check that passes prints
+ * directly in kazeterm-run (no rootfs and no outside network needed). Each check that passes prints
  * a line "ok <name>"; a failure prints the reason and exits with 1; when all pass it prints
  * "all ok" at the end.
  */
@@ -178,7 +178,7 @@ static void test_scm_rights(void)
 static void test_unix_listen(void)
 {
     struct sockaddr_un addr = {.sun_family = AF_UNIX};
-    memcpy(addr.sun_path, "\0appine-test", 12);
+    memcpy(addr.sun_path, "\0kazeterm-test", 12);
     socklen_t alen = offsetof(struct sockaddr_un, sun_path) + 12;
     int srv = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
     CHECK(srv >= 0, "socket");
@@ -297,7 +297,7 @@ static void test_udp_loopback(void)
 }
 
 /*
- * The replies of the DNS stub (127.0.0.53:53) are in Appine's own queue: FIONREAD must report the
+ * The replies of the DNS stub (127.0.0.53:53) are in KazeTerm's own queue: FIONREAD must report the
  * length of the next reply. glibc's resolver sends both the A and the AAAA query at once with
  * sendmmsg and sizes the buffer for the second reply by FIONREAD; when that reports 0 it cannot
  * take the AAAA reply and resolution fails (Debian's apt). Without outside network the stub replies

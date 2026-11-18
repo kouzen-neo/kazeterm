@@ -7,7 +7,7 @@
 
 ## Responsibilities
 
-`harness/cli` owns `hosts/cli/` and `tests/guest/`: appine-run argument handling, host-terminal
+`harness/cli` owns `hosts/cli/` and `tests/guest/`: kazeterm-run argument handling, host-terminal
 setup, result reporting and the cargo integration/guest-test drivers. Kernel run/boot lifecycle
 remains `kernel/boot`, console semantics `kernel/tty`, host terminal helpers `hal`;
 benchmarks are `harness`, differential testing `harness/diff`.
@@ -16,23 +16,23 @@ benchmarks are `harness`, differential testing `harness/diff`.
 
 - `RunOptions` (tier, rootfs, terminal, memory limit, low-port offset, always-map-low-ports, init,
   stop pipe) and `Terminal` (input and output fds, the fd whose size is followed, the resize pipe)
-  — what `appine-run` passes to the kernel's `run`; `RunReport` (status, Tier 1 statistics),
+  — what `kazeterm-run` passes to the kernel's `run`; `RunReport` (status, Tier 1 statistics),
   `RunError` (I/O, rootfs, exec, load, console, Tier 1 unavailable, internal), `ExitStatus`
   (exited, or signalled with signal, pc, fault address and core dump).
-- `Interactive` (in `rootfs_programs.rs`) — a child `appine-run --pty /bin/sh -i` with a fixed
+- `Interactive` (in `rootfs_programs.rs`) — a child `kazeterm-run --pty /bin/sh -i` with a fixed
   prompt and `expect`/`send`/`exit` under 30 s deadlines, killed on drop, for PTY tests.
 
 ## Public entry points
 
-- `appine-run [options] [--] <program> [args…]`: `--tier 0|1` (default 0), `--rootfs <dir>`,
+- `kazeterm-run [options] [--] <program> [args…]`: `--tier 0|1` (default 0), `--rootfs <dir>`,
   `--env N=V` (repeatable), `--pty`/`--no-pty`, `--memory-limit <n[KMG]|none>`,
   `--low-port-offset <n>`, `--always-map-low-ports`, `--init`, `--stats`, `-h`/`--help`,
-  `--version`; `appine-run --rootfs <dir> --import <tar.gz>` makes a store.
+  `--version`; `kazeterm-run --rootfs <dir> --import <tar.gz>` makes a store.
 - `cargo test --workspace` (the three integration test files build only on aarch64 Linux).
 
 ## Data flow / lifecycle
 
-### `appine-run`
+### `kazeterm-run`
 
 - Options stop at the first argument that is not UTF-8, does not start with `-`, or is `--`; an
   option with a value takes it as the next argument or after `=`, and a flag given a value
@@ -53,19 +53,19 @@ benchmarks are `harness`, differential testing `harness/diff`.
   naming the signal, and the pc and address when known); 127 when the program is not found; 1 when
   the store cannot be opened; 126 for every other error (cannot load or execute, the console, no
   Tier 1 on this host, internal errors). `--stats` prints Tier 1's statistics.
-- `SIGINT`, `SIGTERM` and `SIGHUP` to `appine-run` (`timeout`, ^C with `--no-pty`, a closed
-  terminal) are caught once a run starts (`appine_hal::stop_notifier`) and handed to the kernel's
+- `SIGINT`, `SIGTERM` and `SIGHUP` to `kazeterm-run` (`timeout`, ^C with `--no-pty`, a closed
+  terminal) are caught once a run starts (`kazeterm_hal::stop_notifier`) and handed to the kernel's
   `run` (`RunOptions::stop`): the first is sent on to the program, one at least a second later
   ends every guest process (duplicates sent to the whole process group by `timeout` or a terminal
   arrive together); the run then ends as usual, so the inittab shutdown, the final store sync and
   the host terminal's restore still happen.
 - `borrow-check` is a default feature, so every build, the release binaries used by difftest,
   LTP and the survey included, checks that no borrow is held across a BKL release.
-- Environment knobs read by the kernel and engine: `APPINE_LOG` and `APPINE_STRACE` (on when set,
-  not empty and not `0`; tracing also routes fast syscalls through the BKL), `APPINE_PERF_MAP`
-  (any value; Tier 1 writes `/tmp/perf-<pid>.map`), `APPINE_ON_BUG` (`kill`/`abort`; by default release
-  builds kill only the guest process), `APPINE_TEST_HOOKS` (exactly `1`, only in debug or
-  `test-hooks` builds), `APPINE_DBT_REGS` (`go` or `default`), `APPINE_BKL_WATCHDOG` (the
+- Environment knobs read by the kernel and engine: `KAZETERM_LOG` and `KAZETERM_STRACE` (on when set,
+  not empty and not `0`; tracing also routes fast syscalls through the BKL), `KAZETERM_PERF_MAP`
+  (any value; Tier 1 writes `/tmp/perf-<pid>.map`), `KAZETERM_ON_BUG` (`kill`/`abort`; by default release
+  builds kill only the guest process), `KAZETERM_TEST_HOOKS` (exactly `1`, only in debug or
+  `test-hooks` builds), `KAZETERM_DBT_REGS` (`go` or `default`), `KAZETERM_BKL_WATCHDOG` (the
   watchdog's threshold in whole seconds, 10 by default, 0 off; the tests set 1 with a test hook
   that holds the BKL).
 
@@ -75,40 +75,40 @@ benchmarks are `harness`, differential testing `harness/diff`.
   -no-pie`), C with `musl-gcc -static -O2 -Wall -Wextra -Werror -pthread`, both natively on the
   aarch64 host; most run as host paths, a few are copied into the store.
 - `rootfs_programs` imports the newest Alpine tarball by version under `target/rootfs/` (or
-  `APPINE_ROOTFS_TARBALL`) into one shared store per test process, which tests running at the same
+  `KAZETERM_ROOTFS_TARBALL`) into one shared store per test process, which tests running at the same
   time share; groups cover busybox and files, core dumps and the kernel log, shell semantics and
   job control, procfs/sysfs/net, the PTY (interactive shell, ^C/^Z, vi, end of input without a
   store), limits, OOM and cgroups, the Tier 1 code cache, the `Machine` API (low ports, several
-  consoles, inittab with `appine-run --init`, the Files app's inotify and writes), importing into
+  consoles, inittab with `kazeterm-run --init`, the Files app's inotify and writes), importing into
   an existing store, user namespaces, answers of Linux 6.1 that kernels after 6.8 changed
   (`tiocsti.c`, and `linux61.c`: timerfd and signalfd reads, epoll_wait's error order, FUSE clones,
   loop block sizes), and one network test (`apk add`, `git clone`, Python imports
-  at Tier 1 in a store of its own, gated by `APPINE_NETWORK_TESTS=1`, run only by `full.yml`).
+  at Tier 1 in a store of its own, gated by `KAZETERM_NETWORK_TESTS=1`, run only by `full.yml`).
   Most cases run under both tiers.
 - Without a store or `musl-gcc` the tests skip with a message (each rootfs test that skips says
-  so), unless `APPINE_REQUIRE_ROOTFS=1` / `APPINE_REQUIRE_MUSL=1` (set in CI); bug-injection and
+  so), unless `KAZETERM_REQUIRE_ROOTFS=1` / `KAZETERM_REQUIRE_MUSL=1` (set in CI); bug-injection and
   BKL-watchdog tests run only in debug builds and return silently otherwise. No cargo test sends
-  `appine-run` a stop signal. The rootfs tests, difftest, LTP and the survey choose the newest
+  `kazeterm-run` a stop signal. The rootfs tests, difftest, LTP and the survey choose the newest
   Alpine tarball by version (`version_key`, `sort -V`).
 
 ## Dependencies (inbound / outbound)
 
 ### Inbound
 
-- Developers, `harness` CI/benchmarks/LTP/survey/crash runners and `harness/diff` invoke appine-run.
+- Developers, `harness` CI/benchmarks/LTP/survey/crash runners and `harness/diff` invoke kazeterm-run.
 - Cargo test runs the three aarch64-Linux integration files.
 
 ### Outbound
 
-- `appine_kernel` provides run/options/reports, Machine, store import and sync.
+- `kazeterm_kernel` provides run/options/reports, Machine, store import and sync.
 - `hal` provides RawMode, isatty, SIGWINCH and stop notifiers.
-- `harness` supplies `appine-bench` as a dev-dependency and development container/CI.
+- `harness` supplies `kazeterm-bench` as a dev-dependency and development container/CI.
 - `android/setup` fetches rootfs artifacts; guest builds use cc/musl-gcc.
 
 ## Invariants and gotchas
 
 - Default builds enable borrow-check; runners detect kernel bugs on stderr via
-  `appine: internal error`, even when guest exit status otherwise looks successful.
+  `kazeterm: internal error`, even when guest exit status otherwise looks successful.
 - Required-rootfs/musl switches make missing prerequisites fail rather than silently skip;
   bug-injection and BKL-watchdog cases only run in debug builds.
 - RunOptions/Terminal/RunReport/RunError are kernel API types consumed here, not owned here.
@@ -116,8 +116,8 @@ benchmarks are `harness`, differential testing `harness/diff`.
 ## Confirmed bugs / technical debt
 
 - **A forced PTY on a terminal with piped stdout is half set up.** Raw mode needs both fds to be
-  terminals, so the host keeps ISIG (^C reaches the program as `SIGINT` through `appine-run`, ^Z
-  stops `appine-run` itself), line-buffers input and echoes it while the guest echoes into the
+  terminals, so the host keeps ISIG (^C reaches the program as `SIGINT` through `kazeterm-run`, ^Z
+  stops `kazeterm-run` itself), line-buffers input and echoes it while the guest echoes into the
   pipe; the size stays 24×80.
 
 ## Open questions

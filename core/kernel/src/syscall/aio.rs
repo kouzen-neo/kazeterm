@@ -16,7 +16,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::time::Instant;
 
-use appine_engine::prot;
+use kazeterm_engine::prot;
 
 use super::{SysResult, get, put, read_timespec};
 use crate::cell::RefCell;

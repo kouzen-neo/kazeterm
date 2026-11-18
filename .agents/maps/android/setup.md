@@ -25,7 +25,7 @@
   and notification authorization actions and navigation to system battery settings;
 - the store lock shared by the kernel start, store deletion and the Files provider.
 
-Root: `android/app/src/main/java/io/github/mthli/appine/Rootfs.kt`, `SettingsActivity.kt`,
+Root: `android/app/src/main/java/com/kazeterm/Rootfs.kt`, `SettingsActivity.kt`,
 `android/app/src/main/assets/login.sh`, `android/app/src/main/assets/profile.sh`,
 `android/app/src/main/assets/ashrc.sh`, `android/app/src/main/assets/bashrc.sh`,
 `android/app/src/main/assets/zshrc.sh`, `android/app/src/main/assets/xdg-open.sh`, `scripts/fetch-rootfs`.
@@ -62,25 +62,25 @@ session consuming their state and events (`android/vt`).
   reset), Android (conditional notification and battery usage actions, running policy, privacy mode, file access), Terminal (CJK characters filling two
   cells, the cursor's shape, whether it blinks, tab-list button visibility, the volume keys switching tabs), Debugging (execution
   mode and diagnostic export, in all builds) and About (Telegram, project website, privacy policy, licenses, version).
-- `login.sh` — `sh -c <script> appine-login <login> <cwd>`, run as root on each tab's console, or
+- `login.sh` — `sh -c <script> kazeterm-login <login> <cwd>`, run as root on each tab's console, or
   without a console with `--refresh-rules`.
 - `profile.sh` — copied verbatim, comments included, into the guest as
-  `/etc/profile.d/appine.sh`; `Rootfs` keeps the texts of the versions without prompt marks
+  `/etc/profile.d/kazeterm.sh`; `Rootfs` keeps the texts of the versions without prompt marks
   (`OLD_PROFILE`, `UNMARKED_PROFILE`) and the sha256s of the later ones (`REPLACED_PROFILES`) to
   recognise them.
-- `ashrc.sh` — copied verbatim into the guest as `/etc/profile.d/appine.ashrc` (not `.sh`, so
+- `ashrc.sh` — copied verbatim into the guest as `/etc/profile.d/kazeterm.ashrc` (not `.sh`, so
   `/etc/profile` does not read it): ash's prompt marks, read through `ENV`.
-- `bashrc.sh` — copied verbatim into the guest as `/etc/profile.d/appine.bashrc`: bash's prompt
-  marks, read by the profile and, on Alpine, by `/etc/bash/appine.sh` (`BASH_HOOK`, a line sourcing
+- `bashrc.sh` — copied verbatim into the guest as `/etc/profile.d/kazeterm.bashrc`: bash's prompt
+  marks, read by the profile and, on Alpine, by `/etc/bash/kazeterm.sh` (`BASH_HOOK`, a line sourcing
   it).
-- `zshrc.sh` — copied verbatim into the guest as `/etc/profile.d/appine.zshrc`, read by the
+- `zshrc.sh` — copied verbatim into the guest as `/etc/profile.d/kazeterm.zshrc`, read by the
   profile only in zsh. Its anonymous function registers the hooks in local zsh emulation,
   preserving the caller's options. `Rootfs.writeProfile(context, store, distro)` writes all three
   companion files and then the profile.
-- Guest-side state: `/var/lib/appine/admins` (recorded admins), `/var/lib/appine/doas-installed`
+- Guest-side state: `/var/lib/kazeterm/admins` (recorded admins), `/var/lib/kazeterm/doas-installed`
   and `sudo-installed` (markers), `/etc/doas.d/20-wheel.conf`, the NOPASSWD rules
-  (`/etc/doas.d/30-appine.conf` or `/etc/sudoers.d/appine`), `/var/cache/appine/doas.apk`,
-  `/var/cache/appine/{bash,procps,bubblewrap}/` (packages until installed), and `/run/appine-install.lock`.
+  (`/etc/doas.d/30-kazeterm.conf` or `/etc/sudoers.d/kazeterm`), `/var/cache/kazeterm/doas.apk`,
+  `/var/cache/kazeterm/{bash,procps,bubblewrap}/` (packages until installed), and `/run/kazeterm-install.lock`.
 
 ## Public entry points
 
@@ -145,28 +145,28 @@ session consuming their state and events (`android/vt`).
   existing entry that is not a regular file fails the import):
   - always: package sources from the first mirror (apk `main` and `community`; Debian deb822 over
     http for trixie, -updates, -security), `hostname` (`localhost`), `motd`, and
-    `/etc/profile.d/appine.ashrc`, `/etc/profile.d/appine.bashrc`, `/etc/profile.d/appine.zshrc`, on Alpine
-    `/etc/bash/appine.sh`, and then `/etc/profile.d/appine.sh` (the assets' `ashrc.sh`,
+    `/etc/profile.d/kazeterm.ashrc`, `/etc/profile.d/kazeterm.bashrc`, `/etc/profile.d/kazeterm.zshrc`, on Alpine
+    `/etc/bash/kazeterm.sh`, and then `/etc/profile.d/kazeterm.sh` (the assets' `ashrc.sh`,
     `bashrc.sh`, `zshrc.sh` and `profile.sh`: motd, `TERM`, `LANG`, `NMAP_UNPRIVILEGED`, the browser default below,
     `ENV` naming the ash file unless one is set or the file is unreadable, and for bash, busybox ash and zsh only a
     coloured prompt with prompt marks, below; other shells keep the distro's prompt);
   - Alpine: `hosts` only when absent (the minirootfs ships one, so nothing is written), and no
     `resolv.conf` (the kernel writes one pointing at the DNS stub at every start when it is
     missing); bash as the login shell (`useBash`): the bundled packages from the assets' `bash/`
-    into `/var/cache/appine/bash/`, and, when there were any, root's `/etc/passwd` shell changed
+    into `/var/cache/kazeterm/bash/`, and, when there were any, root's `/etc/passwd` shell changed
     from `/bin/sh` to `/bin/bash` (any other shell is kept). Systems imported before keep busybox
     ash; accounts busybox's `adduser` makes later take the shell of `$SHELL` or of the account
     running it, so from a root tab they get bash too; procps-ng and its six dependencies are
-    staged in `/var/cache/appine/procps/` by `cachePackages`, also used for bash and bubblewrap
-    with libcap2 (`/var/cache/appine/bubblewrap/`). Existing stores receive neither new bundle;
+    staged in `/var/cache/kazeterm/procps/` by `cachePackages`, also used for bash and bubblewrap
+    with libcap2 (`/var/cache/kazeterm/bubblewrap/`). Existing stores receive neither new bundle;
   - Debian: `hosts` and `resolv.conf` (the DNS stub) always.
 
 ### Before every start and boot
 
 - `ensureBrowser` installs `xdg-open.sh` as `/usr/local/bin/xdg-open` (0755) on either distro.
-  It preserves custom launchers, replacing only the known previous Appine OSC helper by SHA-256.
-  Before every kernel start it refreshes the static `/usr/local/libexec/appine-open-url` (0755)
-  and `/etc/appine/browser` (0644: current loopback port and capability, shared by guest users).
+  It preserves custom launchers, replacing only the known previous KazeTerm OSC helper by SHA-256.
+  Before every kernel start it refreshes the static `/usr/local/libexec/kazeterm-open-url` (0755)
+  and `/etc/kazeterm/browser` (0644: current loopback port and capability, shared by guest users).
   The shim execs that client; `ConsolePty` sets `BROWSER` to the shim (android/vt).
   The login profile also exports that default when `BROWSER` is unset or empty and the shim is
   executable, restoring browser discovery after `su -` clears the inherited environment.
@@ -176,13 +176,13 @@ session consuming their state and events (`android/vt`).
   inherited tab token; success acknowledges Android intent acceptance, not page loading or login.
 - On the start thread, after an import and the start of its mirror probe when there is one, in
   this order, before the kernel starts under the write lock: a loopback-only `/etc/network/interfaces` when absent;
-  `/etc/containers/containers.rootless.conf.d/appine.conf` setting `netns = "host"` when absent
-  (rootless podman's pasta and slirp4netns need a TUN device Appine lacks; only rootless podman
+  `/etc/containers/containers.rootless.conf.d/kazeterm.conf` setting `netns = "host"` when absent
+  (rootless podman's pasta and slirp4netns need a TUN device KazeTerm lacks; only rootless podman
   reads that directory, and a user's own `containers.conf` overrides it); on Alpine the bundled
-  `doas.apk` into `/var/cache/appine/`, rewritten at every start; a profile left exactly as an
+  `doas.apk` into `/var/cache/kazeterm/`, rewritten at every start; a profile left exactly as an
   earlier version wrote it (with `cd "$HOME"`, without prompt marks, or with marks that do not
   declare `cl=line`, or with ash's, bash's or zsh's marks in itself) replaced by the current one, with
-  the mark files written before it (`/etc/bash/appine.sh` on Alpine stores, bash installed or
+  the mark files written before it (`/etc/bash/kazeterm.sh` on Alpine stores, bash installed or
   not); an edited one is kept and a missing one not recreated, and then the mark files are not
   written either. The first two apply to every distro. A failed write in any of them fails the start.
 - Storage is left to the packages: podman's overlay driver and docker's (containerd's) overlayfs
@@ -202,9 +202,9 @@ session consuming their state and events (`android/vt`).
   command line, also sanitized, once for the whole pipeline or compound command. This is input
   text, not tracking of the foreground executable or its children. Programs can replace it with
   OSC 0/2 between prompts; the next primary prompt restores the directory.
-  Bash sends the directory from `__appine_prompt`, zsh from precmd,
+  Bash sends the directory from `__kazeterm_prompt`, zsh from precmd,
   and ash after the visible PS1 and B mark. Secondary prompts do not replace the title.
-  Bash appends `$(__appine_preexec)` to PS0 once and snapshots `HISTCMD` at each prompt. The
+  Bash appends `$(__kazeterm_preexec)` to PS0 once and snapshots `HISTCMD` at each prompt. The
   preexec function reads `history 1` with no timestamp only when history is enabled and its
   counter advanced; otherwise it reports `bash`, including ignored duplicate/space-prefixed
   commands, HISTIGNORE matches and disabled history. It does not install a DEBUG trap or
@@ -215,32 +215,32 @@ session consuming their state and events (`android/vt`).
 
 - For the terminal's shell integration (android/vtcore) the profile has login shells mark their
   prompts with OSC 133:
-  - bash: the profile sets the coloured PS1 and reads `appine.bashrc`, whose `__appine_prompt`
+  - bash: the profile sets the coloured PS1 and reads `kazeterm.bashrc`, whose `__kazeterm_prompt`
     function, put first in `PROMPT_COMMAND` (once, however often the file is read), prints, before
     each prompt, the last command's end with its status (D) and the prompt's start on a fresh line
     (A, `redraw=last;cl=line`), and wraps PS1 (P with `k=i` … B, the input starting) and PS2
     (`k=s`), and appends the output's start (C) to PS0, each again whenever it is missing, so a PS1
     that `~/.bashrc` or anything later sets is wrapped from the next prompt on; a later plain
     assignment to `PROMPT_COMMAND` drops the function and with it every mark. On Alpine,
-    `/etc/bash/bashrc` reads `/etc/bash/appine.sh`, hence `appine.bashrc`, in every interactive
+    `/etc/bash/bashrc` reads `/etc/bash/kazeterm.sh`, hence `kazeterm.bashrc`, in every interactive
     bash (a login one first, through `/etc/profile.d/00-bashrc.sh`), so a nested bash (`bash`, `su`
     without `-l`) marks its own prompt, Alpine's `\h:\w\$ `;
   - busybox ash, which has no hook before a command or a prompt (1.37 has no `PROMPT_COMMAND`):
     PS1 itself carries D with `$?` (expanded at each prompt and redraw), A with `cl=line`, and
     after the prompt B (the input starts); PS2 is P with `k=s` and B. ash marks no output start
     and breaks a command longer than the screen's width into rows itself, so A and P also carry
-    `appine_lf=output`, the app's own option, asking the terminal to read ash's line feeds
-    (android/vtcore): one ash breaks a line with continues the input, any other ends it. `appine.ashrc`
+    `kazeterm_lf=output`, the app's own option, asking the terminal to read ash's line feeds
+    (android/vtcore): one ash breaks a line with continues the input, any other ends it. `kazeterm.ashrc`
     wraps whatever PS1 and PS2 are when they have no marks, and only in busybox ash: the profile
     sources it after setting its coloured PS1, and every interactive ash reads it again through
     `ENV`, a login shell after `/etc/profile` and `~/.profile`, so a PS1 that `~/.profile` sets is
     marked; one set later (typed, or by a file the user's own `ENV` names) goes without.
-  - zsh: the profile sets the coloured PS1 and reads `appine.zshrc`. Its `__appine_precmd`,
+  - zsh: the profile sets the coloured PS1 and reads `kazeterm.zshrc`. Its `__kazeterm_precmd`,
     appended to `precmd_functions`, prints D with the status before each
     prompt, wraps PS1 (A with `cl=line` … B) and PS2 (P with `k=s` … B) in `%{ %}` whenever the
     marks are missing, and moves itself last in `precmd_functions`, so a PS1 that `~/.zshrc` or a
     theme's own hook sets is wrapped (a theme setting PS1 before each prompt gets its first prompt
-    unmarked); `__appine_preexec`, appended to `preexec_functions`, prints the output's start (C)
+    unmarked); `__kazeterm_preexec`, appended to `preexec_functions`, prints the output's start (C)
     and the command title. Reloading the profile or companion file deduplicates both hook
     registrations while preserving other hooks, including when sourced in sh emulation.
     A and B are in PS1, so every redraw by zle sends them again; D is sent once per prompt.
@@ -249,7 +249,7 @@ session consuming their state and events (`android/vt`).
 - Every login shell of a tab reads it (root's shell `-l`, and `su <account> -c … exec "$SHELL" -l`
   for others) when the shell reads `/etc/profile`: zsh does only where its `/etc/zsh/zprofile`
   sources it (Alpine's does, in sh emulation; Debian trixie's does not, so zsh there has no marks
-  unless the user's `~/.zprofile` sources `/etc/profile.d/appine.sh`). `ENV` is exported from every
+  unless the user's `~/.zprofile` sources `/etc/profile.d/kazeterm.sh`). `ENV` is exported from every
   shell that reads the profile, so a nested interactive ash that inherits it (`ash`, `sh` on
   Alpine, `su` without `-l`, also under bash or zsh) marks its own prompt, the distro's; one
   started through `doas -s`, which resets the environment, does not. Other nested non-login shells
@@ -257,7 +257,7 @@ session consuming their state and events (`android/vt`).
   other shells get no marks from it (fish and nushell send their own, android/vtcore), and shells that
   do not read it still have `TERM`, `LANG` and `NMAP_UNPRIVILEGED` from the console's fixed login
   environment (android/vt), but show no motd.
-- The shared profile contains no zsh array syntax; only zsh sources `appine.zshrc`. The companion
+- The shared profile contains no zsh array syntax; only zsh sources `kazeterm.zshrc`. The companion
   uses an anonymous function with `emulate -L zsh` for registration, so Alpine's sh emulation
   does not change array filtering or indexing and the caller's options are restored afterwards.
   Both hooks also use local zsh emulation when invoked.
@@ -265,7 +265,7 @@ session consuming their state and events (`android/vt`).
 ### Mirrors
 
 - Each distro has built-in mirrors (official, Tsinghua, USTC, Aliyun). After every import, and
-  only then, on the `appine-mirrors` thread, `chooseMirror` probes every mirror at once (one
+  only then, on the `kazeterm-mirrors` thread, `chooseMirror` probes every mirror at once (one
   thread each, checking 512 KiB and 5 s thresholds between reads, waiting at most 10 s for each result) and takes the
   highest throughput (ties to the earlier mirror); if every probe failed it does nothing. A read
   can overshoot either probe threshold; these are not hard byte or elapsed-time caps.
@@ -286,8 +286,8 @@ session consuming their state and events (`android/vt`).
   account by the same rules, except that it does not require a numeric GID or all seven fields.
 - `login.sh` traps SIGINT, so Ctrl-C does not end the login but still interrupts the command
   running (normally apk or apt, skipping the install until the next login), chooses wheel, doas and
-  `/etc/doas.d/30-appine.conf` on Alpine (`/etc/alpine-release`), else sudo, sudo and
-  `/etc/sudoers.d/appine`, picks the account, and:
+  `/etc/doas.d/30-kazeterm.conf` on Alpine (`/etc/alpine-release`), else sudo, sudo and
+  `/etc/sudoers.d/kazeterm`, picks the account, and:
   - every login, root's included: rewrite the NOPASSWD rules for recorded admins still in the
     group that have no password: a shadow field that, after any leading `!`s, is empty or `*`
     (`adduser -D` writes `!`); `passwd -l`'s `!` before a hash still counts as a password, and so
@@ -305,14 +305,14 @@ session consuming their state and events (`android/vt`).
     leaves the cache for the next login and still opens a shell; later user removal is respected.
     This works with any login shell; `--refresh-rules` returns before installing;
   - every login whose account's passwd shell is `/bin/bash` while bash is missing and
-    `/var/cache/appine/bash` exists: install those packages offline, then add `bash` once more by
+    `/var/cache/kazeterm/bash` exists: install those packages offline, then add `bash` once more by
     name (so world records it and `apk upgrade` upgrades it), under the install lock (below), and
     delete the directory once bash is there, so bash removed later is not installed again; if it
     is still missing (Ctrl-C while the install waited, below), say so and use `/bin/sh` this time,
     and the next login tries again;
   - root: `cd` to the directory (else root's home, else `/`) and `exec` root's passwd shell (or
     `/bin/sh` when it is not executable) as a login shell;
-  - a regular account not yet in `/var/lib/appine/admins` (matched literally): add it to wheel
+  - a regular account not yet in `/var/lib/kazeterm/admins` (matched literally): add it to wheel
     (Alpine, with `permit persist :wheel` in `20-wheel.conf`) or sudo (Debian) and record it once
     it really is in the group (otherwise say so and retry at the next login);
   - a regular account, while the tool's marker is missing and the tool is not on PATH (whether or
@@ -323,7 +323,7 @@ session consuming their state and events (`android/vt`).
     and warnings after it ends, and `apt-get install` waits up to an hour for dpkg's lock through
     `DPkg::Lock::Timeout`, which apt shows on the terminal), and touch the marker once the tool is
     there;
-  - the install lock: a `flock` on `/run/appine-install.lock` held around each install of a bundled
+  - the install lock: a `flock` on `/run/kazeterm-install.lock` held around each install of a bundled
     package (`locked`), so concurrent logins install bash, doas, procps-ng and bubblewrap one after another, each first
     checking whether an earlier holder installed it already; each `apk add` (`apk_add`) that fails
     on apk's own lock, held by an apk the user runs, prints that another apk is running and is
@@ -349,13 +349,13 @@ session consuming their state and events (`android/vt`).
 - Diagnostic export is independent of service binding and kernel readiness. Its protected dialog
   offers Save to file or Share. Both call `Privacy.requestLogExport` before generating a ZIP;
   privacy mode requires fresh authentication even when Settings is already unlocked.
-  Only the authorized callback starts `appine-export`. A stopped/replaced fragment or expired
+  Only the authorized callback starts `kazeterm-export`. A stopped/replaced fragment or expired
   authorization deletes its prepared result instead of handing it off.
 - Save stages its already-prepared ZIP in a fragment-scoped `PendingLogSave` ViewModel and then
   launches `CreateDocument("application/zip")`. The mode and pending file reference survive
   configuration recreation, never process death; the authority only covers this archive.
   A picker result consumes the reference once. Cancellation or permanent owner destruction while
-  pending deletes the file; a valid destination transfers ownership to `appine-save-logs`, which
+  pending deletes the file; a valid destination transfers ownership to `kazeterm-save-logs`, which
   opens the source before `openOutputStream("wt")` and deletes the ZIP after success or failure.
   Save files use `cache/diagnostic-saves`, isolated from share-cache pruning; startup attempts to
   remove orphans from a dead process. The row stays disabled while preparing, pending or saving.
@@ -389,14 +389,14 @@ session consuming their state and events (`android/vt`).
     button (all three on by default): usable at any time; the service gives every tab the new cursor values at once
     (android/service), and the terminal reads the CJK, volume-key and tab-list visibility values itself
     (android/terminal).
-- About starts with Telegram (`https://t.me/appinesh`), followed by the project website
-  (`https://github.com/mthli/appine`) and privacy policy (`https://appine.sh/privacy`).
+- About starts with Telegram (`https://t.me/kazetermsh`), followed by the project website
+  (`https://github.com/kazeterm/kazeterm`) and privacy policy (`https://kazeterm.sh/privacy`).
   All three use the shared `link` preference helper, show their URL
   as the summary and open it with AndroidX `CustomTabsIntent`, without pinning a browser package.
   Telegram uses a non-translatable brand label in every locale. A browser without Custom
   Tabs can handle the same VIEW intent; no handler produces the shared `link_no_app` toast.
   The licenses summary names GNU AGPL 3.0 or later; the full copyright, warranty disclaimer and
-  license text remain in the Appine notice on the license page.
+  license text remain in the KazeTerm notice on the license page.
 - About's final Version action shows `BuildConfig.VERSION_NAME` followed by `BuildConfig.VERSION_CODE`
   in parentheses (`1.0.0 (1)`). It opens the HTTPS Google Play
   details URL for `BuildConfig.APPLICATION_ID`, first restricted to `com.android.vending`, then
@@ -525,7 +525,7 @@ session consuming their state and events (`android/vt`).
   ash/bash and Debian dash/bash in container PTYs, including launcher invocation with an intact
   URL, custom/empty values and a non-executable launcher. Debug assembly passed. The updated
   profile and Codex authorization flow have not been retested on Android; existing stores receive
-  the change at kernel restart only when their old Appine profile is recognized and unedited.
+  the change at kernel restart only when their old KazeTerm profile is recognized and unedited.
 
 - Notification authorization passed debug assembly, lint and API 34 checks: visibility after
   banner dismissal, first request, denial then system settings, and removal after granting in

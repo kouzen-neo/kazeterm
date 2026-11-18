@@ -1,4 +1,4 @@
-# Appine design
+# KazeTerm design
 
 - **Status**: the design decisions were confirmed one by one in the design review of 2026-10-24. M0–M8 are done; M9 (release) is in progress, with real-device validation, the license obligations and the Play submission still to go (§14.1).
 - **Scope**: v1. Sections 1–13 describe how things work now and are updated with each round's changes; how a change came about, its measurements and its sources are recorded in the rounds (written in Chinese, indexed in [milestones.md](../milestones.md)). Subsystems are moving section by section to their module's map under `.agents/maps/` (modules are listed in [MODULES.md](../../.agents/MODULES.md)); a migrated section is removed from here and the section numbers stay.
@@ -58,7 +58,7 @@ The default distribution is Alpine; settings can switch it to Debian 13 ([androi
 | **Google Play compliance** | Device and Network Abuse policy: an app may not download executable code (dex/JAR/.so), except "code that runs in a virtual machine or an interpreter" | Alpine binaries downloaded from the network **cannot execute directly on the host CPU**; the CPU back end can only be an interpreter or a translator |
 | Single process | Design goal + phantom process killer | All guest processes share one host address space; isolation between guest processes and fork must be implemented in software |
 | W^X execution restriction | With targetSdk ≥ 29, files in the app's data directory cannot be `execve`d | No execve, and no reliance on the host loader |
-| Storage restrictions | SELinux: the app cannot create hard links, `chown` or `mknod`; shared storage is case-insensitive, has no permission bits and cannot hold symlinks | File system metadata and the namespace must be implemented by Appine itself |
+| Storage restrictions | SELinux: the app cannot create hard links, `chown` or `mknod`; shared storage is case-insensitive, has no permission bits and cannot hold symlinks | File system metadata and the namespace must be implemented by KazeTerm itself |
 | Network restrictions | With targetSdk ≥ 30 the app cannot bind `NETLINK_ROUTE`, and `RTM_GETLINK` is blocked too; no `CAP_NET_RAW` | netlink is emulated in-process; ICMP goes through ping sockets |
 | Page size | From Android 15, apps must be compatible with 16 KB page kernels | The page size presented to the guest must be decoupled from the host page size |
 | Host address space | The common GKI configuration is 4K pages + 39-bit VA, giving user space only about 512 GB | A large contiguous address range cannot be reserved for each guest process |
@@ -70,7 +70,7 @@ The minimum system version is **minSdk 30 (Android 11)**: the Files app provider
 ```mermaid
 flowchart TB
     subgraph APP["Android app process (single process)"]
-        UI["Kotlin shell<br/>Activity · foreground service · DocumentsProvider<br/>terminal UI (libghostty-vt + Appine's view)"]
+        UI["Kotlin shell<br/>Activity · foreground service · DocumentsProvider<br/>terminal UI (libghostty-vt + KazeTerm's view)"]
         subgraph KERNEL["Kernel layer (Rust)"]
             SYS["syscall dispatch · processes/threads · signals · credentials · IPC"]
             MM["mm: VMA table + software page tables"]

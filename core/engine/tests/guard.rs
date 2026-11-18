@@ -11,7 +11,7 @@
 
 use std::ptr::NonNull;
 
-use appine_engine::{Cpu, Dbt, Exit, Mmu, PAGE_SIZE, hwcap, prot};
+use kazeterm_engine::{Cpu, Dbt, Exit, Mmu, PAGE_SIZE, hwcap, prot};
 
 #[repr(C, align(4096))]
 struct Page([u8; 4096]);
@@ -39,7 +39,7 @@ struct Guest {
 
 impl Guest {
     fn new() -> Self {
-        appine_engine::install_fault_guard();
+        kazeterm_engine::install_fault_guard();
         let mut pages: Box<[Page]> = (0..2).map(|_| Page([0; 4096])).collect();
         let broken = unsafe {
             libc::mmap(
@@ -136,7 +136,7 @@ fn translator_survives_a_host_fault() {
 
 #[test]
 fn locks_held_at_the_fault_are_released() {
-    if appine_engine::guest_hwcap() & hwcap::ATOMICS == 0 {
+    if kazeterm_engine::guest_hwcap() & hwcap::ATOMICS == 0 {
         return;
     }
     let mut g = Guest::new();

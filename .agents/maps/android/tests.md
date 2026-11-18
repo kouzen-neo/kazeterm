@@ -90,7 +90,7 @@ debug variant, manifest and network-security configuration belong to `android/bu
   Only `downloadedDistributionsRun` (about 50 MB of Debian, its own store) downloads
   from the internet, behind the `network=true` argument; `routesComeFromLinkProperties` has no
   gate but fails without a default network with an IPv4 gateway.
-- The hooks need the debug variant (`test-hooks`) and `APPINE_TEST_HOOKS=1`, which the tests set
+- The hooks need the debug variant (`test-hooks`) and `KAZETERM_TEST_HOOKS=1`, which the tests set
   and never unset. The KDoc and README ask for runs on 4 KB and 16 KB-page arm64 emulators; CI does
   not run the tests (they need KVM). Nothing here covers `Native.bklStall` (the stall itself is
   tested in `hosts/cli`), terminal gestures, real IME UI or persisted grants end to end.

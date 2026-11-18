@@ -1,7 +1,7 @@
 /*
  * A kernel-layer or engine bug ends only the guest process that hits it (the engine map, design
- * doc §12 item 5). Bugs are simulated with the test hooks of debug builds: appine-run must set
- * APPINE_TEST_HOOKS=1 and APPINE_ON_BUG=kill. Each kind of bug is triggered in a child process;
+ * doc §12 item 5). Bugs are simulated with the test hooks of debug builds: kazeterm-run must set
+ * KAZETERM_TEST_HOOKS=1 and KAZETERM_ON_BUG=kill. Each kind of bug is triggered in a child process;
  * the parent checks that the child was killed by SIGSEGV and keeps running itself. Once the exit
  * status of the whole process is settled, a bug during exit cleanup no longer overrides it.
  *

@@ -3,7 +3,7 @@
 //! accepted connection, where the connection originally wanted to go. Linux answers it from
 //! connection tracking (`getorigdst` and `ipv6_getorigdst` in `nf_conntrack_proto.c`).
 //!
-//! Appine has no connection tracking: nat is done by the socket layer at connect time
+//! KazeTerm has no connection tracking: nat is done by the socket layer at connect time
 //! ([`crate::nft`], `syscall::net::route`), and the connection on the host goes to the address
 //! after nat. So at connect time, TCP connections whose destination nat rewrote are recorded here
 //! by their 4-tuple on the host ([`Table::register`]); at accept time the accepting end claims, by
@@ -39,7 +39,7 @@ pub(crate) fn end_of(addr: &[u8]) -> Option<End> {
 
 /// Records not yet claimed are kept at most this long (Linux connection tracking's timeouts for
 /// SYN_SENT and TIME_WAIT are both 120 seconds), and at most this many (when full the oldest is
-/// dropped). Connections to listeners outside Appine (other apps on the phone) are never claimed.
+/// dropped). Connections to listeners outside KazeTerm (other apps on the phone) are never claimed.
 const KEEP: Duration = Duration::from_secs(120);
 const MAX: usize = 4096;
 
@@ -115,7 +115,7 @@ impl Table {
 
 /// The `getsockopt` answer: the guest sockaddr `addr` written as a `sockaddr_in` (`SOL_IP`, 16
 /// bytes, the IPv4 address taken out of an IPv4-mapped one) or a `sockaddr_in6` (`SOL_IPV6`, 28
-/// bytes; flow label and scope id are 0: Appine does not support setting flow labels, and
+/// bytes; flow label and scope id are 0: KazeTerm does not support setting flow labels, and
 /// link-local addresses cannot reach other namespaces).
 pub(crate) fn encode(addr: &[u8], v6: bool) -> Option<Vec<u8>> {
     let (ip, port) = end_of(addr)?;

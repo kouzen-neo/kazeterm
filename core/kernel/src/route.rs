@@ -7,7 +7,7 @@
 //!
 //! - The main table: the host's routes. On Android the app takes them from the default network's
 //!   `LinkProperties` and hands them to [`crate::Machine::set_routes`]; on other hosts the host's
-//!   own are read ([`appine_hal::net::routes`]). When neither exists they are synthesized from
+//!   own are read ([`kazeterm_hal::net::routes`]). When neither exists they are synthesized from
 //!   the interface addresses: one per subnet of each address, plus a default route without a
 //!   gateway through the default interface (the interface of the local address the host chooses
 //!   for sending to the internet). Routes without a gateway that are exactly the subnet of an
@@ -23,7 +23,7 @@
 //! prefixes first for the same address (the leaves of the fib trie); IPv6 in the post-order of the
 //! fib6 tree (0 first at a fork, a subnet before the subnet containing it); the main table before
 //! the local table. For `ip route get` the host chooses the source address
-//! ([`appine_hal::net::source_for`]), the output interface is the interface of that address, and
+//! ([`kazeterm_hal::net::source_for`]), the output interface is the interface of that address, and
 //! the gateway comes from the longest prefix match in the main table; when the destination is a
 //! local address it is local, through the loopback interface. The rules are only Linux's default
 //! ones.
@@ -31,7 +31,7 @@
 use std::cmp::Ordering;
 use std::fmt::Write as _;
 
-use appine_hal::net::{Interface, Route};
+use kazeterm_hal::net::{Interface, Route};
 
 use crate::net::{AF_INET, AF_INET6};
 
@@ -101,7 +101,7 @@ pub(crate) struct Entry {
 /// The routes of the host's main table: the ones the host handed over
 /// ([`crate::Machine::set_routes`]), otherwise the host's own read directly.
 pub(crate) fn host_routes(k: &crate::kernel::Kernel) -> Option<Vec<Route>> {
-    k.host_routes.clone().or_else(appine_hal::net::routes)
+    k.host_routes.clone().or_else(kazeterm_hal::net::routes)
 }
 
 /// All routes of the main and local tables, in Linux's dump order: IPv4 main and local, then IPv6
@@ -423,7 +423,7 @@ pub(crate) fn get(
         _ => {
             let saddr = match &src {
                 Some(s) => s.clone(),
-                None => appine_hal::net::source_for(&dst)?,
+                None => kazeterm_hal::net::source_for(&dst)?,
             };
             let out = owner(ifaces, &saddr);
             let matched = longest_match(

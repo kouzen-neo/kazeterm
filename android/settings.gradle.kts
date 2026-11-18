@@ -16,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "appine"
+rootProject.name = "kazeterm"
 include(":app")

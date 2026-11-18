@@ -1,4 +1,4 @@
-# Login for an Appine terminal tab (the android/setup map): runs as root, and $1 is the login
+# Login for an KazeTerm terminal tab (the android/setup map): runs as root, and $1 is the login
 # account from Settings: auto, root or an account name. auto uses the first regular user created
 # (the one with the smallest UID among those with UID 1000–65533 and a login shell), or root when
 # there is none; a named account that no longer exists is root too. $2 is the directory to start in
@@ -9,20 +9,20 @@
 # privilege tool is installed, as Alpine's setup-user -a does: on Alpine the wheel group and doas
 # (the app bundles that package, so it installs offline too), on Debian the sudo group and sudo
 # (needs the network; if it cannot be installed, it is retried at every later login). Accounts added
-# to the group are recorded in /var/lib/appine/admins; if the user later takes one out of the group,
+# to the group are recorded in /var/lib/kazeterm/admins; if the user later takes one out of the group,
 # it is not added back. With a password set, escalating asks for the password, following the
 # distro's convention; without one (adduser -D) it does not ask. The rule is rewritten at every
-# login according to the password at that time, and, while Appine runs, within a few seconds of the
+# login according to the password at that time, and, while KazeTerm runs, within a few seconds of the
 # guest changing /etc (passwd replaces /etc/shadow): the app then runs this script with
 # --refresh-rules as $1, which only rewrites the rules.
 # On a system the app imported from Alpine, the login shell is bash (root's, and that of the
 # accounts busybox's adduser makes after it): the app puts bash's packages in
-# /var/cache/appine/bash, and the first login with an account whose shell is /bin/bash installs
+# /var/cache/kazeterm/bash, and the first login with an account whose shell is /bin/bash installs
 # them offline and deletes them, so bash is not installed again if the user removes it. While bash
 # cannot be installed (Ctrl-C, below), the login uses /bin/sh, and the next one tries again.
-# procps-ng and its libraries are staged at import in /var/cache/appine/procps. Any first login
+# procps-ng and its libraries are staged at import in /var/cache/kazeterm/procps. Any first login
 # installs them offline and removes the cache on success, so user removal is respected.
-# bubblewrap and libcap follow the same rule, with their own /var/cache/appine/bubblewrap bundle.
+# bubblewrap and libcap follow the same rule, with their own /var/cache/kazeterm/bubblewrap bundle.
 # apk takes its database lock without waiting, so logins install the bundled packages
 # one at a time, and while an apk the user runs holds the lock, a login says so and waits for it;
 # Ctrl-C then skips installing until the next login. Installing sudo waits for an apt the user runs
@@ -59,15 +59,15 @@ first() {
 
 field() { awk -F: -v u="$1" -v f="$2" '$1 == u { print $f; exit }' "$3"; }
 
-admins=/var/lib/appine/admins
+admins=/var/lib/kazeterm/admins
 if [ -f /etc/alpine-release ]; then
     group=wheel
     tool=doas
-    rules=/etc/doas.d/30-appine.conf
+    rules=/etc/doas.d/30-kazeterm.conf
 else
     group=sudo
     tool=sudo
-    rules=/etc/sudoers.d/appine
+    rules=/etc/sudoers.d/kazeterm
 fi
 ingroup() { id -nG "$1" 2>/dev/null | tr ' ' '\n' | grep -Fqx "$group"; }
 
@@ -78,7 +78,7 @@ locked() {
     (
         flock 9
         "$@"
-    ) 9>/run/appine-install.lock
+    ) 9>/run/kazeterm-install.lock
 }
 
 # apk add, offline (without reading the repository index). When another apk holds apk's lock (the
@@ -88,7 +88,7 @@ apk_add() {
     apk_errors=$(apk add -q --no-network --repositories-file /dev/null "$@" </dev/null 2>&1) && return 0
     case $apk_errors in
     *'Unable to lock database'*)
-        echo "appine: another apk is running; waiting for it to finish (Ctrl-C skips installing until the next login)" >&2
+        echo "kazeterm: another apk is running; waiting for it to finish (Ctrl-C skips installing until the next login)" >&2
         apk add -q --wait 3600 --no-network --repositories-file /dev/null "$@" </dev/null
         ;;
     *)
@@ -101,11 +101,11 @@ apk_add() {
 # Installs the bundled doas; then adds it once more by name, so world records doas rather than the
 # file and apk upgrade upgrades it as usual
 install_doas() {
-    command -v doas >/dev/null || { apk_add /var/cache/appine/doas.apk && apk_add doas; }
+    command -v doas >/dev/null || { apk_add /var/cache/kazeterm/doas.apk && apk_add doas; }
 }
 
 # Installs bash from the bundled packages; then adds it once more by name, as for doas
-bundle=/var/cache/appine/bash
+bundle=/var/cache/kazeterm/bash
 install_bash() {
     [ -x /bin/bash ] || { apk_add "$bundle"/*.apk && apk_add bash; }
 }
@@ -114,7 +114,7 @@ install_bash() {
 # database: busybox already provides ps/top/free. Recheck and remove the cache under the same lock
 # so concurrent first logins cannot reinstall a completed bundle.
 install_procps() {
-    procps_bundle=/var/cache/appine/procps
+    procps_bundle=/var/cache/kazeterm/procps
     [ -d "$procps_bundle" ] || return 0
     if ! apk info -e procps-ng >/dev/null 2>&1; then
         apk_add "$procps_bundle"/*.apk || return 1
@@ -125,7 +125,7 @@ install_procps() {
 
 # Independent of bash and procps; keep failed bundles for retry and respect later user removal.
 install_bubblewrap() {
-    bubblewrap_bundle=/var/cache/appine/bubblewrap
+    bubblewrap_bundle=/var/cache/kazeterm/bubblewrap
     [ -d "$bubblewrap_bundle" ] || return 0
     if ! apk info -e bubblewrap >/dev/null 2>&1; then
         apk_add "$bubblewrap_bundle"/*.apk || return 1
@@ -149,7 +149,7 @@ apt_update() {
         status=1
         [ -z "$interrupted" ] && grep -q 'Could not get lock' "$apt_errors" || break
         if [ -z "$waiting" ]; then
-            echo "appine: another apt is running; waiting for it to finish (Ctrl-C skips installing until the next login)" >&2
+            echo "kazeterm: another apt is running; waiting for it to finish (Ctrl-C skips installing until the next login)" >&2
             waiting=1
         fi
         sleep 2
@@ -168,7 +168,7 @@ ensure_shell() {
     if [ -x /bin/bash ]; then
         rm -rf "$bundle"
     else
-        echo "appine: cannot install bash now, using /bin/sh; Appine tries again at the next login" >&2
+        echo "kazeterm: cannot install bash now, using /bin/sh; KazeTerm tries again at the next login" >&2
     fi
 }
 
@@ -191,7 +191,7 @@ refresh_rules() {
     if [ -n "$nopass" ] && [ -d "${rules%/*}" ]; then
         tmp=$rules.new.$$
         {
-            echo "# Written by Appine at each login and when /etc changes: administrators without a password ($admins)."
+            echo "# Written by KazeTerm at each login and when /etc changes: administrators without a password ($admins)."
             for u in $nopass; do
                 if [ "$group" = wheel ]; then
                     echo "permit nopass $u"
@@ -212,14 +212,14 @@ if [ "$want" = --refresh-rules ]; then
     exit 0
 fi
 
-if [ -d /var/cache/appine/procps ]; then
+if [ -d /var/cache/kazeterm/procps ]; then
     locked install_procps ||
-        echo "appine: cannot install procps-ng now; Appine tries again at the next login" >&2
+        echo "kazeterm: cannot install procps-ng now; KazeTerm tries again at the next login" >&2
 fi
 
-if [ -d /var/cache/appine/bubblewrap ]; then
+if [ -d /var/cache/kazeterm/bubblewrap ]; then
     locked install_bubblewrap ||
-        echo "appine: cannot install bubblewrap now; Appine tries again at the next login" >&2
+        echo "kazeterm: cannot install bubblewrap now; KazeTerm tries again at the next login" >&2
 fi
 
 case $want in
@@ -232,7 +232,7 @@ root) ;;
     if [ -n "$(field "$want" 1 /etc/passwd)" ]; then
         user=$want
     else
-        echo "appine: there is no user $want any more, logging in as root" >&2
+        echo "kazeterm: there is no user $want any more, logging in as root" >&2
     fi
     ;;
 esac
@@ -267,14 +267,14 @@ if ! grep -Fqsx -- "$user" "$admins"; then
         echo "$user" >>"$admins"
         fresh=1
     else
-        echo "appine: cannot add $user to the $group group; Appine tries again at the next login" >&2
+        echo "kazeterm: cannot add $user to the $group group; KazeTerm tries again at the next login" >&2
     fi
 fi
 
 # Privilege tool: once installed (or already present) it is recorded, and if the user uninstalls it
 # later it is not installed again; if it could not be installed (Debian had no network then), it is
 # retried at every later login
-installed=/var/lib/appine/$tool-installed
+installed=/var/lib/kazeterm/$tool-installed
 tried=
 if [ ! -e "$installed" ] && ! command -v "$tool" >/dev/null; then
     tried=1
@@ -287,7 +287,7 @@ if [ ! -e "$installed" ] && ! command -v "$tool" >/dev/null; then
         # pseudo-terminal of its own, so Ctrl-C cannot reach it, and apt stops only after it has
         # finished installing. While another apt runs, apt-get install waits for dpkg's lock itself
         # (an hour at most), saying so
-        echo "appine: installing sudo so that $user can become root (Ctrl-C skips it until the next login)"
+        echo "kazeterm: installing sudo so that $user can become root (Ctrl-C skips it until the next login)"
         apt_update &&
             DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=3600 install -y sudo </dev/null
     fi
@@ -297,13 +297,13 @@ if command -v "$tool" >/dev/null; then
     # Say so when the user was first added to the group, or when the tool was installed only this
     # time (no network before, skipped)
     if [ -n "$fresh" ] || [ -n "$tried" ]; then
-        echo "appine: $user is in the $group group and can become root with $tool"
+        echo "kazeterm: $user is in the $group group and can become root with $tool"
     fi
 elif [ -n "$interrupted" ]; then
     # The progress line of the interrupted apt stopped halfway
-    printf '\nappine: skipped installing %s; Appine tries again at the next login\n' "$tool" >&2
+    printf '\nkazeterm: skipped installing %s; KazeTerm tries again at the next login\n' "$tool" >&2
 elif [ ! -e "$installed" ]; then
-    echo "appine: $user is in the $group group, but $tool is not installed yet; Appine tries again at the next login" >&2
+    echo "kazeterm: $user is in the $group group, but $tool is not installed yet; KazeTerm tries again at the next login" >&2
 fi
 
 refresh_rules

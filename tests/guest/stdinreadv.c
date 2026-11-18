@@ -1,5 +1,5 @@
 /*
- * readv on host stdio (appine-run without a PTY, stdin a host pipe) returns what has arrived once
+ * readv on host stdio (kazeterm-run without a PTY, stdin a host pipe) returns what has arrived once
  * an iovec is full, as Linux's pipe read_iter does, rather than waiting for more input to fill the
  * next one. The host sends exactly 8 bytes for an 8-byte and a 64-byte iovec and waits for the
  * answer line before sending more; then 10 bytes, which spread over both iovecs; then it closes

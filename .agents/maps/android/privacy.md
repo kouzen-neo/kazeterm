@@ -14,7 +14,7 @@ activity and dialog windows, the locked-page shield, fresh authorization for dia
 and the activity that authenticates private notification report copies.
 
 Root: `Privacy.kt` and `NotificationActivity.kt` in
-`android/app/src/main/java/io/github/mthli/appine/`, and `layout/privacy_shield.xml`,
+`android/app/src/main/java/com/kazeterm/`, and `layout/privacy_shield.xml`,
 `drawable/privacy_emblem.xml` and `drawable/ic_lock.xml` under `android/app/src/main/res/`.
 
 Outside the module: shared strings, themes and `Ui.kt` (including the `showPrivate` wrapper)

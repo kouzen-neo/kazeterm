@@ -1,15 +1,15 @@
 //! Long-running lockstep:
 //!
 //! ```text
-//! appine-lockstep [--iterations N] [--seed S] [--class NAME]
+//! kazeterm-lockstep [--iterations N] [--seed S] [--class NAME]
 //! ```
 
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use appine_lockstep::{AVAILABLE, Config, classes::CLASSES, run};
+use kazeterm_lockstep::{AVAILABLE, Config, classes::CLASSES, run};
 
-const USAGE: &str = "usage: appine-lockstep [--iterations N] [--seed S] [--class NAME]";
+const USAGE: &str = "usage: kazeterm-lockstep [--iterations N] [--seed S] [--class NAME]";
 
 fn main() -> ExitCode {
     let mut config = Config {
@@ -45,7 +45,7 @@ fn main() -> ExitCode {
         match arg.as_str() {
             "--iterations" | "--seed" => {
                 let Ok(n) = value.parse() else {
-                    eprintln!("appine-lockstep: {arg} expects a number");
+                    eprintln!("kazeterm-lockstep: {arg} expects a number");
                     return ExitCode::from(2);
                 };
                 if arg == "--seed" {
@@ -56,7 +56,7 @@ fn main() -> ExitCode {
             }
             _ => {
                 if !CLASSES.iter().any(|c| c.name == value) {
-                    eprintln!("appine-lockstep: unknown class `{value}`");
+                    eprintln!("kazeterm-lockstep: unknown class `{value}`");
                     return ExitCode::from(2);
                 }
                 config.class = Some(value);
@@ -65,7 +65,7 @@ fn main() -> ExitCode {
     }
 
     if !AVAILABLE {
-        eprintln!("appine-lockstep: needs a Linux aarch64 host");
+        eprintln!("kazeterm-lockstep: needs a Linux aarch64 host");
         return ExitCode::from(2);
     }
     println!(

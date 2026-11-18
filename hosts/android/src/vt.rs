@@ -3,7 +3,7 @@
 //! crosses JNI as bytes.
 //!
 //! The matching Kotlin declarations are in
-//! `android/app/src/main/java/io/github/mthli/appine/VtNative.kt`. Like [`Machine`]s in the crate
+//! `android/app/src/main/java/com/kazeterm/VtNative.kt`. Like [`Machine`]s in the crate
 //! root, tabs are registered in a table and Kotlin holds a handle.
 //!
 //! A tab names its kernel by the crate root's handle too and looks it up for each call, as the
@@ -22,7 +22,7 @@
 //! written by `frame`, which only the main thread calls, so the main thread may read it after the
 //! lock is released.
 //!
-//! [`pump`]: Java_io_github_mthli_appine_VtNative_pump
+//! [`pump`]: Java_com_kazeterm_VtNative_pump
 
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
@@ -31,7 +31,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, Once, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use appine_kernel::Machine;
+use kazeterm_kernel::Machine;
 use jni::JNIEnv;
 use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jbyteArray, jfloat, jint, jintArray, jlong, jobject, jstring};
@@ -39,11 +39,11 @@ use jni::sys::{jboolean, jbyteArray, jfloat, jint, jintArray, jlong, jobject, js
 use super::{machine, string, throw};
 
 #[repr(C)]
-struct AppineVt {
+struct KazeTermVt {
     _opaque: [u8; 0],
 }
 
-/// What `appine_vt_take_effects` reports (vt.c's `AppineVtEffects`).
+/// What `kazeterm_vt_take_effects` reports (vt.c's `KazeTermVtEffects`).
 #[repr(C)]
 struct RawEffects {
     bells: u32,
@@ -68,14 +68,14 @@ struct RawEffects {
     tmux_detached: bool,
 }
 
-/// vt.c's `APPINE_CLIPBOARD_TEXT` and `APPINE_CLIPBOARD_CLEAR`.
+/// vt.c's `KAZETERM_CLIPBOARD_TEXT` and `KAZETERM_CLIPBOARD_CLEAR`.
 const CLIPBOARD_TEXT: i32 = 1;
 const CLIPBOARD_CLEAR: i32 = 2;
 
 /// vt.c's `STATUS_HEADER_BYTES`: the fixed part of a queued program status report.
 const STATUS_HEADER_BYTES: usize = 7;
 
-/// vt.c's `APPINE_COMPRESS_STEP` and `APPINE_COMPRESS_WAIT` (`APPINE_COMPRESS_DONE` is any other).
+/// vt.c's `KAZETERM_COMPRESS_STEP` and `KAZETERM_COMPRESS_WAIT` (`KAZETERM_COMPRESS_DONE` is any other).
 const COMPRESS_STEP: i32 = 1;
 const COMPRESS_WAIT: i32 = 2;
 
@@ -92,27 +92,27 @@ const COMPRESS_MAX_WAIT: Duration = Duration::from_secs(5);
 
 // vt.c
 unsafe extern "C" {
-    fn appine_vt_new(cols: u16, rows: u16, cell_width: u32, cell_height: u32) -> *mut AppineVt;
-    fn appine_vt_restore(
+    fn kazeterm_vt_new(cols: u16, rows: u16, cell_width: u32, cell_height: u32) -> *mut KazeTermVt;
+    fn kazeterm_vt_restore(
         data: *const u8,
         len: usize,
         cols: u16,
         rows: u16,
         cell_width: u32,
         cell_height: u32,
-    ) -> *mut AppineVt;
-    fn appine_vt_set_cursor(vt: *mut AppineVt, style: i32, blink: bool);
-    fn appine_vt_free(vt: *mut AppineVt);
-    fn appine_vt_feed(vt: *mut AppineVt, data: *const u8, len: usize, background: bool);
-    fn appine_vt_take_replies(vt: *mut AppineVt, len: *mut usize) -> *const u8;
-    fn appine_vt_set_password_input(vt: *mut AppineVt, on: bool);
-    fn appine_vt_resize(vt: *mut AppineVt, cols: u16, rows: u16, cell_width: u32, cell_height: u32);
-    fn appine_vt_scroll(vt: *mut AppineVt, delta: i32);
-    fn appine_vt_at_prompt(vt: *mut AppineVt) -> bool;
-    fn appine_vt_jump_prompt(vt: *mut AppineVt, delta: i32);
-    fn appine_vt_frame(vt: *mut AppineVt, full: bool, len: *mut usize) -> *const u8;
-    fn appine_vt_image(
-        vt: *mut AppineVt,
+    ) -> *mut KazeTermVt;
+    fn kazeterm_vt_set_cursor(vt: *mut KazeTermVt, style: i32, blink: bool);
+    fn kazeterm_vt_free(vt: *mut KazeTermVt);
+    fn kazeterm_vt_feed(vt: *mut KazeTermVt, data: *const u8, len: usize, background: bool);
+    fn kazeterm_vt_take_replies(vt: *mut KazeTermVt, len: *mut usize) -> *const u8;
+    fn kazeterm_vt_set_password_input(vt: *mut KazeTermVt, on: bool);
+    fn kazeterm_vt_resize(vt: *mut KazeTermVt, cols: u16, rows: u16, cell_width: u32, cell_height: u32);
+    fn kazeterm_vt_scroll(vt: *mut KazeTermVt, delta: i32);
+    fn kazeterm_vt_at_prompt(vt: *mut KazeTermVt) -> bool;
+    fn kazeterm_vt_jump_prompt(vt: *mut KazeTermVt, delta: i32);
+    fn kazeterm_vt_frame(vt: *mut KazeTermVt, full: bool, len: *mut usize) -> *const u8;
+    fn kazeterm_vt_image(
+        vt: *mut KazeTermVt,
         id: u32,
         generation: u64,
         out: *mut u8,
@@ -121,8 +121,8 @@ unsafe extern "C" {
         stride: usize,
     ) -> bool;
     #[allow(clippy::too_many_arguments)]
-    fn appine_vt_key(
-        vt: *mut AppineVt,
+    fn kazeterm_vt_key(
+        vt: *mut KazeTermVt,
         key: i32,
         mods: u16,
         consumed: u16,
@@ -133,10 +133,10 @@ unsafe extern "C" {
         out: *mut u8,
         cap: usize,
     ) -> isize;
-    fn appine_vt_paste(vt: *mut AppineVt, data: *const u8, len: usize, allow_unsafe: bool) -> i32;
+    fn kazeterm_vt_paste(vt: *mut KazeTermVt, data: *const u8, len: usize, allow_unsafe: bool) -> i32;
     #[allow(clippy::too_many_arguments)]
-    fn appine_vt_mouse(
-        vt: *mut AppineVt,
+    fn kazeterm_vt_mouse(
+        vt: *mut KazeTermVt,
         action: i32,
         button: i32,
         mods: u16,
@@ -146,19 +146,19 @@ unsafe extern "C" {
         out: *mut u8,
         cap: usize,
     ) -> isize;
-    fn appine_vt_focus(vt: *mut AppineVt, gained: bool, out: *mut u8, cap: usize) -> isize;
-    fn appine_vt_gesture_press(
-        vt: *mut AppineVt,
+    fn kazeterm_vt_focus(vt: *mut KazeTermVt, gained: bool, out: *mut u8, cap: usize) -> isize;
+    fn kazeterm_vt_gesture_press(
+        vt: *mut KazeTermVt,
         behavior: i32,
         x: u16,
         y: u16,
         px: f64,
         py: f64,
     ) -> bool;
-    fn appine_vt_gesture_drag(vt: *mut AppineVt, x: u16, y: u16, px: f64, py: f64) -> bool;
-    fn appine_vt_gesture_end(vt: *mut AppineVt);
-    fn appine_vt_mouse_press(
-        vt: *mut AppineVt,
+    fn kazeterm_vt_gesture_drag(vt: *mut KazeTermVt, x: u16, y: u16, px: f64, py: f64) -> bool;
+    fn kazeterm_vt_gesture_end(vt: *mut KazeTermVt);
+    fn kazeterm_vt_mouse_press(
+        vt: *mut KazeTermVt,
         x: u16,
         y: u16,
         px: f64,
@@ -167,45 +167,45 @@ unsafe extern "C" {
         interval_ns: u64,
         output: bool,
     ) -> i32;
-    fn appine_vt_mouse_drag(
-        vt: *mut AppineVt,
+    fn kazeterm_vt_mouse_drag(
+        vt: *mut KazeTermVt,
         x: u16,
         y: u16,
         px: f64,
         py: f64,
         rectangle: bool,
     ) -> i32;
-    fn appine_vt_mouse_release(vt: *mut AppineVt, x: i32, y: i32) -> i32;
-    fn appine_vt_select_context(vt: *mut AppineVt, x: u16, y: u16) -> bool;
-    fn appine_vt_select_grab(vt: *mut AppineVt, end: bool) -> bool;
-    fn appine_vt_select_to(vt: *mut AppineVt, x: u16, y: u16) -> bool;
-    fn appine_vt_select_adjust(vt: *mut AppineVt, adjustment: i32) -> bool;
-    fn appine_vt_select_rectangle(vt: *mut AppineVt, on: bool) -> bool;
-    fn appine_vt_select_all(vt: *mut AppineVt) -> bool;
-    fn appine_vt_output_at(vt: *mut AppineVt, x: u16, y: u16) -> bool;
-    fn appine_vt_select_output(vt: *mut AppineVt) -> bool;
-    fn appine_vt_select_clear(vt: *mut AppineVt);
-    fn appine_vt_copy(vt: *mut AppineVt, len: *mut usize) -> *const u8;
-    fn appine_vt_link(vt: *mut AppineVt, x: u16, y: u16, len: *mut usize) -> *const u8;
-    fn appine_vt_prompt_click(vt: *mut AppineVt, x: u16, y: u16) -> bool;
-    fn appine_vt_search(vt: *mut AppineVt, needle: *const u8, len: usize) -> bool;
-    fn appine_vt_search_select(vt: *mut AppineVt, older: bool) -> bool;
-    fn appine_vt_search_rows(vt: *mut AppineVt, len: *mut usize, selected: *mut i64) -> *const u32;
-    fn appine_vt_search_end(vt: *mut AppineVt);
-    fn appine_vt_clear(vt: *mut AppineVt) -> i32;
-    fn appine_vt_reset(vt: *mut AppineVt) -> bool;
-    fn appine_vt_take_title_changed(vt: *mut AppineVt) -> bool;
-    fn appine_vt_take_effects(vt: *mut AppineVt, out: *mut RawEffects);
-    fn appine_vt_title(vt: *mut AppineVt, len: *mut usize) -> *const u8;
-    fn appine_vt_message(vt: *mut AppineVt, text: *const u8, len: usize) -> bool;
-    fn appine_vt_transcript(vt: *mut AppineVt, len: *mut usize) -> *const u8;
-    fn appine_vt_snapshot(vt: *mut AppineVt, out: *mut *mut u8, len: *mut usize) -> i32;
-    fn appine_vt_free_snapshot(data: *mut u8, len: usize);
-    fn appine_vt_version(len: *mut usize) -> *const u8;
-    fn appine_vt_compress_wanted(vt: *mut AppineVt) -> bool;
-    fn appine_vt_compress_step(vt: *mut AppineVt, may_wait: bool) -> i32;
-    fn appine_vt_compress_all(vt: *mut AppineVt);
-    fn appine_vt_drop_images(vt: *mut AppineVt);
+    fn kazeterm_vt_mouse_release(vt: *mut KazeTermVt, x: i32, y: i32) -> i32;
+    fn kazeterm_vt_select_context(vt: *mut KazeTermVt, x: u16, y: u16) -> bool;
+    fn kazeterm_vt_select_grab(vt: *mut KazeTermVt, end: bool) -> bool;
+    fn kazeterm_vt_select_to(vt: *mut KazeTermVt, x: u16, y: u16) -> bool;
+    fn kazeterm_vt_select_adjust(vt: *mut KazeTermVt, adjustment: i32) -> bool;
+    fn kazeterm_vt_select_rectangle(vt: *mut KazeTermVt, on: bool) -> bool;
+    fn kazeterm_vt_select_all(vt: *mut KazeTermVt) -> bool;
+    fn kazeterm_vt_output_at(vt: *mut KazeTermVt, x: u16, y: u16) -> bool;
+    fn kazeterm_vt_select_output(vt: *mut KazeTermVt) -> bool;
+    fn kazeterm_vt_select_clear(vt: *mut KazeTermVt);
+    fn kazeterm_vt_copy(vt: *mut KazeTermVt, len: *mut usize) -> *const u8;
+    fn kazeterm_vt_link(vt: *mut KazeTermVt, x: u16, y: u16, len: *mut usize) -> *const u8;
+    fn kazeterm_vt_prompt_click(vt: *mut KazeTermVt, x: u16, y: u16) -> bool;
+    fn kazeterm_vt_search(vt: *mut KazeTermVt, needle: *const u8, len: usize) -> bool;
+    fn kazeterm_vt_search_select(vt: *mut KazeTermVt, older: bool) -> bool;
+    fn kazeterm_vt_search_rows(vt: *mut KazeTermVt, len: *mut usize, selected: *mut i64) -> *const u32;
+    fn kazeterm_vt_search_end(vt: *mut KazeTermVt);
+    fn kazeterm_vt_clear(vt: *mut KazeTermVt) -> i32;
+    fn kazeterm_vt_reset(vt: *mut KazeTermVt) -> bool;
+    fn kazeterm_vt_take_title_changed(vt: *mut KazeTermVt) -> bool;
+    fn kazeterm_vt_take_effects(vt: *mut KazeTermVt, out: *mut RawEffects);
+    fn kazeterm_vt_title(vt: *mut KazeTermVt, len: *mut usize) -> *const u8;
+    fn kazeterm_vt_message(vt: *mut KazeTermVt, text: *const u8, len: usize) -> bool;
+    fn kazeterm_vt_transcript(vt: *mut KazeTermVt, len: *mut usize) -> *const u8;
+    fn kazeterm_vt_snapshot(vt: *mut KazeTermVt, out: *mut *mut u8, len: *mut usize) -> i32;
+    fn kazeterm_vt_free_snapshot(data: *mut u8, len: usize);
+    fn kazeterm_vt_version(len: *mut usize) -> *const u8;
+    fn kazeterm_vt_compress_wanted(vt: *mut KazeTermVt) -> bool;
+    fn kazeterm_vt_compress_step(vt: *mut KazeTermVt, may_wait: bool) -> i32;
+    fn kazeterm_vt_compress_all(vt: *mut KazeTermVt);
+    fn kazeterm_vt_drop_images(vt: *mut KazeTermVt);
 }
 
 /// `AndroidBitmapInfo` (`<android/bitmap.h>`).
@@ -239,7 +239,7 @@ unsafe extern "C" {
 }
 
 /// Owns one vt.c terminal.
-struct Term(*mut AppineVt);
+struct Term(*mut KazeTermVt);
 
 // SAFETY: the terminal is only used under the tab's lock (module docs)
 unsafe impl Send for Term {}
@@ -248,14 +248,14 @@ impl Term {
     /// Feeds bytes and returns the replies they produced. `background`: the console's foreground
     /// process group did not write them (`Machine::read_console_run`).
     fn feed(&mut self, data: &[u8], background: bool) -> Vec<u8> {
-        unsafe { appine_vt_feed(self.0, data.as_ptr(), data.len(), background) };
+        unsafe { kazeterm_vt_feed(self.0, data.as_ptr(), data.len(), background) };
         self.take_replies()
     }
 
     /// The bytes the terminal wrote for the console since the last call (replies, a paste).
     fn take_replies(&mut self) -> Vec<u8> {
         let mut len = 0;
-        let p = unsafe { appine_vt_take_replies(self.0, &mut len) };
+        let p = unsafe { kazeterm_vt_take_replies(self.0, &mut len) };
         if len == 0 {
             return Vec::new();
         }
@@ -289,7 +289,7 @@ impl Term {
             command_ms: 0,
             tmux_detached: false,
         };
-        unsafe { appine_vt_take_effects(self.0, &mut raw) };
+        unsafe { kazeterm_vt_take_effects(self.0, &mut raw) };
         /// The `len` bytes vt.c returned at `p`, which it keeps until the next feed.
         fn bytes<'a>(p: *const u8, len: usize) -> &'a [u8] {
             if p.is_null() || len == 0 {
@@ -337,7 +337,7 @@ impl Term {
 
 impl Drop for Term {
     fn drop(&mut self) {
-        unsafe { appine_vt_free(self.0) };
+        unsafe { kazeterm_vt_free(self.0) };
     }
 }
 
@@ -552,7 +552,7 @@ impl Tab {
     fn compress_step(&self, may_wait: bool) -> Option<Duration> {
         // Not through term(), whose guard would schedule this very pass
         let term = self.term.lock().unwrap_or_else(PoisonError::into_inner);
-        match unsafe { appine_vt_compress_step(term.0, may_wait) } {
+        match unsafe { kazeterm_vt_compress_step(term.0, may_wait) } {
             COMPRESS_STEP => Some(COMPRESS_STEP_GAP),
             COMPRESS_WAIT => Some(COMPRESS_IDLE),
             _ => None,
@@ -585,7 +585,7 @@ impl DerefMut for TermGuard<'_> {
 impl Drop for TermGuard<'_> {
     fn drop(&mut self) {
         // Still under the tab's lock; the schedule's lock is only ever taken after it
-        if unsafe { appine_vt_compress_wanted(self.term.0) } {
+        if unsafe { kazeterm_vt_compress_wanted(self.term.0) } {
             compress_later(self.tab.id);
         }
     }
@@ -596,7 +596,7 @@ static NEXT_TAB: AtomicI64 = AtomicI64::new(1);
 
 /// Creates the terminal of an open console; returns the tab handle.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_create<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_create<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -612,7 +612,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_create<'l>(
             return 0;
         }
         let (cols, rows, cw, ch) = size(cols, rows, cell_width, cell_height);
-        let raw = unsafe { appine_vt_new(cols, rows, cw, ch) };
+        let raw = unsafe { kazeterm_vt_new(cols, rows, cw, ch) };
         if raw.is_null() {
             throw(&mut env, "cannot create a terminal");
             return 0;
@@ -622,13 +622,13 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_create<'l>(
 }
 
 /// Creates the terminal of an open console from a tab's saved `snapshot` ([`snapshot`]), settled
-/// for a new shell (vt.c's `appine_vt_restore`); returns the tab handle, 0 when the snapshot
+/// for a new shell (vt.c's `kazeterm_vt_restore`); returns the tab handle, 0 when the snapshot
 /// cannot be decoded.
 ///
-/// [`snapshot`]: Java_io_github_mthli_appine_VtNative_snapshot
+/// [`snapshot`]: Java_com_kazeterm_VtNative_snapshot
 #[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_restore<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_restore<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -648,7 +648,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_restore<'l>(
             return 0;
         };
         let (cols, rows, cw, ch) = size(cols, rows, cell_width, cell_height);
-        let raw = unsafe { appine_vt_restore(data.as_ptr(), data.len(), cols, rows, cw, ch) };
+        let raw = unsafe { kazeterm_vt_restore(data.as_ptr(), data.len(), cols, rows, cw, ch) };
         if raw.is_null() {
             return 0;
         }
@@ -657,7 +657,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_restore<'l>(
 }
 
 /// Registers a new terminal of kernel `machine`'s `console` in [`TABS`]; returns its handle.
-fn register(machine: jlong, console: jint, raw: *mut AppineVt) -> jlong {
+fn register(machine: jlong, console: jint, raw: *mut KazeTermVt) -> jlong {
     let id = NEXT_TAB.fetch_add(1, Ordering::Relaxed);
     let tab = Tab {
         id,
@@ -675,7 +675,7 @@ fn register(machine: jlong, console: jint, raw: *mut AppineVt) -> jlong {
 /// Sets the cursor's default shape (`style`, libghostty-vt's `GhosttyCursorStyle`) and whether it
 /// blinks, the user's setting; shown at once unless a program chose its own cursor.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_setCursor<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_setCursor<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -684,7 +684,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_setCursor<'l>(
 ) {
     guarded!("VtNative.setCursor", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_set_cursor(tab.term().0, style, blink != 0) };
+            unsafe { kazeterm_vt_set_cursor(tab.term().0, style, blink != 0) };
         }
     })
 }
@@ -692,7 +692,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_setCursor<'l>(
 /// Shows bytes from the app itself (not the program) as if the console had printed them; replies
 /// are dropped.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_print<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_print<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -726,7 +726,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_print<'l>(
 /// in the foreground after the read that carried the report, so a report from a command that has
 /// already exited by then lasts until the next command takes the foreground.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_pump<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_pump<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -751,9 +751,9 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_pump<'l>(
             let password = m.console_password_input(tab.console).unwrap_or(false);
             let (replies, titled, effects) = {
                 let mut term = tab.term();
-                unsafe { appine_vt_set_password_input(term.0, password) };
+                unsafe { kazeterm_vt_set_password_input(term.0, password) };
                 let replies = term.feed(&buf[..n], background);
-                let titled = unsafe { appine_vt_take_title_changed(term.0) };
+                let titled = unsafe { kazeterm_vt_take_title_changed(term.0) };
                 (replies, titled, term.take_effects())
             };
             // A program waiting for an answer (DA, DSR) does not read further until it comes
@@ -789,7 +789,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_pump<'l>(
 
 /// The title a program set (OSC 0/2); null when none.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_title<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_title<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -800,7 +800,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_title<'l>(
         };
         let term = tab.term();
         let mut len = 0;
-        let p = unsafe { appine_vt_title(term.0, &mut len) };
+        let p = unsafe { kazeterm_vt_title(term.0, &mut len) };
         term.text(&mut env, p, len)
     })
 }
@@ -808,20 +808,20 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_title<'l>(
 /// Whether the shell is at its prompt (or the input typed at it), as its prompt marks (OSC 133)
 /// tell; false without them, on the alternate screen, or when the tab is gone.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_atPrompt<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_atPrompt<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) -> jboolean {
     guarded!("VtNative.atPrompt", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_at_prompt(tab.term().0) }) as jboolean
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_at_prompt(tab.term().0) }) as jboolean
     })
 }
 
 /// Captures a frame (vt.c's format) of the rows that changed, or of all rows with `full`. The
 /// buffer stays valid until the next call, which only the main thread makes.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_frame<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_frame<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -833,11 +833,11 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_frame<'l>(
         };
         tab.dirty.store(false, Ordering::Release);
         let mut len = 0;
-        let p = unsafe { appine_vt_frame(tab.term().0, full != 0, &mut len) };
+        let p = unsafe { kazeterm_vt_frame(tab.term().0, full != 0, &mut len) };
         if p.is_null() {
             return std::ptr::null_mut();
         }
-        // SAFETY: vt.c keeps the frame until the next appine_vt_frame call (above)
+        // SAFETY: vt.c keeps the frame until the next kazeterm_vt_frame call (above)
         match unsafe { env.new_direct_byte_buffer(p as *mut u8, len) } {
             Ok(b) => b.into_raw(),
             Err(_) => std::ptr::null_mut(),
@@ -850,7 +850,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_frame<'l>(
 /// size (a later frame names the new one), its pixels have not all arrived, or the bitmap does not
 /// fit.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_image<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_image<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -883,7 +883,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_image<'l>(
             return 0;
         }
         let copied = unsafe {
-            appine_vt_image(
+            kazeterm_vt_image(
                 tab.term().0,
                 id as u32,
                 generation as u64,
@@ -904,7 +904,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_image<'l>(
 /// program may turn echo back on without printing anything after (sudo prints its line break
 /// first). False when the tab or its console is gone.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_passwordInput<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_passwordInput<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -916,7 +916,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_passwordInput<'l>(
         let password = tab
             .machine()
             .is_some_and(|m| m.console_password_input(tab.console).unwrap_or(false));
-        unsafe { appine_vt_set_password_input(tab.term().0, password) };
+        unsafe { kazeterm_vt_set_password_input(tab.term().0, password) };
         password as jboolean
     })
 }
@@ -926,7 +926,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_passwordInput<'l>(
 /// with mode 2048 (empty when there are none, null when the tab is gone), for the caller to write
 /// after the resize: the pump would send them only after its next read.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_resize<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_resize<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -942,7 +942,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_resize<'l>(
         let (cols, rows, cw, ch) = size(cols, rows, cell_width, cell_height);
         let replies = {
             let mut term = tab.term();
-            unsafe { appine_vt_resize(term.0, cols, rows, cw, ch) };
+            unsafe { kazeterm_vt_resize(term.0, cols, rows, cw, ch) };
             term.take_replies()
         };
         if let Some(m) = tab.machine() {
@@ -965,7 +965,7 @@ fn size(cols: jint, rows: jint, cell_width: jint, cell_height: jint) -> (u16, u1
 /// keyboard protocol); null when it fails. `text` is what the key types without Ctrl and Alt.
 #[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_key<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_key<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -987,7 +987,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_key<'l>(
         };
         let mut out = [0u8; 128];
         let n = unsafe {
-            appine_vt_key(
+            kazeterm_vt_key(
                 tab.term().0,
                 key,
                 mods as u16,
@@ -1013,7 +1013,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_key<'l>(
 /// and `allow_unsafe` is false (the view asks first and tries again). An empty array when it
 /// failed.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_paste<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_paste<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1029,7 +1029,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_paste<'l>(
         };
         let bytes = {
             let mut term = tab.term();
-            match unsafe { appine_vt_paste(term.0, text.as_ptr(), text.len(), allow_unsafe != 0) } {
+            match unsafe { kazeterm_vt_paste(term.0, text.as_ptr(), text.len(), allow_unsafe != 0) } {
                 0 => term.take_replies(),
                 1 => return std::ptr::null_mut(),
                 _ => Vec::new(),
@@ -1044,7 +1044,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_paste<'l>(
 /// 1 left, 2 right, 3 middle, 4 and 5 the wheel up and down, 6 and 7 left and right.
 #[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouse<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_mouse<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1061,7 +1061,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouse<'l>(
         };
         let mut out = [0u8; 64];
         let n = unsafe {
-            appine_vt_mouse(
+            kazeterm_vt_mouse(
                 tab.term().0,
                 action,
                 button,
@@ -1079,7 +1079,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouse<'l>(
 
 /// Encodes focus gained or lost; empty when the program did not ask for focus events.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_focus<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_focus<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1090,7 +1090,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_focus<'l>(
             return std::ptr::null_mut();
         };
         let mut out = [0u8; 16];
-        let n = unsafe { appine_vt_focus(tab.term().0, gained != 0, out.as_mut_ptr(), out.len()) };
+        let n = unsafe { kazeterm_vt_focus(tab.term().0, gained != 0, out.as_mut_ptr(), out.len()) };
         encoded(&mut env, &out, n)
     })
 }
@@ -1110,7 +1110,7 @@ fn bytes_array(env: &mut JNIEnv<'_>, bytes: &[u8]) -> jbyteArray {
 
 /// Scrolls the viewport by `delta` rows (negative: back); 0 returns to the bottom.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_scroll<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_scroll<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1118,7 +1118,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_scroll<'l>(
 ) {
     guarded!("VtNative.scroll", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_scroll(tab.term().0, delta) };
+            unsafe { kazeterm_vt_scroll(tab.term().0, delta) };
         }
     })
 }
@@ -1126,7 +1126,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_scroll<'l>(
 /// Scrolls the viewport by `delta` prompts (negative: back), as the shell's prompt marks
 /// (OSC 133) find them; nothing without them.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_jumpPrompt<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_jumpPrompt<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1134,7 +1134,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_jumpPrompt<'l>(
 ) {
     guarded!("VtNative.jumpPrompt", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_jump_prompt(tab.term().0, delta) };
+            unsafe { kazeterm_vt_jump_prompt(tab.term().0, delta) };
         }
     })
 }
@@ -1143,7 +1143,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_jumpPrompt<'l>(
 /// corner: selects the word or the line there (`behavior`, libghostty-vt's
 /// `GhosttySelectionGestureBehavior`); false when there is none (the selection is then cleared).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_gesturePress<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_gesturePress<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1155,7 +1155,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_gesturePress<'l>(
 ) -> jboolean {
     guarded!("VtNative.gesturePress", 0, {
         tab(handle).is_some_and(|tab| unsafe {
-            appine_vt_gesture_press(
+            kazeterm_vt_gesture_press(
                 tab.term().0,
                 behavior,
                 cell(x),
@@ -1170,7 +1170,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_gesturePress<'l>(
 /// Drags the selection gesture on to viewport cell (`x`, `y`), pixel (`px`, `py`), extending the
 /// selection by words or lines; false when the selection stays as it was.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_gestureDrag<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_gestureDrag<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1181,21 +1181,21 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_gestureDrag<'l>(
 ) -> jboolean {
     guarded!("VtNative.gestureDrag", 0, {
         tab(handle).is_some_and(|tab| unsafe {
-            appine_vt_gesture_drag(tab.term().0, cell(x), cell(y), px.into(), py.into())
+            kazeterm_vt_gesture_drag(tab.term().0, cell(x), cell(y), px.into(), py.into())
         }) as jboolean
     })
 }
 
 /// Ends the selection gesture, keeping its selection.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_gestureEnd<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_gestureEnd<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) {
     guarded!("VtNative.gestureEnd", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_gesture_end(tab.term().0) };
+            unsafe { kazeterm_vt_gesture_end(tab.term().0) };
         }
     })
 }
@@ -1204,7 +1204,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_gestureEnd<'l>(
 /// a timed press of the selection gesture, which counts the clicks (`interval_ns` apart at most).
 /// Returns the click count, 0 when it failed.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_mousePress<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_mousePress<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1218,7 +1218,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mousePress<'l>(
 ) -> jint {
     guarded!("VtNative.mousePress", 0, {
         tab(handle).map_or(0, |tab| unsafe {
-            appine_vt_mouse_press(
+            kazeterm_vt_mouse_press(
                 tab.term().0,
                 cell(x),
                 cell(y),
@@ -1235,7 +1235,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mousePress<'l>(
 /// The held left button dragged on to viewport cell (`x`, `y`), pixel (`px`, `py`): 1 with a
 /// selection, 0 without, -1 when no press is under way.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouseDrag<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_mouseDrag<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1247,7 +1247,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouseDrag<'l>(
 ) -> jint {
     guarded!("VtNative.mouseDrag", -1, {
         tab(handle).map_or(-1, |tab| unsafe {
-            appine_vt_mouse_drag(
+            kazeterm_vt_mouse_drag(
                 tab.term().0,
                 cell(x),
                 cell(y),
@@ -1262,7 +1262,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouseDrag<'l>(
 /// The left button released at viewport cell (`x`, `y`) (out of the grid: moved away): the click
 /// count, negated after a drag, 0 without a press.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouseRelease<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_mouseRelease<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1271,7 +1271,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouseRelease<'l>(
 ) -> jint {
     guarded!("VtNative.mouseRelease", 0, {
         tab(handle).map_or(0, |tab| unsafe {
-            appine_vt_mouse_release(tab.term().0, x, y)
+            kazeterm_vt_mouse_release(tab.term().0, x, y)
         })
     })
 }
@@ -1279,7 +1279,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_mouseRelease<'l>(
 /// A right-click at viewport cell (`x`, `y`): keeps a selection holding it, else selects the word
 /// there; true when there is a selection afterwards.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectContext<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectContext<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1288,7 +1288,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectContext<'l>(
 ) -> jboolean {
     guarded!("VtNative.selectContext", 0, {
         tab(handle)
-            .is_some_and(|tab| unsafe { appine_vt_select_context(tab.term().0, cell(x), cell(y)) })
+            .is_some_and(|tab| unsafe { kazeterm_vt_select_context(tab.term().0, cell(x), cell(y)) })
             as jboolean
     })
 }
@@ -1296,21 +1296,21 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectContext<'l>(
 /// Starts dragging the handle of the selection's last cell (`end`) or first cell: the other
 /// end becomes the anchor. False when there is no selection.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectGrab<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectGrab<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
     end: jboolean,
 ) -> jboolean {
     guarded!("VtNative.selectGrab", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_select_grab(tab.term().0, end != 0) })
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_grab(tab.term().0, end != 0) })
             as jboolean
     })
 }
 
 /// Extends the selection from its anchor to viewport cell (`x`, `y`).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectTo<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectTo<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1319,7 +1319,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectTo<'l>(
 ) -> jboolean {
     guarded!("VtNative.selectTo", 0, {
         tab(handle)
-            .is_some_and(|tab| unsafe { appine_vt_select_to(tab.term().0, cell(x), cell(y)) })
+            .is_some_and(|tab| unsafe { kazeterm_vt_select_to(tab.term().0, cell(x), cell(y)) })
             as jboolean
     })
 }
@@ -1327,14 +1327,14 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectTo<'l>(
 /// Moves the selection's end by `adjustment` (libghostty-vt's `GhosttySelectionAdjust`) and
 /// scrolls the viewport to show it; false without a selection.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectAdjust<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectAdjust<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
     adjustment: jint,
 ) -> jboolean {
     guarded!("VtNative.selectAdjust", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_select_adjust(tab.term().0, adjustment) })
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_adjust(tab.term().0, adjustment) })
             as jboolean
     })
 }
@@ -1347,36 +1347,36 @@ fn cell(v: jint) -> u16 {
 /// Makes the selection a rectangle (`on`) with its ends at opposite corners, or linear again;
 /// false when there is no selection.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectRectangle<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectRectangle<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
     on: jboolean,
 ) -> jboolean {
     guarded!("VtNative.selectRectangle", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_select_rectangle(tab.term().0, on != 0) })
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_rectangle(tab.term().0, on != 0) })
             as jboolean
     })
 }
 
 /// Selects everything, scrollback included.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectAll<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectAll<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) -> jboolean {
     guarded!("VtNative.selectAll", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_select_all(tab.term().0) }) as jboolean
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_all(tab.term().0) }) as jboolean
     })
 }
 
 /// Whether viewport cell (`x`, `y`) is in a command's output, as the shell's prompt marks
 /// (OSC 133) delimit it; if so, [`selectOutput`] selects that output.
 ///
-/// [`selectOutput`]: Java_io_github_mthli_appine_VtNative_selectOutput
+/// [`selectOutput`]: Java_com_kazeterm_VtNative_selectOutput
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_outputAt<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_outputAt<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1385,7 +1385,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_outputAt<'l>(
 ) -> jboolean {
     guarded!("VtNative.outputAt", 0, {
         tab(handle)
-            .is_some_and(|tab| unsafe { appine_vt_output_at(tab.term().0, cell(x), cell(y)) })
+            .is_some_and(|tab| unsafe { kazeterm_vt_output_at(tab.term().0, cell(x), cell(y)) })
             as jboolean
     })
 }
@@ -1393,28 +1393,28 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_outputAt<'l>(
 /// Selects the whole output the last [`outputAt`] found and anchors drags to it; false when it is
 /// gone.
 ///
-/// [`outputAt`]: Java_io_github_mthli_appine_VtNative_outputAt
+/// [`outputAt`]: Java_com_kazeterm_VtNative_outputAt
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectOutput<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectOutput<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) -> jboolean {
     guarded!("VtNative.selectOutput", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_select_output(tab.term().0) }) as jboolean
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_output(tab.term().0) }) as jboolean
     })
 }
 
 /// Clears the selection.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectClear<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_selectClear<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) {
     guarded!("VtNative.selectClear", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_select_clear(tab.term().0) };
+            unsafe { kazeterm_vt_select_clear(tab.term().0) };
         }
     })
 }
@@ -1422,7 +1422,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_selectClear<'l>(
 /// The selection as plain text (soft wraps joined, trailing blanks trimmed); null when there is
 /// no selection or it is empty.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_copy<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_copy<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1433,7 +1433,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_copy<'l>(
         };
         let term = tab.term();
         let mut len = 0;
-        let p = unsafe { appine_vt_copy(term.0, &mut len) };
+        let p = unsafe { kazeterm_vt_copy(term.0, &mut len) };
         term.text(&mut env, p, len)
     })
 }
@@ -1441,7 +1441,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_copy<'l>(
 /// The link at viewport cell (`x`, `y`): its OSC 8 URI, else an http or https URL in the text
 /// there; null when there is none.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_link<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_link<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1454,7 +1454,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_link<'l>(
         };
         let term = tab.term();
         let mut len = 0;
-        let p = unsafe { appine_vt_link(term.0, cell(x), cell(y), &mut len) };
+        let p = unsafe { kazeterm_vt_link(term.0, cell(x), cell(y), &mut len) };
         term.text(&mut env, p, len)
     })
 }
@@ -1464,7 +1464,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_link<'l>(
 /// move; null when the tap is no prompt's (the prompt declared no way to move the cursor, the
 /// cursor is not at the prompt, the cell is above it) or the tab is gone.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_promptClick<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_promptClick<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1477,7 +1477,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_promptClick<'l>(
         };
         let bytes = {
             let mut term = tab.term();
-            if !unsafe { appine_vt_prompt_click(term.0, cell(x), cell(y)) } {
+            if !unsafe { kazeterm_vt_prompt_click(term.0, cell(x), cell(y)) } {
                 return std::ptr::null_mut();
             }
             term.take_replies()
@@ -1490,7 +1490,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_promptClick<'l>(
 /// when it changed; empty finds nothing. The frames that follow find the matches and carry their
 /// count and marks. False when the search cannot be made.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_search<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_search<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1500,21 +1500,21 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_search<'l>(
         let (Some(tab), Some(needle)) = (tab(handle), string(&mut env, &needle)) else {
             return 0;
         };
-        (unsafe { appine_vt_search(tab.term().0, needle.as_ptr(), needle.len()) }) as jboolean
+        (unsafe { kazeterm_vt_search(tab.term().0, needle.as_ptr(), needle.len()) }) as jboolean
     })
 }
 
 /// Selects the next match towards older output (`older`) or newer, going round, and scrolls the
 /// viewport to it when needed; false when there is none.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchSelect<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_searchSelect<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
     older: jboolean,
 ) -> jboolean {
     guarded!("VtNative.searchSelect", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_search_select(tab.term().0, older != 0) })
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_search_select(tab.term().0, older != 0) })
             as jboolean
     })
 }
@@ -1523,7 +1523,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchSelect<'l>(
 /// first (-1 for none), then each row a match starts on once, newest first (none without a
 /// search); null without the tab.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchRows<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_searchRows<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1535,7 +1535,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchRows<'l>(
         let term = tab.term();
         let mut len = 0usize;
         let mut selected = -1i64;
-        let p = unsafe { appine_vt_search_rows(term.0, &mut len, &mut selected) };
+        let p = unsafe { kazeterm_vt_search_rows(term.0, &mut len, &mut selected) };
         let mut rows = Vec::with_capacity(len + 1);
         rows.push(i32::try_from(selected).unwrap_or(-1));
         if !p.is_null() {
@@ -1559,14 +1559,14 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchRows<'l>(
 
 /// Ends the search; the next frame takes its marks away.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchEnd<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_searchEnd<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) {
     guarded!("VtNative.searchEnd", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_search_end(tab.term().0) };
+            unsafe { kazeterm_vt_search_end(tab.term().0) };
         }
     })
 }
@@ -1575,32 +1575,32 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_searchEnd<'l>(
 /// shell's prompt (the caller sends the shell a form feed to draw it again), 0 when it cleared
 /// elsewhere, -1 on the alternate screen or without the tab, where nothing changes.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_clear<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_clear<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) -> jint {
     guarded!("VtNative.clear", -1, {
-        tab(handle).map_or(-1, |tab| unsafe { appine_vt_clear(tab.term().0) })
+        tab(handle).map_or(-1, |tab| unsafe { kazeterm_vt_clear(tab.term().0) })
     })
 }
 
 /// Resets the terminal (a full reset, RIS); true when the shell was at its prompt (the caller
 /// sends it a form feed to draw it again).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_reset<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_reset<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) -> jboolean {
     guarded!("VtNative.reset", 0, {
-        tab(handle).is_some_and(|tab| unsafe { appine_vt_reset(tab.term().0) }) as jboolean
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_reset(tab.term().0) }) as jboolean
     })
 }
 
 /// Shows a yellow line of app notice above the cursor's line; false on the alternate screen.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_message<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_message<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1610,7 +1610,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_message<'l>(
         let (Some(tab), Some(text)) = (tab(handle), string(&mut env, &text)) else {
             return 0;
         };
-        (unsafe { appine_vt_message(tab.term().0, text.as_ptr(), text.len()) }) as jboolean
+        (unsafe { kazeterm_vt_message(tab.term().0, text.as_ptr(), text.len()) }) as jboolean
     })
 }
 
@@ -1618,7 +1618,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_message<'l>(
 /// null on the alternate screen, when nothing changed the screen since the last transcript (whose
 /// text the caller keeps), or on failure.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_transcript<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_transcript<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1629,18 +1629,18 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_transcript<'l>(
         };
         let term = tab.term();
         let mut len = 0;
-        let p = unsafe { appine_vt_transcript(term.0, &mut len) };
+        let p = unsafe { kazeterm_vt_transcript(term.0, &mut len) };
         term.text(&mut env, p, len)
     })
 }
 
 /// A snapshot of the whole terminal for saving the tab, which [`restore`] brings back; null when
 /// nothing changed since the last one (whose bytes the caller keeps) or the tab is gone, empty
-/// when none can be taken of the terminal as it is (vt.c's `appine_vt_snapshot`).
+/// when none can be taken of the terminal as it is (vt.c's `kazeterm_vt_snapshot`).
 ///
-/// [`restore`]: Java_io_github_mthli_appine_VtNative_restore
+/// [`restore`]: Java_com_kazeterm_VtNative_restore
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_snapshot<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_snapshot<'l>(
     mut env: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1651,13 +1651,13 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_snapshot<'l>(
         };
         let mut data = std::ptr::null_mut();
         let mut len = 0;
-        let taken = unsafe { appine_vt_snapshot(tab.term().0, &mut data, &mut len) };
+        let taken = unsafe { kazeterm_vt_snapshot(tab.term().0, &mut data, &mut len) };
         match taken {
             0 => std::ptr::null_mut(),
             1 => {
                 // SAFETY: vt.c returned len bytes at data, ours until freed below
                 let array = bytes_array(&mut env, unsafe { std::slice::from_raw_parts(data, len) });
-                unsafe { appine_vt_free_snapshot(data, len) };
+                unsafe { kazeterm_vt_free_snapshot(data, len) };
                 array
             }
             _ => bytes_array(&mut env, &[]),
@@ -1669,13 +1669,13 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_snapshot<'l>(
 /// is not decoded: the snapshot format is versioned apart from the library and is not covered by
 /// its ABI promise.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_version<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_version<'l>(
     env: JNIEnv<'l>,
     _: JClass<'l>,
 ) -> jstring {
     guarded!("VtNative.version", std::ptr::null_mut(), {
         let mut len = 0;
-        let p = unsafe { appine_vt_version(&mut len) };
+        let p = unsafe { kazeterm_vt_version(&mut len) };
         let lib = if p.is_null() {
             String::new()
         } else {
@@ -1690,7 +1690,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_version<'l>(
 /// Compresses the cold scrollback of every tab at once, idle or not (the app trimming its memory),
 /// so a tab whose output never pauses is compressed too.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_compressAll<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_compressAll<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
 ) {
@@ -1704,7 +1704,7 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_compressAll<'l>(
         for tab in tabs {
             // Not through term(): the pass leaves nothing to schedule
             let term = tab.term.lock().unwrap_or_else(PoisonError::into_inner);
-            unsafe { appine_vt_compress_all(term.0) };
+            unsafe { kazeterm_vt_compress_all(term.0) };
         }
     })
 }
@@ -1712,21 +1712,21 @@ pub extern "system" fn Java_io_github_mthli_appine_VtNative_compressAll<'l>(
 /// Cuts a tab's Kitty images down to a few MiB per screen, the oldest going first (the app trimming
 /// its memory under pressure, for a tab not shown).
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_dropImages<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_dropImages<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
 ) {
     guarded!("VtNative.dropImages", (), {
         if let Some(tab) = tab(handle) {
-            unsafe { appine_vt_drop_images(tab.term().0) };
+            unsafe { kazeterm_vt_drop_images(tab.term().0) };
         }
     })
 }
 
 /// Forgets a tab; its terminal is freed once a running pump has returned too.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_mthli_appine_VtNative_destroy<'l>(
+pub extern "system" fn Java_com_kazeterm_VtNative_destroy<'l>(
     _: JNIEnv<'l>,
     _: JClass<'l>,
     handle: jlong,
@@ -1767,7 +1767,7 @@ fn compress_later(id: jlong) {
             .name("vt-compress".into())
             .spawn(compressor)
         {
-            eprintln!("appine: cannot start the scrollback compressor: {e}");
+            eprintln!("kazeterm: cannot start the scrollback compressor: {e}");
         }
     });
     let now = Instant::now();

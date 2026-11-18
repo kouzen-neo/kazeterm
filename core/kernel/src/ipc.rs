@@ -686,7 +686,7 @@ pub(crate) fn nattch(k: &Kernel, id: ShmKey) -> u64 {
 
 /// Current CLOCK_REALTIME seconds (for timestamps such as `*_stime`).
 pub(crate) fn now() -> i64 {
-    appine_hal::clock_gettime(0).map_or(0, |(s, _)| s)
+    kazeterm_hal::clock_gettime(0).map_or(0, |(s, _)| s)
 }
 
 /// `n` zeros, or ENOMEM when the host cannot allocate them: sizes the guest chooses (up to the

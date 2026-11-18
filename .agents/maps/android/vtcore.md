@@ -18,7 +18,7 @@
 - all `VtNative` JNI functions, including the locked calls into the interaction and rendering
   sections owned by other modules.
 
-Root: `VtNative.kt` in `android/app/src/main/java/io/github/mthli/appine/`,
+Root: `VtNative.kt` in `android/app/src/main/java/com/kazeterm/`,
 `hosts/android/src/vt.rs`, and `hosts/android/src/vt.c` except its frame-format specification
 and Frames section (android/vtrender) and its Input, Paste, Mouse and focus, Selection, Links,
 Taps on the prompt and Search sections (android/vtview).
@@ -38,13 +38,13 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
 - In `vt.rs`: `Tab` (its own handle, the kernel's handle, console number, the terminal under a
   mutex, a `dirty` flag) in a table `TABS` keyed by handles from 1, never reused; `TermGuard` (a
   tab's locked terminal, which schedules a compression pass when it is released); `Term` (owns the
-  `AppineVt`, freed on drop); `RawEffects`, laid out as vt.c's `AppineVtEffects`, turned into
+  `KazeTermVt`, freed on drop); `RawEffects`, laid out as vt.c's `KazeTermVtEffects`, turned into
   `Effects` (with the `StatusReport`s decoded from vt.c's queue, the clipboard reads, the last
   command finished: its exit code when reported and how long it ran, and whether tmux's control
   mode, which vt.c detached, ended); the
   compression schedule `COMPRESS` (a `Due` per tab: when to look at it next and when it was
   scheduled), served by the `vt-compress` thread (`compressor`).
-- In `vt.c`: `AppineVt`, one per terminal: the terminal, its render state, key and mouse encoders,
+- In `vt.c`: `KazeTermVt`, one per terminal: the terminal, its render state, key and mouse encoders,
   the grid and cell pixel sizes; reply, frame and scratch buffers and one text buffer shared by
   title, copy, link and transcript; the title-changed flag, the synchronized-output hold and
   `password_input` (the cursor then a lock), and `resize_pending` with `resize_output_at` (output
@@ -54,7 +54,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   since they were last taken (bells, the last clipboard write, notification and progress report,
   every program status report queued in a byte layout vt.rs reads, the clipboard reads with the
   clipboard last named, the last command finished, `tmux_detached`), handed out as
-  `AppineVtEffects`; command timing (`command_start`, `was_at_prompt`); the OSC string the output
+  `KazeTermVtEffects`; command timing (`command_start`, `was_at_prompt`); the OSC string the output
   is in (its first 64 bytes and length) and the DCS string (first 5 bytes, header, length, and
   `tmux_control`); `prompt_click` (how a tap on the input moves the shell's cursor, as the primary
   screen's last prompt start declared); the search (a `GhosttySearch`, scratch for the viewport's
@@ -84,7 +84,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
 
 ### Terminal creation and ownership
 
-- `create` and `restore` check the kernel handle, create or decode an `AppineVt`, then register
+- `create` and `restore` check the kernel handle, create or decode an `KazeTermVt`, then register
   a `Tab` in `TABS`. Kotlin holds the monotonically allocated handle; a call clones the tab's
   `Arc`. `destroy` removes the handle, while a running pump keeps its terminal until it returns.
 - New and restored terminals use the same options: scrollback limited to
@@ -128,7 +128,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   one frame, and nothing is asked while no view takes frames) and `onTitle` after OSC 0/2. It runs
   whether or not a view shows the tab, and ends when the kernel is gone, the console reads end or
   fail, a reply cannot be written, a call into Java throws, or it panics.
-- What programs ask of the app is taken after each read (`appine_vt_take_effects`) and handed to
+- What programs ask of the app is taken after each read (`kazeterm_vt_take_effects`) and handed to
   the session, which posts it to the service unless released: the bell (any number of BELs in a
   read counts once); a clipboard write (OSC 52, OSC 1337, OSC 5522, to any location, as Ghostty's
   `clipboard-write = allow`): its first `text/plain…` representation up to 256 KiB (larger is
@@ -156,7 +156,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   the empty line as a detach, leaving its session running, and ends the string with ST. That end
   is reported (only an ESC ending it, which libghostty-vt reports at ST's first byte; 0x9C is
   payload once the header is complete, and a string a program cancels with CAN or SUB, or the app's
-  own CAN cuts, reports nothing), and the service shows a yellow `[appine]` line in the tab saying
+  own CAN cuts, reports nothing), and the service shows a yellow `[kazeterm]` line in the tab saying
   so and that `tmux attach` brings the session back (android/service; nothing on the alternate
   screen). Other DCS strings (DECRQSS, XTGETTCAP, tmux passthrough) only cost two extra stops each. Nothing
   retries when tmux does not detach.
@@ -260,7 +260,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
 
 - The guest's login shells mark their prompts with OSC 133 (android/setup's profile: bash marks the
   prompt, the typed command and the output's start, and so does zsh where it reads the profile;
-  busybox ash the prompt and the typed command, asking with `appine_lf=output` for its line feeds
+  busybox ash the prompt and the typed command, asking with `kazeterm_lf=output` for its line feeds
   to be read, below; fish 4 and nushell send their own,
   all four marks, fish's prompt start with `click_events=1` and nushell's with no way for taps to
   move the cursor). libghostty-vt keeps the marks in the rows and cells it writes (prompt, input,
@@ -270,8 +270,8 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   the menu's Select output. A shell without the marks (zsh on Debian, dash, mksh, tcsh, elvish, a
   nested non-login shell other than busybox ash and, on Alpine, bash, a remote one over ssh that sends none) leaves every cell output: it is
   never at a prompt, there is nothing to jump to and no output to select, and no command is timed.
-- A prompt start or prompt mark (OSC 133;A or P, on the primary screen) with `appine_lf=output`
-  has `appine_vt_feed` read the shell's line feeds from there on, outside OSC and DCS strings,
+- A prompt start or prompt mark (OSC 133;A or P, on the primary screen) with `kazeterm_lf=output`
+  has `kazeterm_vt_feed` read the shell's line feeds from there on, outside OSC and DCS strings,
   until one ends the input: a line feed after two carriage returns is ash breaking a long command
   (it writes CR LF, and the console's ONLCR adds a CR; counted across feeds), so the input goes on
   and libghostty-vt marks the next row as the prompt's continuation; any other line feed with the
@@ -325,7 +325,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   to the main thread and owns clipboard responses and progress/status lifetime. android/setup
   provides the prompt marks whose parsing is described here.
 - android/vtview and android/vtrender own the excluded vt.c sections; their implementations
-  share `AppineVt` and obey this module's lock, buffer and compression contracts.
+  share `KazeTermVt` and obey this module's lock, buffer and compression contracts.
 - libghostty-vt 1.0.0, Ghostty's terminal library released apart from the app (the terminal
   state and its full reset, the default cursor's shape and blinking, writes that stop at OSC and
   DCS strings' starts and ends, render state with one overscan row, key and mouse encoders, paste,
@@ -340,7 +340,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   APC strings, its log, scrollback compression, snapshots with continuation tracking, Kitty
   graphics with their render-state image list and animation), and the Wuffs PNG decoder it
   carries, linked into
-  `libappine.so` (`android/build`); the system's libjnigraphics (bitmap locking for images'
+  `libkazeterm.so` (`android/build`); the system's libjnigraphics (bitmap locking for images'
   pixels, used by android/vtrender); `Machine::read_console_run`,
   `write_console`, `resize_console`, `console_foreground` and `console_password_input`
   (kernel/tty) and the
@@ -376,7 +376,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
 - The pump stays in native code for the tab's whole life, so JNI local references it makes for
   each event (the clipboard text, a notification's strings) must be deleted after the call, or
   they pile up in its frame.
-- `AppineVtEffects` (vt.c) and `RawEffects` (vt.rs) are one layout and change together, as the
+- `KazeTermVtEffects` (vt.c) and `RawEffects` (vt.rs) are one layout and change together, as the
   frame format does (vt.c's comments name vt.rs's `Effects` for it).
 - A restored terminal is a new one (the decoder makes it): the userdata and callbacks are not in a
   snapshot, nor are the Kitty storage limit (a decoder option), the media, the Glyph Protocol,
@@ -391,7 +391,7 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
   takes the same lock). OSC 52 reads are therefore found by vt.c and answered later through the
   tab's writer, and OSC 5522 reads, which only the callback can serve, stay refused.
 - vt.c's OSC and DCS tracking (`osc_open`, `dcs_open` and `tmux_control`) follows only what goes
-  through `appine_vt_feed`. App writes that cancel a program's string with CAN (`write_own`) clear
+  through `kazeterm_vt_feed`. App writes that cancel a program's string with CAN (`write_own`) clear
   it (a tmux control string so cut is never reported as detached); any other write into the
   terminal that could end or start such a string must too, or a later string's start is misread.
   Text the app prints (`VtNative.print`) goes through the tracking, but its replies are dropped,
@@ -431,13 +431,13 @@ the host console (`kernel/tty`); `guarded!` and the kernel handle table (`androi
 - Without a DA reply, programs that probe for it (vim, tmux) wait for a timeout, so `vt.c` answers
   DA1 (132 columns, selective erase, ANSI colour, and clipboard access, 52, which Ghostty lists
   whenever clipboard writes are allowed and programs check before using OSC 52), DA2 (VT220), DA3
-  and XTVERSION ("appine") and reports a dark colour scheme. XTGETTCAP answers `TN` with the name
+  and XTVERSION ("kazeterm") and reports a dark colour scheme. XTGETTCAP answers `TN` with the name
   vt.c sets, and every other capability from libghostty-vt's built-in table of Ghostty's own entry,
   not from `xterm-256color`'s.
-- Command timing's at-prompt state (`was_at_prompt`) changes only in `appine_vt_feed`, which the
+- Command timing's at-prompt state (`was_at_prompt`) changes only in `kazeterm_vt_feed`, which the
   app's own printed text also goes through; clearing, resetting, messages and resizes leave it.
   With an edited profile's older ash marks (input ends with its line, OSC 133;I, and no
-  `appine_lf=output`), output of a background job while the shell waits
+  `kazeterm_lf=output`), output of a background job while the shell waits
   at its prompt starts the timing, so the next command's time is counted from then; the current
   ash marks, bash and zsh are not affected. libghostty-vt is built ReleaseFast, so its log emits info and
   above, of which `on_log` passes warnings and errors; the log is installed when the first

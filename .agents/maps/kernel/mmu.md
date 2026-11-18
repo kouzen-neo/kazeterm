@@ -40,17 +40,17 @@ Tier 1 translator with its inline TLB fast path and refill (`engine`).
 
 ### Translation
 
-- `struct appine_mmu` / `Mmu` — 4-level radix tree, 512 entries per level, covering 48-bit guest
+- `struct kazeterm_mmu` / `Mmu` — 4-level radix tree, 512 entries per level, covering 48-bit guest
   addresses; each leaf table spans 2 MB. A leaf entry is a 4 KB-aligned host page address ORed with
   R/W/X bits; 0 means absent, and prot 0 with a nonzero address means "present, no access". `Mmu`
   is neither `Send` nor `Sync`; `map`/`unmap`/`protect`/`move_entries` take `&mut`, while
   `fill_shared`/`map_shared`/`protect_shared`/`next_present`/`translate` take `&self` so CoW can
   edit another address space's table. Guest address spaces only fill empty slots (`fill_shared`,
   `map_shared` for CoW); the replacing `map` serves the vDSO's own probe table.
-- `struct appine_tlb_entry` — data TLB entry `{read tag, read addend, write tag, write addend}`,
+- `struct kazeterm_tlb_entry` — data TLB entry `{read tag, read addend, write tag, write addend}`,
   4096 direct-mapped entries per thread; tag is the inverted page number and 0 is invalid, so
   zeroed memory is an empty TLB. A `tlb_used` bitmap records filled slots.
-- `struct appine_itlb_entry` — 512-entry instruction TLB, used only by Tier 0 instruction fetch.
+- `struct kazeterm_itlb_entry` — 512-entry instruction TLB, used only by Tier 0 instruction fetch.
 
 ### Consistency and code
 
@@ -76,7 +76,7 @@ Tier 1 translator with its inline TLB fast path and refill (`engine`).
 - **After changes**: `sync` (after BKL syscalls, `ic ivau` exits, `write_force`, truncation and
   file moves), `quiesce` (fork, membarrier, `sync`), `shootdown` (CoW re-pointing an entry).
 - **Entries**: `fault_in` (the fault path), `mmu().translate`, `map_pages` (inside `kernel/mm`).
-- **Tier 0**: `appine_tlb_fill` on a TLB miss.
+- **Tier 0**: `kazeterm_tlb_fill` on a TLB miss.
 
 ## Data flow / lifecycle
 
@@ -97,7 +97,7 @@ Tier 1 translator with its inline TLB fast path and refill (`engine`).
 
 ### The TLB
 
-- Tier 0 looks up the data TLB in C (data addresses untagged first) and calls `appine_tlb_fill` on
+- Tier 0 looks up the data TLB in C (data addresses untagged first) and calls `kazeterm_tlb_fill` on
   a miss. The fill fails if the entry is absent or lacks the needed bit. A data fill sets both
   halves at once, leaving the read half invalid on pages with a load watchpoint and the write half
   invalid on pages with any watchpoint or without read permission (Tier 1 can use a write entry
@@ -178,7 +178,7 @@ Tier 1 translator with its inline TLB fast path and refill (`engine`).
 
 ### Outbound
 
-- `appine_engine`: `Mmu`, `Cpu::tlb_flush`, `Kicker`, `DbtSpace`/`Dbt` (trust, new_tag, share,
+- `kazeterm_engine`: `Mmu`, `Cpu::tlb_flush`, `Kicker`, `DbtSpace`/`Dbt` (trust, new_tag, share,
   retire_outside, set_sources, invalidate, flush).
 - The Tier 1 translator depends on the page-table geometry, the PTE bit layout, the TLB entry
   layout and offsets, `tlb_used`, and the watchpoint count.
@@ -220,7 +220,7 @@ Tier 1 translator with its inline TLB fast path and refill (`engine`).
 ## To verify
 
 - Linux 6.1 arm64 semantics for `PROT_EXEC`-only mappings (execute-only with Enhanced PAN, or
-  exec implying read): needs the Linux 6.1 source to decide whether Appine's execute-only behaviour
+  exec implying read): needs the Linux 6.1 source to decide whether KazeTerm's execute-only behaviour
   matches.
 - That Tier 1's dependency-ordered (non-acquire) page-table walk is safe against concurrent entry
   stores: only a code comment claims it; the translator is outside this module.

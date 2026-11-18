@@ -9,7 +9,7 @@
 
 ## Responsibilities
 
-`hal` (crate `appine-hal`, depending only on `libc`) is the host abstraction layer under the kernel
+`hal` (crate `kazeterm-hal`, depending only on `libc`) is the host abstraction layer under the kernel
 layer. It wraps the host syscalls the kernel needs, with one implementation for Android (bionic)
 and Linux (glibc), the only hosts it builds for, returning raw host errnos:
 

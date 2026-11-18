@@ -15,31 +15,31 @@
 /*
  * Keep a few freed cpus for the next thread: a shell needs one for every process it starts, and
  * mapping a new region, faulting in the TLB's pages one by one and tearing it down at exit costs
- * much more than appine_cpu_init clearing only the filled entries
+ * much more than kazeterm_cpu_init clearing only the filled entries
  */
 #define SPARE_CPUS 8
 static struct {
     pthread_mutex_t lock;
-    struct appine_cpu *cpus[SPARE_CPUS];
+    struct kazeterm_cpu *cpus[SPARE_CPUS];
     unsigned n;
 } spare = {.lock = PTHREAD_MUTEX_INITIALIZER};
 
-struct appine_cpu *appine_cpu_new(struct appine_mmu *mmu)
+struct kazeterm_cpu *kazeterm_cpu_new(struct kazeterm_mmu *mmu)
 {
     pthread_mutex_lock(&spare.lock);
     void *p = spare.n ? spare.cpus[--spare.n] : NULL;
     pthread_mutex_unlock(&spare.lock);
     if (!p) {
-        p = mmap(NULL, sizeof(struct appine_cpu), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
+        p = mmap(NULL, sizeof(struct kazeterm_cpu), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
                  0);
         if (p == MAP_FAILED)
             return NULL;
     }
-    appine_cpu_init(p, mmu);
+    kazeterm_cpu_init(p, mmu);
     return p;
 }
 
-void appine_cpu_free(struct appine_cpu *cpu)
+void kazeterm_cpu_free(struct kazeterm_cpu *cpu)
 {
     if (!cpu)
         return;
@@ -52,26 +52,26 @@ void appine_cpu_free(struct appine_cpu *cpu)
         munmap(cpu, sizeof(*cpu));
 }
 
-void appine_cpu_init(struct appine_cpu *cpu, struct appine_mmu *mmu)
+void kazeterm_cpu_init(struct kazeterm_cpu *cpu, struct kazeterm_mmu *mmu)
 {
     /* Clear only the filled entries of the data TLB: a newly allocated cpu is zeroed memory, and
      * untouched pages need not be written */
-    memset(cpu, 0, offsetof(struct appine_cpu, tlb));
+    memset(cpu, 0, offsetof(struct kazeterm_cpu, tlb));
     memset(cpu->v, 0, sizeof(cpu->v));
     cpu->nbrk = cpu->nwatch = 0;
     cpu->dit = 0;
     cpu->mmu = mmu;
-    appine_cpu_tlb_flush(cpu);
+    kazeterm_cpu_tlb_flush(cpu);
 }
 
 /* The data TLB has 4096 entries; clearing all of it each time is too expensive when a process
  * mmaps/munmaps often, so only the filled entries are cleared */
-void appine_cpu_tlb_flush(struct appine_cpu *cpu)
+void kazeterm_cpu_tlb_flush(struct kazeterm_cpu *cpu)
 {
-    for (unsigned w = 0; w < APPINE_TLB_ENTRIES / 64; w++) {
+    for (unsigned w = 0; w < KAZETERM_TLB_ENTRIES / 64; w++) {
         for (uint64_t bits = cpu->tlb_used[w]; bits; bits &= bits - 1) {
             unsigned i = w * 64 + (unsigned)__builtin_ctzll(bits);
-            cpu->tlb[i] = (struct appine_tlb_entry){TLB_INVALID, 0, TLB_INVALID, 0};
+            cpu->tlb[i] = (struct kazeterm_tlb_entry){TLB_INVALID, 0, TLB_INVALID, 0};
         }
         cpu->tlb_used[w] = 0;
     }
@@ -79,35 +79,35 @@ void appine_cpu_tlb_flush(struct appine_cpu *cpu)
     _Static_assert(TLB_INVALID == 0, "a zeroed entry is an invalid one");
 }
 
-/* Kinds of the watchpoints on page vpn (APPINE_WATCH_*) */
-static uint32_t watched_page(const struct appine_cpu *cpu, uint64_t vpn)
+/* Kinds of the watchpoints on page vpn (KAZETERM_WATCH_*) */
+static uint32_t watched_page(const struct kazeterm_cpu *cpu, uint64_t vpn)
 {
     uint32_t type = 0;
     for (unsigned i = 0; i < cpu->nwatch; i++) {
-        const struct appine_watch *w = &cpu->watch[i];
-        if (w->lo >> APPINE_PAGE_SHIFT <= vpn && (w->hi - 1) >> APPINE_PAGE_SHIFT >= vpn)
+        const struct kazeterm_watch *w = &cpu->watch[i];
+        if (w->lo >> KAZETERM_PAGE_SHIFT <= vpn && (w->hi - 1) >> KAZETERM_PAGE_SHIFT >= vpn)
             type |= w->type;
     }
     return type;
 }
 
-void *appine_tlb_fill(struct appine_cpu *cpu, uint64_t va, uint32_t access)
+void *kazeterm_tlb_fill(struct kazeterm_cpu *cpu, uint64_t va, uint32_t access)
 {
-    uintptr_t pte = appine_mmu_lookup_pte(cpu->mmu, va);
+    uintptr_t pte = kazeterm_mmu_lookup_pte(cpu->mmu, va);
     if (!pte)
         return NULL;
     uint32_t prot = (uint32_t)(pte & PTE_PROT_MASK);
-    uint32_t need = access == APPINE_ACCESS_READ    ? APPINE_PROT_READ
-                    : access == APPINE_ACCESS_WRITE ? APPINE_PROT_WRITE
-                                                    : APPINE_PROT_EXEC;
+    uint32_t need = access == KAZETERM_ACCESS_READ    ? KAZETERM_PROT_READ
+                    : access == KAZETERM_ACCESS_WRITE ? KAZETERM_PROT_WRITE
+                                                    : KAZETERM_PROT_EXEC;
     if (!(prot & need))
         return NULL;
 
-    uint64_t vpn = va >> APPINE_PAGE_SHIFT;
+    uint64_t vpn = va >> KAZETERM_PAGE_SHIFT;
     uintptr_t host_page = pte & ~(uintptr_t)PAGE_MASK;
-    uint64_t addend = (uint64_t)host_page - (vpn << APPINE_PAGE_SHIFT);
-    if (access == APPINE_ACCESS_EXEC) {
-        cpu->itlb[vpn & (APPINE_ITLB_ENTRIES - 1)] = (struct appine_itlb_entry){~vpn, addend};
+    uint64_t addend = (uint64_t)host_page - (vpn << KAZETERM_PAGE_SHIFT);
+    if (access == KAZETERM_ACCESS_EXEC) {
+        cpu->itlb[vpn & (KAZETERM_ITLB_ENTRIES - 1)] = (struct kazeterm_itlb_entry){~vpn, addend};
     } else {
         /*
          * Pages with watchpoints are not filled in: Tier 1's access misses and falls back to
@@ -117,11 +117,11 @@ void *appine_tlb_fill(struct appine_cpu *cpu, uint64_t va, uint32_t access)
          * the write half
          */
         uint32_t watched = UNLIKELY(cpu->nwatch) ? watched_page(cpu, vpn) : 0;
-        unsigned idx = (unsigned)(vpn & (APPINE_TLB_ENTRIES - 1));
+        unsigned idx = (unsigned)(vpn & (KAZETERM_TLB_ENTRIES - 1));
         cpu->tlb_used[idx / 64] |= UINT64_C(1) << (idx % 64);
-        uint32_t rw = APPINE_PROT_READ | APPINE_PROT_WRITE;
-        cpu->tlb[idx] = (struct appine_tlb_entry){
-            (prot & APPINE_PROT_READ) && !(watched & APPINE_WATCH_LOAD) ? ~vpn : TLB_INVALID,
+        uint32_t rw = KAZETERM_PROT_READ | KAZETERM_PROT_WRITE;
+        cpu->tlb[idx] = (struct kazeterm_tlb_entry){
+            (prot & KAZETERM_PROT_READ) && !(watched & KAZETERM_WATCH_LOAD) ? ~vpn : TLB_INVALID,
             addend,
             (prot & rw) == rw && !watched ? ~vpn : TLB_INVALID,
             addend,
@@ -130,20 +130,20 @@ void *appine_tlb_fill(struct appine_cpu *cpu, uint64_t va, uint32_t access)
     return (void *)(host_page + (va & PAGE_MASK));
 }
 
-static inline enum appine_exit fetch_fault(struct appine_cpu *cpu, uint64_t pc, uint32_t kind)
+static inline enum kazeterm_exit fetch_fault(struct kazeterm_cpu *cpu, uint64_t pc, uint32_t kind)
 {
-    raise_fault(cpu, pc, APPINE_ACCESS_EXEC, kind);
-    return APPINE_EXIT_FAULT;
+    raise_fault(cpu, pc, KAZETERM_ACCESS_EXEC, kind);
+    return KAZETERM_EXIT_FAULT;
 }
 
-static inline enum appine_exit exec_at(struct appine_cpu *cpu, const void *host)
+static inline enum kazeterm_exit exec_at(struct kazeterm_cpu *cpu, const void *host)
 {
     uint32_t insn;
     memcpy(&insn, host, sizeof(insn));
-    return appine_interp_exec(cpu, insn);
+    return kazeterm_interp_exec(cpu, insn);
 }
 
-static enum appine_exit cpu_run(void *ctx, struct appine_cpu *cpu)
+static enum kazeterm_exit cpu_run(void *ctx, struct kazeterm_cpu *cpu)
 {
     (void)ctx;
     /* A kick ends this run before the kernel can reclaim the page. Recheck execute permission
@@ -154,30 +154,30 @@ static enum appine_exit cpu_run(void *ctx, struct appine_cpu *cpu)
          * really is a request, so a concurrently arriving kick is not swallowed */
         if (UNLIKELY(__atomic_load_n(&cpu->pending, __ATOMIC_RELAXED)) &&
             __atomic_exchange_n(&cpu->pending, 0, __ATOMIC_ACQUIRE))
-            return APPINE_EXIT_KICK;
-        uint64_t pc = cpu->pc, page = pc >> APPINE_PAGE_SHIFT;
-        enum appine_exit r;
+            return KAZETERM_EXIT_KICK;
+        uint64_t pc = cpu->pc, page = pc >> KAZETERM_PAGE_SHIFT;
+        enum kazeterm_exit r;
         if (UNLIKELY((pc & 3) || cpu->nbrk)) {
-            r = appine_interp_step(cpu);
+            r = kazeterm_interp_step(cpu);
         } else {
             if (UNLIKELY(last_page != page)) {
-                void *host = tlb_lookup(cpu, pc, APPINE_ACCESS_EXEC);
+                void *host = tlb_lookup(cpu, pc, KAZETERM_ACCESS_EXEC);
                 if (!host)
-                    return fetch_fault(cpu, pc, APPINE_FAULT_PAGE);
+                    return fetch_fault(cpu, pc, KAZETERM_FAULT_PAGE);
                 last_page = page;
                 addend = (uintptr_t)host - pc;
             }
             r = exec_at(cpu, (const void *)(uintptr_t)(pc + addend));
         }
-        if (r != APPINE_EXIT_NONE)
+        if (r != KAZETERM_EXIT_NONE)
             return r;
     }
 }
 
-enum appine_exit appine_cpu_run(struct appine_cpu *cpu)
+enum kazeterm_exit kazeterm_cpu_run(struct kazeterm_cpu *cpu)
 {
-    appine_sync_dit(cpu);
-    return appine_guard_run(cpu_run, NULL, cpu);
+    kazeterm_sync_dit(cpu);
+    return kazeterm_guard_run(cpu_run, NULL, cpu);
 }
 
 /* The host thread's current PSTATE.DIT: -1 is unknown (a new thread inherits it from the thread
@@ -192,11 +192,11 @@ static __thread int host_dit = -1;
  * always 0. The probe cpu that Tier 1 uses during translation to ask Tier 0 whether it recognizes
  * an instruction has no mmu, and the MSR DIT it executes does not touch the host.
  */
-void appine_sync_dit(struct appine_cpu *cpu)
+void kazeterm_sync_dit(struct kazeterm_cpu *cpu)
 {
 #ifdef __aarch64__
     int want = (int)cpu->dit;
-    if (LIKELY(want == host_dit) || !cpu->mmu || !appine_has(APPINE_HWCAP_DIT))
+    if (LIKELY(want == host_dit) || !cpu->mmu || !kazeterm_has(KAZETERM_HWCAP_DIT))
         return;
     if (want)
         __asm__ volatile(".inst 0xd503415f" ::: "memory"); /* msr dit, #1 */
@@ -209,7 +209,7 @@ void appine_sync_dit(struct appine_cpu *cpu)
 }
 
 /* pc hits a hardware breakpoint (only threads with breakpoints set by ptrace have any) */
-static bool brk_hit(const struct appine_cpu *cpu, uint64_t pc)
+static bool brk_hit(const struct kazeterm_cpu *cpu, uint64_t pc)
 {
     for (unsigned i = 0; i < cpu->nbrk; i++)
         if (cpu->brk[i] == pc)
@@ -217,51 +217,51 @@ static bool brk_hit(const struct appine_cpu *cpu, uint64_t pc)
     return false;
 }
 
-enum appine_exit appine_interp_step(struct appine_cpu *cpu)
+enum kazeterm_exit kazeterm_interp_step(struct kazeterm_cpu *cpu)
 {
     uint64_t pc = cpu->pc;
     if (UNLIKELY(pc & 3))
-        return fetch_fault(cpu, pc, APPINE_FAULT_ALIGN);
+        return fetch_fault(cpu, pc, KAZETERM_FAULT_ALIGN);
     /* As on hardware, before executing this instruction */
     if (UNLIKELY(cpu->nbrk) && brk_hit(cpu, pc))
-        return fetch_fault(cpu, pc, APPINE_FAULT_BREAK);
-    void *p = tlb_lookup(cpu, pc, APPINE_ACCESS_EXEC);
+        return fetch_fault(cpu, pc, KAZETERM_FAULT_BREAK);
+    void *p = tlb_lookup(cpu, pc, KAZETERM_ACCESS_EXEC);
     if (UNLIKELY(!p))
-        return fetch_fault(cpu, pc, APPINE_FAULT_PAGE);
+        return fetch_fault(cpu, pc, KAZETERM_FAULT_PAGE);
     return exec_at(cpu, p);
 }
 
-enum appine_exit appine_cpu_exec_insn(struct appine_cpu *cpu, uint32_t insn)
+enum kazeterm_exit kazeterm_cpu_exec_insn(struct kazeterm_cpu *cpu, uint32_t insn)
 {
-    return appine_interp_exec(cpu, insn);
+    return kazeterm_interp_exec(cpu, insn);
 }
 
-static enum appine_exit cpu_step(void *ctx, struct appine_cpu *cpu)
+static enum kazeterm_exit cpu_step(void *ctx, struct kazeterm_cpu *cpu)
 {
     (void)ctx;
-    return appine_interp_step(cpu);
+    return kazeterm_interp_step(cpu);
 }
 
-enum appine_exit appine_cpu_step(struct appine_cpu *cpu)
+enum kazeterm_exit kazeterm_cpu_step(struct kazeterm_cpu *cpu)
 {
-    appine_sync_dit(cpu);
-    return appine_guard_run(cpu_step, NULL, cpu);
+    kazeterm_sync_dit(cpu);
+    return kazeterm_guard_run(cpu_step, NULL, cpu);
 }
 
-void appine_cpu_kick(struct appine_cpu *cpu)
+void kazeterm_cpu_kick(struct kazeterm_cpu *cpu)
 {
     __atomic_store_n(&cpu->pending, 1, __ATOMIC_RELEASE);
 }
 
-int appine_cpu_layout_check(size_t size, size_t off_x, size_t off_pc, size_t off_tpidr,
+int kazeterm_cpu_layout_check(size_t size, size_t off_x, size_t off_pc, size_t off_tpidr,
                             size_t off_pending, size_t off_mmu, size_t off_jump_cache,
                             size_t off_tlb, size_t off_v)
 {
-    return size == sizeof(struct appine_cpu) && off_tlb == offsetof(struct appine_cpu, tlb) &&
-           off_v == offsetof(struct appine_cpu, v) &&
-           off_x == offsetof(struct appine_cpu, x) && off_pc == offsetof(struct appine_cpu, pc) &&
-           off_tpidr == offsetof(struct appine_cpu, tpidr_el0) &&
-           off_pending == offsetof(struct appine_cpu, pending) &&
-           off_mmu == offsetof(struct appine_cpu, mmu) &&
-           off_jump_cache == offsetof(struct appine_cpu, dbt_jump_cache);
+    return size == sizeof(struct kazeterm_cpu) && off_tlb == offsetof(struct kazeterm_cpu, tlb) &&
+           off_v == offsetof(struct kazeterm_cpu, v) &&
+           off_x == offsetof(struct kazeterm_cpu, x) && off_pc == offsetof(struct kazeterm_cpu, pc) &&
+           off_tpidr == offsetof(struct kazeterm_cpu, tpidr_el0) &&
+           off_pending == offsetof(struct kazeterm_cpu, pending) &&
+           off_mmu == offsetof(struct kazeterm_cpu, mmu) &&
+           off_jump_cache == offsetof(struct kazeterm_cpu, dbt_jump_cache);
 }

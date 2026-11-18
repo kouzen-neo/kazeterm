@@ -45,7 +45,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
-use appine_engine::{Cpu, PAGE_SIZE, prot};
+use kazeterm_engine::{Cpu, PAGE_SIZE, prot};
 
 use super::fs::{
     AT_FDCWD, AT_SYMLINK_NOFOLLOW, ROOT_DEV, encode_stat, encode_statx, newfstatat_flags,
@@ -64,7 +64,7 @@ use crate::vfs::{Cached, Node, ROOT_MOUNT};
 pub(crate) struct Fast {
     /// [`Shared::fast_epoch`] when recorded.
     epoch: u64,
-    /// Syscalls are being traced (`APPINE_STRACE`): all go to the BKL path so they can be printed.
+    /// Syscalls are being traced (`KAZETERM_STRACE`): all go to the BKL path so they can be printed.
     traced: bool,
     /// None when paths cannot be resolved without the BKL (the credentials need search-permission
     /// checks, or the root is not in the store).
@@ -215,11 +215,11 @@ impl Fast {
     fn clock_gettime(&self, cpu: &Cpu, clock: i32, tp: u64) -> Option<SysResult> {
         let (sec, nsec) = if self.own_cpu_clock(clock) {
             let (host, base) = self.cpu_clock?;
-            let (sec, nsec) = appine_hal::clock_gettime(host).ok()?;
+            let (sec, nsec) = kazeterm_hal::clock_gettime(host).ok()?;
             let ns = (sec as u64 * 1_000_000_000 + nsec as u64).saturating_sub(base);
             ((ns / 1_000_000_000) as i64, (ns % 1_000_000_000) as i64)
         } else if host_clock(clock) {
-            super::misc::add_offset(appine_hal::clock_gettime(clock).ok()?, self.offset(clock))
+            super::misc::add_offset(kazeterm_hal::clock_gettime(clock).ok()?, self.offset(clock))
         } else {
             return None;
         };
@@ -270,7 +270,7 @@ fn clock_getres(cpu: &Cpu, clock: i32, res: u64) -> Option<SysResult> {
     if !host_clock(clock) {
         return None;
     }
-    let (sec, nsec) = appine_hal::clock_getres(clock).ok()?;
+    let (sec, nsec) = kazeterm_hal::clock_getres(clock).ok()?;
     if res != 0 {
         write(cpu, res, &pair(sec, nsec))?;
     }
@@ -279,7 +279,7 @@ fn clock_getres(cpu: &Cpu, clock: i32, res: u64) -> Option<SysResult> {
 
 fn gettimeofday(cpu: &Cpu, tv: u64, tz: u64) -> Option<SysResult> {
     if tv != 0 {
-        let (sec, nsec) = appine_hal::clock_gettime(CLOCK_REALTIME).ok()?;
+        let (sec, nsec) = kazeterm_hal::clock_gettime(CLOCK_REALTIME).ok()?;
         write(cpu, tv, &pair(sec, nsec / 1000))?;
     }
     if tz != 0 {
@@ -442,7 +442,7 @@ fn sleep(task: &Task, deadline: Option<Expiry>) -> bool {
             None => None,
         };
         let mut fds = [(task.event.fd(), POLLIN, 0)];
-        match appine_hal::poll(&mut fds, timeout) {
+        match kazeterm_hal::poll(&mut fds, timeout) {
             Ok(0) => {}
             _ => break true,
         }

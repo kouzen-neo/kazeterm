@@ -58,7 +58,7 @@ const puppeteer = require('puppeteer-core');
   console.log('title', await page.title());
   console.log('fetched', await page.$eval('#fetched', e => e.textContent));
   console.log('worker', await page.$eval('#worker', e => e.textContent));
-  await page.type('#q', 'appine');
+  await page.type('#q', 'kazeterm');
   await page.click('#b');
   console.log('out', await page.$eval('#out', e => e.textContent));
   console.log('pixel', await page.evaluate(() =>

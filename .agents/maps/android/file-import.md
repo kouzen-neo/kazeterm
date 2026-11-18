@@ -7,7 +7,7 @@
 
 ## Responsibilities
 
-`android/file-import` owns `TerminalFiles.kt` in `android/app/src/main/java/io/github/mthli/appine/`:
+`android/file-import` owns `TerminalFiles.kt` in `android/app/src/main/java/com/kazeterm/`:
 process-local picker state, retained copy work/results, safe home-file creation and shell path
 escaping. Picker launching, privacy checks, result dialogs and clipboard writes in MainActivity
 remain `android/terminal`; the import button belongs to `android/tabbar`.

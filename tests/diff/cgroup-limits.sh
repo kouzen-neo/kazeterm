@@ -7,7 +7,7 @@
 # against memory.max, and cpu.max keeps its period when only a quota is written. The native side
 # is a privileged container whose
 # root is not the real root, and controllers cannot be enabled while it has processes, so first
-# move all processes into init as docker-in-docker does (Appine's root is the real root, and
+# move all processes into init as docker-in-docker does (KazeTerm's root is the real root, and
 # does the same). For memory only the event counts are compared (max is the number of times the
 # limit was hit, which Linux counts on every allocation, so the exact numbers are not compared)
 cd /sys/fs/cgroup
@@ -205,7 +205,7 @@ w=$!
 read line < /tmp/ready
 echo "w: $line"
 echo 16M > t/w/memory.max && echo "lowered"
-# Linux kills it during the write, Appine a little later: whether ash prints Killed depends on
+# Linux kills it during the write, KazeTerm a little later: whether ash prints Killed depends on
 # whether it has ended when ash waits for it
 wait $w 2>/dev/null
 echo "w status $?"

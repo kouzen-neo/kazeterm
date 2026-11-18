@@ -1387,7 +1387,7 @@ pub(super) fn map_fill(
         return Err(Errno::ENODEV);
     }
     let size = fuse::cached_attr(&*cx.vfs()?, id)?.size;
-    let host = appine_hal::memfd(c"appine-fuse").map_err(Errno)?;
+    let host = kazeterm_hal::memfd(c"kazeterm-fuse").map_err(Errno)?;
     host.set_len(size)
         .map_err(|e| Errno(e.raw_os_error().unwrap_or(Errno::EIO.0)))?;
     Ok(Some(Fill::new(host, size, file.clone())))
@@ -1412,7 +1412,7 @@ pub(crate) fn fill(cx: &mut Cx<'_>, (fill, page): (Rc<Fill>, u64)) -> Result<(),
 /// syscall that already consumed input cannot simply run again when its copy finds one missing
 /// ([`Errno::FUSE_RETRY`]). Errors are left for the syscall to meet.
 pub(super) fn prefault(cx: &mut Cx<'_>, nr: u64, a: &[u64; 6]) {
-    use appine_engine::prot;
+    use kazeterm_engine::prot;
     if !cx.mm().has_fills() {
         return;
     }

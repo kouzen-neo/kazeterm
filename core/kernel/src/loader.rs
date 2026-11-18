@@ -20,7 +20,7 @@ use std::os::fd::AsRawFd;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
-use appine_engine::{DbtRegs, PAGE_SIZE, VA_BITS, prot};
+use kazeterm_engine::{DbtRegs, PAGE_SIZE, VA_BITS, prot};
 
 use crate::errno::Errno;
 use crate::mm::{Mm, flags};
@@ -336,7 +336,7 @@ impl ExeCache {
     /// The identity and content version of host file `fd`; None when there is no trustworthy
     /// version.
     fn version(fd: i32) -> Option<(u64, u64, u64, u64)> {
-        let st = appine_hal::fstat(fd).ok()?;
+        let st = kazeterm_hal::fstat(fd).ok()?;
         let (dev, ino) = (st.st_dev, st.st_ino);
         crate::mm::content_version(&st, dev, ino).map(|(ctime, size)| (dev, ino, ctime, size))
     }
@@ -689,12 +689,12 @@ pub fn load_prepared(
     mm.set_brk(main.end);
     (mm.code, mm.data) = exe.code_and_data(main.bias);
     let mut random = [0u8; 16];
-    appine_hal::fill_random(&mut random).map_err(|e| LoadError::Memory(Errno(e)))?;
+    kazeterm_hal::fill_random(&mut random).map_err(|e| LoadError::Memory(Errno(e)))?;
     // arm64's ARCH_DLINFO (AT_SYSINFO_EHDR, AT_MINSIGSTKSZ) comes first
     let auxv = [
         (AT_SYSINFO_EHDR, vdso_base),
         (AT_MINSIGSTKSZ, crate::signal::MIN_SIGSTKSZ),
-        (AT_HWCAP, appine_engine::guest_hwcap()),
+        (AT_HWCAP, kazeterm_engine::guest_hwcap()),
         (AT_PAGESZ, PAGE_SIZE),
         (AT_CLKTCK, CLOCK_TICKS),
         (AT_PHDR, main.phdr),
@@ -709,7 +709,7 @@ pub fn load_prepared(
         (AT_EGID, args.ids[3] as u64),
         (AT_SECURE, args.secure as u64),
         (AT_RANDOM, 0),
-        (AT_HWCAP2, appine_engine::guest_hwcap2()),
+        (AT_HWCAP2, kazeterm_engine::guest_hwcap2()),
         (AT_EXECFN, 0),
         (AT_PLATFORM, 0),
     ];
@@ -778,11 +778,11 @@ fn map_programs(mm: &mut Mm, prepared: &Prepared<'_>, execfn: &[u8]) -> Option<M
 }
 
 /// Which register set Tier 1 uses for the program: Go programs use a separate one
-/// ([`DbtRegs::Go`]). The environment variable `APPINE_DBT_REGS` (`go` or `default`) makes every
+/// ([`DbtRegs::Go`]). The environment variable `KAZETERM_DBT_REGS` (`go` or `default`) makes every
 /// program use the same set, for testing the other one.
 fn dbt_regs(go: bool) -> DbtRegs {
     static FORCED: OnceLock<Option<DbtRegs>> = OnceLock::new();
-    let forced = *FORCED.get_or_init(|| match std::env::var("APPINE_DBT_REGS").as_deref() {
+    let forced = *FORCED.get_or_init(|| match std::env::var("KAZETERM_DBT_REGS").as_deref() {
         Ok("go") => Some(DbtRegs::Go),
         Ok("default") => Some(DbtRegs::Default),
         _ => None,
@@ -1123,8 +1123,8 @@ mod tests {
         let aux = auxv(&mm, sp);
         assert_eq!(aux[&AT_PAGESZ], PAGE_SIZE);
         assert_eq!(aux[&AT_ENTRY], 0x400078);
-        assert_eq!(aux[&AT_HWCAP], appine_engine::guest_hwcap());
-        assert_eq!(aux[&AT_HWCAP2], appine_engine::guest_hwcap2());
+        assert_eq!(aux[&AT_HWCAP], kazeterm_engine::guest_hwcap());
+        assert_eq!(aux[&AT_HWCAP2], kazeterm_engine::guest_hwcap2());
         assert_eq!(aux[&AT_PHDR], 0x400040);
         assert_eq!((aux[&AT_PHENT], aux[&AT_PHNUM]), (56, 1));
         assert_eq!(aux[&AT_BASE], 0);
@@ -1225,7 +1225,7 @@ mod tests {
         f.extend_from_slice(&0xd503201fu32.to_le_bytes());
 
         // Contents in memory are copied into anonymous memory; a host file is mapped directly
-        let path = std::env::temp_dir().join(format!("appine-loader-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("kazeterm-loader-{}", std::process::id()));
         std::fs::write(&path, &f).unwrap();
         let from_file = Executable::open(File::open(&path).unwrap()).unwrap();
         std::fs::remove_file(&path).unwrap();

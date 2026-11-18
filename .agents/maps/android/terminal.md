@@ -15,15 +15,15 @@ It owns activity lifecycle, choosing/closing tabs, shortcuts, search UI, link ro
 questions, insets and IME animation, plus shared UI helpers, strings and themes.
 
 Root: `MainActivity.kt`, `TerminalLayout.kt`, `TerminalLinks.kt`, `NotificationPermission.kt`, `BatteryOptimization.kt`, `SearchBarView.kt` and `Ui.kt`
-in `android/app/src/main/java/io/github/mthli/appine/`, and `android/app/src/main/res/` except
+in `android/app/src/main/java/com/kazeterm/`, and `android/app/src/main/res/` except
 android/privacy's `layout/privacy_shield.xml`, `drawable/privacy_emblem.xml` and `drawable/ic_lock.xml`,
 and android/licenses' `layout/list_item.xml` and `values/ids.xml`.
 
 Controls are `android/tabbar` and `android/keys`; retained file-copy work is `android/file-import`.
 All MainActivity adapters, picker/dialog handling, shared strings and themes remain here.
-`Theme.Appine` is Material 3 DayNight; `Theme.Appine.Terminal` is always dark with black window
-and system bars. Shared resources include `Widget.Appine.MorePopup`,
-`ThemeOverlay.Appine.CheckPopup` (framework checkbox without its own ripple), `page.xml`
+`Theme.KazeTerm` is Material 3 DayNight; `Theme.KazeTerm.Terminal` is always dark with black window
+and system bars. Shared resources include `Widget.KazeTerm.MorePopup`,
+`ThemeOverlay.KazeTerm.CheckPopup` (framework checkbox without its own ripple), `page.xml`
 and `preference_switch.xml` (MaterialSwitch at AndroidX's `switchWidget` ID). Settings uses
 AndroidX category/row layouts.
 
@@ -68,7 +68,7 @@ assets are `android/build`; authentication is `android/privacy`, notice UI `andr
 
 ## Public entry points
 
-- Launcher activity `MainActivity` (`singleTask`, `adjustResize`, `Theme.Appine.Terminal`, handles
+- Launcher activity `MainActivity` (`singleTask`, `adjustResize`, `Theme.KazeTerm.Terminal`, handles
   most configuration changes itself, the dark mode included, but not density, locale or font
   scale, which recreate it), started with
   `EXTRA_TAB` (a `VtSession.id`) by a tab's notification; listener callbacks `onProgress`,
@@ -156,7 +156,7 @@ assets are `android/build`; authentication is `android/privacy`, notice UI `andr
   The choice sets or clears `FLAG_KEEP_SCREEN_ON`: only the visible terminal window keeps the
   screen lit; opening Settings or leaving the app allows the system's normal screen timeout.
   It is independent of the service's screen-off run policy and partial wake lock. The popup's
-  context uses `ThemeOverlay.Appine.CheckPopup`, removing the checkbox's own background while
+  context uses `ThemeOverlay.KazeTerm.CheckPopup`, removing the checkbox's own background while
   retaining the menu row's press feedback and the overflow menu's placement.
 
 ### Permission banners
@@ -346,7 +346,7 @@ assets are `android/build`; authentication is `android/privacy`, notice UI `andr
   MainActivity's early configuration override aligns them and survives configuration updates.
   Keep the override limited to night mode so locale, font scale, density and window size still update.
   Theme.Material3 does not set the system bars' colours, which Android applies up to version 14,
-  so `Theme.Appine.Terminal` sets them black, as the framework theme had them.
+  so `Theme.KazeTerm.Terminal` sets them black, as the framework theme had them.
 - `TerminalLayout` must be built after dynamic colours are applied and assigned before attaching
   its root to the window: its view adapters access the activity's layout once input, grid and
   search callbacks begin. The activity still detaches the session on restart and destruction.

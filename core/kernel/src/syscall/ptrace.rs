@@ -4,7 +4,7 @@
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 
-use appine_engine::PAGE_SIZE;
+use kazeterm_engine::PAGE_SIZE;
 
 use super::proc::may_ptrace;
 use super::{SysResult, get, put};

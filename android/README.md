@@ -1,11 +1,11 @@
-# Appine Android app
+# KazeTerm Android app
 
 The Gradle project for the Android shell (design doc §3 and the `android/*` maps; terminals in the `kernel/tty` map):
 
 - `app/`: the Kotlin app. `TerminalService` is a `specialUse` foreground service that
   owns the guest kernel and the terminal sessions; `MainActivity` shows them with tabs
   and a row of extra keys. The terminal emulator is libghostty-vt from Ghostty, linked into
-  `libappine.so` (`hosts/android/src/vt.c`, `vt.rs`), and drawn by `VtView` with the bundled
+  `libkazeterm.so` (`hosts/android/src/vt.c`, `vt.rs`), and drawn by `VtView` with the bundled
   JetBrains Mono font. `Rootfs` imports Alpine from the APK assets on first launch,
   picks the fastest mirror, and can replace it with Debian (downloaded and checked
   against a pinned sha256 digest). `SettingsActivity`, opened from the tab bar's menu,
@@ -18,7 +18,7 @@ The Gradle project for the Android shell (design doc §3 and the `android/*` map
   installs the bundled bash, procps-ng and bubblewrap packages offline on a new Alpine system,
   and switches to it with `su` (`--session-command` where su is util-linux's, so that the
   shell keeps its controlling terminal and job control). `Native` is the JNI interface to
-  `libappine.so`, which is built from `hosts/android` with cargo-ndk.
+  `libkazeterm.so`, which is built from `hosts/android` with cargo-ndk.
 
 ## Building
 
@@ -44,7 +44,7 @@ zig.path=/opt/homebrew/bin/zig
 ./gradlew assembleRelease              # build app/build/outputs/apk/release/app-release.apk
 ```
 
-Both APKs build `libappine.so` for `arm64-v8a`. Debug uses Cargo's `release` profile to keep
+Both APKs build `libkazeterm.so` for `arm64-v8a`. Debug uses Cargo's `release` profile to keep
 the interpreter fast. Release uses `android-release` for cross-crate LTO and a smaller library.
 
 The release APK uses R8 and resource shrinking and is signed with the local debug key.
@@ -76,10 +76,10 @@ Custom Tabs and needs no network connection to read a notice.
 
 Keep notices in the same change as dependency updates:
 
-- Appine's notice includes the repository's `LICENSE`, copyright, warranty and source link.
+- KazeTerm's notice includes the repository's `LICENSE`, copyright, warranty and source link.
 - Fuchsia, libghostty-vt and its linked components, and JetBrains Mono retain their original
   notices; `licenses/` keeps the upstream source copies for comparison.
-- Rust entries cover the normal dependencies reachable from `appine-android` on
+- Rust entries cover the normal dependencies reachable from `kazeterm-android` on
   `aarch64-linux-android`, excluding workspace members, build dependencies and proc-macros.
   Record the chosen MIT license when offered as an alternative, and retain the upstream
   expression and any additional notices in the detail page. Keep separate entries for
@@ -101,5 +101,5 @@ resolved dependencies and bundled package metadata remains part of updating the 
 ```sh
 ./gradlew assembleDebug lintDebug
 ./gradlew connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=io.github.mthli.appine.LicenseTest
+  -Pandroid.testInstrumentationRunnerArguments.class=com.kazeterm.LicenseTest
 ```

@@ -5,7 +5,7 @@
  * another set, see struct regs):
  *   - guest X0–X15, X19–X25, X29 and X30 live in the same-numbered host registers, and guest SP
  *     lives in host X26;
- *   - host X28 points to struct appine_cpu; host X16, X17 and X27 are temporaries;
+ *   - host X28 points to struct kazeterm_cpu; host X16, X17 and X27 are temporaries;
  *   - host X18 is the platform register (on Android, the shadow call stack pointer bionic sets up
  *     for each thread), and translated code does not touch it: the host's signal handlers may use
  *     it at any time;
@@ -29,7 +29,7 @@
  * not recognize are likewise handed to Tier 0, which keeps the two tiers' whitelists exactly the
  * same (the engine map).
  *
- * Translations never invalidate themselves; see appine_dbt_invalidate(). The code cache is
+ * Translations never invalidate themselves; see kazeterm_dbt_invalidate(). The code cache is
  * double-mapped W^X.
  */
 #define _GNU_SOURCE /* needed for madvise, mremap and their flags under -std=c17 */
@@ -82,8 +82,8 @@ _Static_assert(CODE_CACHE_BYTES <= (UINT64_C(128) << 20), "the offset range of b
 #define FRAME_BYTES 176
 
 /*
- * Host registers: CTX points to struct appine_cpu, T0, T1 and T2 are temporaries, and SP_HOST
- * holds the guest SP. Which set an instance uses is chosen at creation (appine_dbt_new), and
+ * Host registers: CTX points to struct kazeterm_cpu, T0, T1 and T2 are temporaries, and SP_HOST
+ * holds the guest SP. Which set an instance uses is chosen at creation (kazeterm_dbt_new), and
  * routines, translations and templates are all generated for it, so these names can only be used
  * where there is an `x` (struct xlate *). The same-numbered guest registers and X18 are the stolen
  * registers (is_stolen).
@@ -99,8 +99,8 @@ struct regs {
     unsigned ctx, t0, t1, t2, sp;
 };
 static const struct regs reg_sets[] = {
-    [APPINE_DBT_REGS_DEFAULT] = {.ctx = 28, .t0 = 16, .t1 = 17, .t2 = 27, .sp = 26},
-    [APPINE_DBT_REGS_GO] = {.ctx = 25, .t0 = 21, .t1 = 22, .t2 = 23, .sp = 24},
+    [KAZETERM_DBT_REGS_DEFAULT] = {.ctx = 28, .t0 = 16, .t1 = 17, .t2 = 27, .sp = 26},
+    [KAZETERM_DBT_REGS_GO] = {.ctx = 25, .t0 = 21, .t1 = 22, .t2 = 23, .sp = 24},
 };
 #define CTX (x->d->r->ctx)
 #define T0 (x->d->r->t0)
@@ -164,12 +164,12 @@ _Static_assert((MAX_BLOCK_WORDS & BRANCH_MASK) == 0 && MAX_BLOCK_WORDS << REASON
 #define DCZID_VALUE 4
 
 #define TLB_BITS 12
-#define TLB_OFF offsetof(struct appine_cpu, tlb)
-_Static_assert(APPINE_TLB_ENTRIES == 1u << TLB_BITS, "the TLB index is fixed at 12 bits in generated code");
-_Static_assert(sizeof(struct appine_tlb_entry) == 32, "generated code addresses TLB entries as 32 bytes each");
+#define TLB_OFF offsetof(struct kazeterm_cpu, tlb)
+_Static_assert(KAZETERM_TLB_ENTRIES == 1u << TLB_BITS, "the TLB index is fixed at 12 bits in generated code");
+_Static_assert(sizeof(struct kazeterm_tlb_entry) == 32, "generated code addresses TLB entries as 32 bytes each");
 _Static_assert(TLB_OFF % 16 == 0 && TLB_OFF + 16 <= 504, "the TLB must be addressable by ldp's 7-bit scaled immediate");
-_Static_assert(offsetof(struct appine_cpu, dbt_rs) < TLB_OFF, "dbt_rs is also read and written directly with ldr/str");
-_Static_assert(offsetof(struct appine_cpu, dbt_jump_cache) < TLB_OFF,
+_Static_assert(offsetof(struct kazeterm_cpu, dbt_rs) < TLB_OFF, "dbt_rs is also read and written directly with ldr/str");
+_Static_assert(offsetof(struct kazeterm_cpu, dbt_jump_cache) < TLB_OFF,
                "fields that generated code reads and writes directly with ldr/str must precede the TLB");
 
 struct slot {
@@ -204,7 +204,7 @@ struct table {
 
 /*
  * When several address spaces of the same program share one instance (the kernel layer's
- * CodeGroup), blocks in the trusted file mappings registered with the group (appine_dbt_share) are
+ * CodeGroup), blocks in the trusted file mappings registered with the group (kazeterm_dbt_share) are
  * valid for every member and go into the translation table by pc; blocks elsewhere (JIT-generated
  * or written code) are valid only for the member that translated them, and their key in the table
  * is pc | the member's tag << TAG_SHIFT. A guest pc has only 48 bits and there are no blocks above
@@ -212,16 +212,16 @@ struct table {
  * by pc, and one linear probe finds both the shared blocks and this member's private ones: with
  * two separate probes, JIT code would take one more cache miss on every jump-cache miss. Shared
  * blocks do not link to private blocks (LINK_SHARED). Tags are allocated by the instance
- * (appine_dbt_new_tag); when the instance returns to the pool its private blocks are removed
+ * (kazeterm_dbt_new_tag); when the instance returns to the pool its private blocks are removed
  * (drop_private) and tags are allocated from the start again. Tag 0 means not in a group, and all
  * blocks are keyed by pc.
  */
-#define TAG_SHIFT APPINE_VA_BITS
+#define TAG_SHIFT KAZETERM_VA_BITS
 #define TAG_MAX 0xffffu
 #define PC_MASK ((UINT64_C(1) << TAG_SHIFT) - 1)
 
 /* When invalidating translations, find the blocks that start in a guest page by that page
- * (appine_dbt_invalidate) */
+ * (kazeterm_dbt_invalidate) */
 #define PAGE_BUCKET_BITS 14
 #define INVALIDATE_MAX_PAGES 256 /* beyond this many pages, look at every block in turn */
 
@@ -267,7 +267,7 @@ static uint64_t block_key(const struct block *b)
 
 /*
  * The translations of one address space (code cache, translation table, various records), shared
- * by all threads in that address space (appine_dbt_attach): multi-threaded programs (the Go
+ * by all threads in that address space (kazeterm_dbt_attach): multi-threaded programs (the Go
  * compiler, the JVM) used to translate the same code once per thread, doing translation, template
  * copying, linking and instruction-cache syncing several times over, each with its own code cache.
  *
@@ -275,7 +275,7 @@ static uint64_t block_key(const struct block *b)
  * for all threads to leave translated code: the initiating thread kicks the other threads and waits
  * until each has stopped in the dispatcher (parked) or left dbt_run; see flush_world.
  */
-struct appine_dbt {
+struct kazeterm_dbt {
     /* Host register assignment (one set in reg_sets); routines and translations are all generated
      * for it */
     const struct regs *r;
@@ -283,9 +283,9 @@ struct appine_dbt {
     intptr_t rw_delta;  /* writable alias minus execution address; 0 when mapped directly as RWX */
     struct written *written; /* pages written in the writable alias (note_written); NULL for RWX */
     /* The list pool.all linking all instances (live and pooled), walked by
-     * appine_dbt_unmap_written. Read and written while holding pool.lock; prev_instance is NULL
+     * kazeterm_dbt_unmap_written. Read and written while holding pool.lock; prev_instance is NULL
      * when not in the list */
-    struct appine_dbt *next_instance, **prev_instance;
+    struct kazeterm_dbt *next_instance, **prev_instance;
     size_t cache_words;
     size_t used_words;
     size_t routine_words;
@@ -309,26 +309,26 @@ struct appine_dbt {
     /* Address space changed (taken from the pool after exec or fork); check before the next run */
     bool stale;
     /* The mappings the translations are in, recorded before returning to the pool
-     * (appine_dbt_set_sources) */
-    struct appine_dbt_source sources[APPINE_DBT_SOURCES];
+     * (kazeterm_dbt_set_sources) */
+    struct kazeterm_dbt_source sources[KAZETERM_DBT_SOURCES];
     unsigned nsources;
-    /* Ranges [start, end) the next check need not look at (appine_dbt_trust) */
-    uint64_t trusted[APPINE_DBT_SOURCES][2];
+    /* Ranges [start, end) the next check need not look at (kazeterm_dbt_trust) */
+    uint64_t trusted[KAZETERM_DBT_SOURCES][2];
     unsigned ntrusted;
     /* The previous user's file mappings [start, end): blocks in them that are not mapped yet are
      * parked during the check (recheck) */
-    uint64_t parkable[APPINE_DBT_SOURCES][2];
+    uint64_t parkable[KAZETERM_DBT_SOURCES][2];
     unsigned nparkable;
-    /* A host fault occurred while running (APPINE_EXIT_HOST_FAULT): the tables may be only half
+    /* A host fault occurred while running (KAZETERM_EXIT_HOST_FAULT): the tables may be only half
      * updated, so they are no longer used */
     bool poisoned;
     uint32_t *page_head;  /* hash of a guest page → list head in blocks (index plus 1) */
     uint32_t *page_parked; /* same hash: parked count, read lock-free if a lookup fails (revive) */
-    /* The group's registered mappings (appine_dbt_share), sorted by start and non-overlapping;
+    /* The group's registered mappings (kazeterm_dbt_share), sorted by start and non-overlapping;
      * read without the lock. A replaced old array hangs off the new one's older and is freed when
      * the instance returns to the pool */
     struct shared_ranges *shared;
-    unsigned next_tag; /* next tag that can be allocated (appine_dbt_new_tag) */
+    unsigned next_tag; /* next tag that can be allocated (kazeterm_dbt_new_tag) */
     uint64_t nogroup[NOGROUP_MAX];
     unsigned nogroup_count;
     uint64_t strikes[STRIKES];
@@ -339,14 +339,14 @@ struct appine_dbt {
 
     pthread_mutex_t lock;
     pthread_cond_t flushed; /* a full flush has finished (or the instance was poisoned) */
-    struct appine_dbt_thread *threads; /* attached threads */
+    struct kazeterm_dbt_thread *threads; /* attached threads */
     unsigned nthreads;                 /* their number (read atomically) */
     bool flushing;     /* a thread waits for the others to stop for a full flush (atomic read) */
     /* A full flush is wanted: the caller asked for one, or a forwarding stub did not fit when
      * invalidating (read atomically) */
     bool flush_wanted;
     /* Statistics of the lock holder: translations and invalidations are charged to it */
-    struct appine_dbt_stats *st;
+    struct kazeterm_dbt_stats *st;
 };
 
 /* Registered mappings: [r[i][0], r[i][1]), sorted by start and non-overlapping */
@@ -357,7 +357,7 @@ struct shared_ranges {
 };
 
 /* Whether pc is in a registered mapping (without the lock) */
-static bool in_shared(const struct appine_dbt *d, uint64_t pc)
+static bool in_shared(const struct kazeterm_dbt *d, uint64_t pc)
 {
     const struct shared_ranges *s = __atomic_load_n(&d->shared, __ATOMIC_ACQUIRE);
     if (!s)
@@ -377,22 +377,22 @@ static bool in_shared(const struct appine_dbt *d, uint64_t pc)
 
 /* The part a thread uses to run in an address space: jump cache, shadow return stack and
  * statistics */
-struct appine_dbt_thread {
-    struct appine_dbt *d;
+struct kazeterm_dbt_thread {
+    struct kazeterm_dbt *d;
     unsigned tag; /* the group tag of the thread's address space, 0 if not in a group (TAG_SHIFT) */
-    struct appine_dbt_thread *next; /* d->threads list, read and written holding d->lock */
-    struct appine_cpu *cpu; /* cpu running in dbt_run or NULL (atomic): a full flush kicks it */
+    struct kazeterm_dbt_thread *next; /* d->threads list, read and written holding d->lock */
+    struct kazeterm_cpu *cpu; /* cpu running in dbt_run or NULL (atomic): a full flush kicks it */
     bool parked;            /* stopped in park for a full flush (accessed holding d->lock) */
     uint64_t generation;    /* the d->generation that jc and rs correspond to */
     struct slot *jc;        /* jump cache for indirect branches, direct-mapped */
     bool jc_dirty;
     uint64_t (*rs)[2]; /* shadow return stack */
-    struct appine_dbt_stats stats;
+    struct kazeterm_dbt_stats stats;
     /* Workspace for translating without the lock (prepare): the translation in progress, the
      * generated code and the result */
     struct xlate *xlate;
     uint32_t *scratch;
-    struct appine_cpu *probe;
+    struct kazeterm_cpu *probe;
     uint64_t *defined; /* results of tier0_defined, per instruction word (DEFINED_CACHE entries) */
     struct prep *prep;
 };
@@ -448,17 +448,17 @@ enum { TO_EXIT, TO_REFILL_READ, TO_REFILL_WRITE, TO_LOOKUP, TO_EXIT_FULL };
 #define GROUP_SPAN 512
 #define GROUP_MAX 16
 #define GROUP_SLOTS 4
-_Static_assert(sizeof(((struct appine_cpu *)0)->dbt_groups) == GROUP_SLOTS * 8, "one slot per group");
+_Static_assert(sizeof(((struct kazeterm_cpu *)0)->dbt_groups) == GROUP_SLOTS * 8, "one slot per group");
 #define MAX_RELOCS (MAX_STUBS * 2 + 4)
 
 struct xlate {
-    struct appine_dbt *d;
+    struct kazeterm_dbt *d;
     uint32_t *buf;
     /* Write address minus buf: 0 when translating into the thread's scratch area, rw_delta when
      * writing the code cache directly */
     intptr_t wdelta;
-    struct appine_dbt_stats *st; /* whom the translation statistics are charged to */
-    struct appine_cpu *probe;    /* used to ask Tier 0 whether it recognizes an instruction */
+    struct kazeterm_dbt_stats *st; /* whom the translation statistics are charged to */
+    struct kazeterm_cpu *probe;    /* used to ask Tier 0 whether it recognizes an instruction */
     uint64_t *defined;           /* its answers, cached per instruction word */
     size_t n;
     struct stub stubs[MAX_STUBS];
@@ -499,7 +499,7 @@ struct xlate {
 };
 
 /* Write address of code (the writable alias of the W^X double mapping) */
-static uint32_t *rw(const struct appine_dbt *d, const uint32_t *p)
+static uint32_t *rw(const struct kazeterm_dbt *d, const uint32_t *p)
 {
     return (uint32_t *)((uintptr_t)p + (uintptr_t)d->rw_delta);
 }
@@ -521,7 +521,7 @@ static size_t host_page_size(void)
  * the execute view counts twice, so the code cache is counted double in RssShmem, in the RSS the
  * LMK looks at and in the usage the memory limit measures. So the pages written in the writable
  * view are recorded, and the kernel layer's timer thread drops their page-table entries once a
- * second (appine_dbt_unmap_written): MADV_DONTNEED on shared memory only removes the mapping and
+ * second (kazeterm_dbt_unmap_written): MADV_DONTNEED on shared memory only removes the mapping and
  * keeps the content, and the next write faults once more. Dropping is by time, not by amount: JIT
  * workloads patch links and invalidate blocks in thousands of different pages per second, and
  * when dropping by amount (once every 256 KB accumulated) those pages faulted again and again and
@@ -536,7 +536,7 @@ struct written {
 };
 
 /* Drop the pages recorded in the writable view */
-static void drop_written(const struct appine_dbt *d)
+static void drop_written(const struct kazeterm_dbt *d)
 {
     struct written *w = d->written;
     if (!w || !__atomic_load_n(&w->pages, __ATOMIC_RELAXED) ||
@@ -562,7 +562,7 @@ static void drop_written(const struct appine_dbt *d)
 }
 
 /* [start, end) (execution addresses) was written through the writable view */
-static void note_written(const struct appine_dbt *d, const void *start, const void *end)
+static void note_written(const struct kazeterm_dbt *d, const void *start, const void *end)
 {
     struct written *w = d->written;
     if (!w || start == end)
@@ -579,7 +579,7 @@ static void note_written(const struct appine_dbt *d, const void *start, const vo
 }
 
 /* Make instruction fetch see several pieces of code after they are written */
-static void sync_written(const struct appine_dbt *d, void *const *start, void *const *end, unsigned n)
+static void sync_written(const struct kazeterm_dbt *d, void *const *start, void *const *end, unsigned n)
 {
     sync_code_ranges(start, end, n, d->rw_delta);
     for (unsigned i = 0; i < n; i++)
@@ -587,7 +587,7 @@ static void sync_written(const struct appine_dbt *d, void *const *start, void *c
 }
 
 /* Make instruction fetch see the new code after [start, end) is written */
-static void sync_range(const struct appine_dbt *d, const uint32_t *start, const uint32_t *end)
+static void sync_range(const struct kazeterm_dbt *d, const uint32_t *start, const uint32_t *end)
 {
     void *s = (void *)start, *e = (void *)end;
     sync_written(d, &s, &e, 1);
@@ -602,7 +602,7 @@ static void sync_range(const struct appine_dbt *d, const uint32_t *start, const 
  * doing an isb: at java startup each block is linked once or twice, and a full sync each time
  * waits for the invalidation broadcast to complete, which took a fifth of the startup time.
  */
-static void publish_link(const struct appine_dbt *d, uint32_t *site, uint32_t *branch)
+static void publish_link(const struct kazeterm_dbt *d, uint32_t *site, uint32_t *branch)
 {
     publish_code_lazily(site, site + 1, d->rw_delta);
     if (branch)
@@ -625,7 +625,7 @@ static void sync_add(struct syncs *s, const uint32_t *start, const uint32_t *end
     s->n++;
 }
 
-static void sync_all(const struct appine_dbt *d, struct syncs *s)
+static void sync_all(const struct kazeterm_dbt *d, struct syncs *s)
 {
     if (s->n)
         sync_written(d, s->start, s->end, s->n);
@@ -644,7 +644,7 @@ static uint32_t *here(struct xlate *x)
     return &x->buf[x->n];
 }
 
-static uint32_t *routine(const struct appine_dbt *d, unsigned to)
+static uint32_t *routine(const struct kazeterm_dbt *d, unsigned to)
 {
     switch (to) {
     case TO_EXIT:
@@ -712,7 +712,7 @@ static bool stolen_in(const struct regs *regs, unsigned r)
 
 static size_t guest_off(unsigned r)
 {
-    return r == REG_SP ? offsetof(struct appine_cpu, sp) : offsetof(struct appine_cpu, x) + 8 * r;
+    return r == REG_SP ? offsetof(struct kazeterm_cpu, sp) : offsetof(struct kazeterm_cpu, x) + 8 * r;
 }
 
 static void emit_load_guest(struct xlate *x, unsigned host, unsigned guest)
@@ -830,7 +830,7 @@ static void emit_to_refill(struct xlate *x, uint64_t pc, unsigned bytes, bool wr
 static void emit_refill_stub(struct xlate *x, const struct stub *s)
 {
     if (s->bytes > 1u << REFILL_REASON_SHIFT || s->fail >> (REFILL_RESUME_SHIFT - REFILL_REASON_SHIFT))
-        appine_guard_fail(); /* the info word cannot hold it: an engine bug */
+        kazeterm_guard_fail(); /* the info word cannot hold it: an engine bug */
     emit(x, enc_adr(T1, 8));
     emit_to_routine(x, s->write ? TO_REFILL_WRITE : TO_REFILL_READ);
     intptr_t resume = s->resume - here(x);
@@ -1117,7 +1117,7 @@ static unsigned structure_bytes(uint32_t insn)
     return selem << scale;
 }
 
-/* SIMD&FP memory access (bit 26 set): decoded the same way as Tier 0's appine_simd_ldst */
+/* SIMD&FP memory access (bit 26 set): decoded the same way as Tier 0's kazeterm_simd_ldst */
 static bool decode_simd_memop(uint32_t insn, uint64_t pc, struct memop *m)
 {
     unsigned size = FIELD(insn, 31, 30), opc = FIELD(insn, 23, 22);
@@ -1202,10 +1202,10 @@ static void emit_tlb_check(struct xlate *x, uint64_t pc, unsigned bytes, bool wr
         emit(x, enc_add_imm(T1, T0, bytes - 1, 0));
         last = T1;
     }
-    emit(x, enc_ubfx(T1, last, APPINE_PAGE_SHIFT, TLB_BITS));
+    emit(x, enc_ubfx(T1, last, KAZETERM_PAGE_SHIFT, TLB_BITS));
     emit(x, enc_add_lsl(T1, CTX, T1, 5));
     emit(x, enc_ldp_x(T1, T2, T1, (int)TLB_OFF + (write ? 16 : 0)));
-    emit(x, enc_eon_lsr(T1, T1, T0, APPINE_PAGE_SHIFT)); /* tag is the inverted page number */
+    emit(x, enc_eon_lsr(T1, T1, T0, KAZETERM_PAGE_SHIFT)); /* tag is the inverted page number */
     emit_to_refill(x, pc, bytes, write, fail);
 }
 
@@ -1219,7 +1219,7 @@ static void emit_tlb_check_known(struct xlate *x, uint64_t pc, uint64_t addr, un
                                  unsigned fail)
 {
     x->t2_group = -1;
-    uint64_t off = TLB_OFF + ((addr >> APPINE_PAGE_SHIFT) & (APPINE_TLB_ENTRIES - 1)) * 32 + (write ? 16 : 0);
+    uint64_t off = TLB_OFF + ((addr >> KAZETERM_PAGE_SHIFT) & (KAZETERM_TLB_ENTRIES - 1)) * 32 + (write ? 16 : 0);
     int64_t lo = (int64_t)(off & 0xfff);
     uint64_t hi = off - (uint64_t)lo;
     if (lo > 504 && lo >= 4096 - 512) { /* ldp offsets are -512..504 */
@@ -1237,7 +1237,7 @@ static void emit_tlb_check_known(struct xlate *x, uint64_t pc, uint64_t addr, un
         lo = 0;
     }
     emit(x, enc_ldp_x(T1, T2, b, (int)lo));
-    emit(x, enc_eon_lsr(T1, T1, T0, APPINE_PAGE_SHIFT)); /* tag is the inverted page number */
+    emit(x, enc_eon_lsr(T1, T1, T0, KAZETERM_PAGE_SHIFT)); /* tag is the inverted page number */
     emit_to_refill(x, pc, bytes, write, fail);
 }
 
@@ -1248,7 +1248,7 @@ static bool known_address(const struct xlate *x, unsigned rn, int64_t imm, unsig
     if (rn > 30 || !(x->konst >> rn & 1))
         return false;
     *addr = x->kval[rn] + (uint64_t)imm;
-    return ((*addr ^ (*addr + bytes - 1)) >> APPINE_PAGE_SHIFT) == 0;
+    return ((*addr ^ (*addr + bytes - 1)) >> KAZETERM_PAGE_SHIFT) == 0;
 }
 
 /*
@@ -1309,7 +1309,7 @@ static void emit_memop(struct xlate *x, const struct memop *m, uint64_t pc)
     if (m->mode == M_LITERAL) {
         emit_mov_const(x, T0, (uint64_t)m->imm);
         addr = (uint64_t)m->imm;
-        known = ((addr ^ (addr + memop_bytes(m) - 1)) >> APPINE_PAGE_SHIFT) == 0;
+        known = ((addr ^ (addr + memop_bytes(m) - 1)) >> KAZETERM_PAGE_SHIFT) == 0;
     } else {
         unsigned base = rn == REG_SP ? SP_HOST : rn;
         if (rn == REG_SP) { /* SP must be 16-byte aligned */
@@ -1476,7 +1476,7 @@ static bool member_fits(const struct xlate *x, const struct memop *m, int64_t of
 /* Whether the access at pc may lead a group: a recorded leader and anything within one block's
  * length after it may not, since its former members would most likely fail the check for the same
  * reason */
-static bool nogroup(const struct appine_dbt *d, uint64_t pc)
+static bool nogroup(const struct kazeterm_dbt *d, uint64_t pc)
 {
     unsigned n = d->nogroup_count < NOGROUP_MAX ? d->nogroup_count : NOGROUP_MAX;
     for (unsigned i = 0; i < n; i++) {
@@ -1497,7 +1497,7 @@ static int keeps_group(const struct xlate *x, uint32_t insn, unsigned rn, int64_
     struct operands o = {.n = 0};
     if ((top & 7) == 7) { /* SIMD&FP data processing: only general-register operands matter */
         struct native_desc nd;
-        if (!appine_simd_dp_decode(insn, &nd))
+        if (!kazeterm_simd_dp_decode(insn, &nd))
             return false;
         for (unsigned i = 0; i < nd.n; i++) {
             add_operand(&o, nd.gpr[i].pos, false);
@@ -1707,7 +1707,7 @@ static void emit_group(struct xlate *x, const struct memop *lead, uint64_t pc, i
     }
     emit(x, enc_add_lsl(T2, T2, base, 0));
     if (g->spill)
-        emit(x, enc_str_x(T2, CTX, offsetof(struct appine_cpu, dbt_groups) + 8 * (size_t)slot));
+        emit(x, enc_str_x(T2, CTX, offsetof(struct kazeterm_cpu, dbt_groups) + 8 * (size_t)slot));
     x->t2_group = slot;
     g->next = 1;
     emit_member(x, lead, g->off[0]);
@@ -1800,8 +1800,8 @@ static bool translate_exclusive(struct xlate *x, uint32_t insn, uint64_t pc)
 {
     unsigned size = FIELD(insn, 31, 30), bytes = 1u << size;
     unsigned rs = FIELD(insn, 20, 16), rn = FIELD(insn, 9, 5), rt = insn & 31;
-    size_t addr = offsetof(struct appine_cpu, excl_addr), value = offsetof(struct appine_cpu, excl_value),
-           len = offsetof(struct appine_cpu, excl_size);
+    size_t addr = offsetof(struct kazeterm_cpu, excl_addr), value = offsetof(struct kazeterm_cpu, excl_value),
+           len = offsetof(struct kazeterm_cpu, excl_size);
 
     if (BIT(insn, 22)) { /* LDXR/LDAXR */
         unsigned h = (rt == 31 || is_stolen(rt)) ? T1 : rt;
@@ -1962,7 +1962,7 @@ static int64_t sext(uint64_t v, unsigned bits)
  */
 static void emit_call(struct xlate *x, uint64_t pc)
 {
-    size_t rs = offsetof(struct appine_cpu, dbt_rs);
+    size_t rs = offsetof(struct kazeterm_cpu, dbt_rs);
     uint32_t *site = here(x);
     emit(x, enc_bl(0));
     emit_exit_stub(x, R_CHAIN, pc + 4); /* landing pad */
@@ -1987,7 +1987,7 @@ static void emit_call(struct xlate *x, uint64_t pc)
  * through to the jump-cache lookup after it */
 static void emit_predicted_return(struct xlate *x)
 {
-    size_t rs = offsetof(struct appine_cpu, dbt_rs);
+    size_t rs = offsetof(struct kazeterm_cpu, dbt_rs);
     emit(x, enc_ldr_x(T1, CTX, rs));
     emit(x, enc_ldp_x(T0, T2, T1, 0));
     emit(x, enc_eor_lsr(T0, T0, 30, 0));
@@ -2026,7 +2026,7 @@ static void emit_fpcr_write_check(struct xlate *x, unsigned src, uint64_t pc)
 {
     emit_mov_const(x, T1, fpcr_write_mask());
     emit(x, enc_and_reg(T1, src, T1));
-    emit(x, enc_ldr_x(T0, CTX, offsetof(struct appine_cpu, fpcr)));
+    emit(x, enc_ldr_x(T0, CTX, offsetof(struct kazeterm_cpu, fpcr)));
     emit(x, enc_eor_lsr(T1, T1, T0, 0));
     emit_to_stub(x, enc_cbnz_x(T1), FIX_IMM19, R_INTERP, pc);
 }
@@ -2068,14 +2068,14 @@ static bool translate_branch_sys(struct xlate *x, uint32_t insn, uint64_t pc)
     if ((insn & 0xfffff01f) == 0xd503301f) {
         unsigned op2 = FIELD(insn, 7, 5);
         if (op2 == 2) { /* CLREX: clear the guest's exclusive marker */
-            emit(x, enc_str_w(31, CTX, offsetof(struct appine_cpu, excl_size)));
+            emit(x, enc_str_w(31, CTX, offsetof(struct kazeterm_cpu, excl_size)));
             x->st->insns_remapped++;
             return true;
         }
         /* Complete the barrier before resuming at pc + 4 with any changed blocks retired. */
         emit(x, insn);
         if (op2 == 4 || op2 == 6) {
-            emit(x, enc_ldr_x(T0, CTX, offsetof(struct appine_cpu, ivau_page)));
+            emit(x, enc_ldr_x(T0, CTX, offsetof(struct kazeterm_cpu, ivau_page)));
             emit_to_stub(x, enc_cbnz_x(T0), FIX_IMM19, R_CODE, pc + 4);
         }
         x->st->insns_copied++;
@@ -2102,7 +2102,7 @@ static bool translate_branch_sys(struct xlate *x, uint32_t insn, uint64_t pc)
         case SYSREG_FPCR:
         case SYSREG_TPIDR_EL0: {
             bool fpcr = sysreg == SYSREG_FPCR;
-            size_t off = fpcr ? offsetof(struct appine_cpu, fpcr) : offsetof(struct appine_cpu, tpidr_el0);
+            size_t off = fpcr ? offsetof(struct kazeterm_cpu, fpcr) : offsetof(struct kazeterm_cpu, tpidr_el0);
             unsigned h = is_stolen(rt) ? T0 : rt;
             if (!read) {
                 if (h == T0)
@@ -2158,15 +2158,15 @@ static bool translate_branch_sys(struct xlate *x, uint32_t insn, uint64_t pc)
         emit_xreg_to_t0(x, insn & 31);
         emit_tlb_check(x, pc, 1, false, true, false, R_INTERP);
         if (cmo == 0xd50b7520) {
-            emit(x, enc_and_ror(T0, T0, DATA_TAG_SHIFT - APPINE_PAGE_SHIFT, 64 - APPINE_PAGE_SHIFT));
+            emit(x, enc_and_ror(T0, T0, DATA_TAG_SHIFT - KAZETERM_PAGE_SHIFT, 64 - KAZETERM_PAGE_SHIFT));
             /* Zero means no pending page. Tier 0 returns this address explicitly. */
             emit_to_stub(x, enc_cbz_x(T0), FIX_IMM19, R_INTERP, pc);
-            emit(x, enc_ldr_x(T1, CTX, offsetof(struct appine_cpu, ivau_page)));
+            emit(x, enc_ldr_x(T1, CTX, offsetof(struct kazeterm_cpu, ivau_page)));
             emit(x, enc_eor_lsr(T2, T1, T0, 0));
             uint32_t *same_page = here(x);
             emit(x, enc_cbz_x(T2));
             emit_to_stub(x, enc_cbnz_x(T1), FIX_IMM19, R_INTERP, pc);
-            emit(x, enc_str_x(T0, CTX, offsetof(struct appine_cpu, ivau_page)));
+            emit(x, enc_str_x(T0, CTX, offsetof(struct kazeterm_cpu, ivau_page)));
             patch_local(x, same_page, here(x));
         }
         x->st->insns_memory++;
@@ -2181,7 +2181,7 @@ static bool translate_branch_sys(struct xlate *x, uint32_t insn, uint64_t pc)
         emit_xreg_to_t0(x, rn);
         if (reg_branch == 0xd63f0000)
             emit_call(x, pc);
-        emit(x, enc_ldr_x(T1, CTX, offsetof(struct appine_cpu, dbt_jump_cache)));
+        emit(x, enc_ldr_x(T1, CTX, offsetof(struct kazeterm_cpu, dbt_jump_cache)));
         emit(x, enc_ubfx(T2, T0, 2, JC_BITS));
         emit(x, enc_add_lsl(T1, T1, T2, 4));
         emit(x, enc_ldp_x(T2, T1, T1, 0));
@@ -2201,28 +2201,28 @@ static bool translate_branch_sys(struct xlate *x, uint32_t insn, uint64_t pc)
  * took two percentage points.
  */
 #define DEFINED_CACHE 4096
-static bool tier0_defined(struct appine_cpu *probe, uint64_t *cache, uint32_t insn, uint64_t pc)
+static bool tier0_defined(struct kazeterm_cpu *probe, uint64_t *cache, uint32_t insn, uint64_t pc)
 {
     uint64_t *e = &cache[(insn * UINT32_C(0x9e3779b1)) >> 20];
     if ((*e >> 1) == ((uint64_t)1 << 39 | insn))
         return *e & 1;
     probe->pc = pc;
     probe->sp = 0;
-    bool ok = appine_interp_exec(probe, insn) != APPINE_EXIT_UNDEF;
+    bool ok = kazeterm_interp_exec(probe, insn) != KAZETERM_EXIT_UNDEF;
     *e = (uint64_t)1 << 40 | (uint64_t)insn << 1 | ok;
     return ok;
 }
 
 /*
- * SIMD&FP data processing: the whitelist decision shares appine_simd_dp_decode with Tier 0. V
+ * SIMD&FP data processing: the whitelist decision shares kazeterm_simd_dp_decode with Tier 0. V
  * registers need no rewriting; only general-register operands may be stolen registers. It does
  * not go through tier0_defined, to avoid generating a native stub for every instruction.
  */
 static bool translate_simd_dp(struct xlate *x, uint32_t insn)
 {
     struct native_desc nd;
-    if (!appine_has(APPINE_HWCAP_FP | APPINE_HWCAP_ASIMD) || !appine_native_available() ||
-        !appine_simd_dp_decode(insn, &nd))
+    if (!kazeterm_has(KAZETERM_HWCAP_FP | KAZETERM_HWCAP_ASIMD) || !kazeterm_native_available() ||
+        !kazeterm_simd_dp_decode(insn, &nd))
         return false;
     struct operands o = {.n = 0, .writes_rd = false};
     for (unsigned i = 0; i < nd.n; i++) {
@@ -2360,11 +2360,11 @@ static bool translate_insn_body(struct xlate *x, uint32_t insn, uint64_t pc)
             if (g->next >= g->n || x->idx != g->idx[g->next])
                 continue;
             if (g->reload[g->next]) {
-                size_t off = offsetof(struct appine_cpu, dbt_groups) + 8 * (size_t)i;
+                size_t off = offsetof(struct kazeterm_cpu, dbt_groups) + 8 * (size_t)i;
                 emit(x, enc_ldr_x(T2, CTX, off));
                 x->t2_group = i;
             } else if (x->t2_group != i) {
-                appine_guard_fail(); /* plan_group ensures nothing used T2 before a member not
+                kazeterm_guard_fail(); /* plan_group ensures nothing used T2 before a member not
                                       * marked reload */
             }
             emit_member(x, &m, g->off[g->next++]);
@@ -2387,7 +2387,7 @@ static bool translate_insn_body(struct xlate *x, uint32_t insn, uint64_t pc)
 /* Point a conditional branch directly at the target block; if that is out of its offset range,
  * leave it unchanged (it still goes through the stub) and return false.
  * Does not sync the instruction cache */
-static bool relink_word(const struct appine_dbt *d, uint32_t *site, const uint32_t *target)
+static bool relink_word(const struct kazeterm_dbt *d, uint32_t *site, const uint32_t *target)
 {
     /* Read through the execution address: a read fault on the writable alias makes the host also
      * map a dozen or so nearby pages (fault-around), which are not recorded in struct written */
@@ -2486,7 +2486,7 @@ static uint32_t *table_find_for(const struct table *t, uint64_t pc, unsigned tag
  * The dispatcher and the lookup routine (emit_lookup) look up the table without the lock: while
  * the cpu's dbt_lookup_seq is odd, a replaced old table is not freed (table_publish)
  */
-static uint32_t *table_lookup(struct appine_dbt *d, struct appine_cpu *c, uint64_t pc, unsigned *found)
+static uint32_t *table_lookup(struct kazeterm_dbt *d, struct kazeterm_cpu *c, uint64_t pc, unsigned *found)
 {
     __atomic_store_n(&c->dbt_lookup_seq, c->dbt_lookup_seq + 1, __ATOMIC_SEQ_CST);
     uint32_t *code = table_find_for(__atomic_load_n(&d->table, __ATOMIC_SEQ_CST), pc, c->dbt_tag, found);
@@ -2496,14 +2496,14 @@ static uint32_t *table_lookup(struct appine_dbt *d, struct appine_cpu *c, uint64
 
 /* Install the new table, and free the old one once the threads looking it up have finished. Lock
  * held */
-static void table_publish(struct appine_dbt *d, struct table *table)
+static void table_publish(struct kazeterm_dbt *d, struct table *table)
 {
     struct table *old = d->table;
     __atomic_store_n(&d->table, table, __ATOMIC_SEQ_CST);
     /* Threads not in dbt_run do not look up the table; those entering later register their cpu
      * before reading table, so they read the new table */
-    for (struct appine_dbt_thread *t = d->threads; t; t = t->next) {
-        struct appine_cpu *c = __atomic_load_n(&t->cpu, __ATOMIC_SEQ_CST);
+    for (struct kazeterm_dbt_thread *t = d->threads; t; t = t->next) {
+        struct kazeterm_cpu *c = __atomic_load_n(&t->cpu, __ATOMIC_SEQ_CST);
         if (!c)
             continue;
         unsigned seq = __atomic_load_n(&c->dbt_lookup_seq, __ATOMIC_SEQ_CST);
@@ -2520,7 +2520,7 @@ static void table_publish(struct appine_dbt *d, struct table *table)
  * Shared blocks only link to shared blocks (TAG_SHIFT). The changes are synced together with the
  * whole block. Lock held
  */
-static void link_block(const struct appine_dbt *d, uint32_t *code, uint64_t pc, unsigned tag,
+static void link_block(const struct kazeterm_dbt *d, uint32_t *code, uint64_t pc, unsigned tag,
                        const struct link *links, unsigned n)
 {
     for (unsigned i = 0; i < n; i++) {
@@ -2550,9 +2550,9 @@ static unsigned page_bucket(uint64_t page)
 /* Put the live blocks into a new table of 2^bits entries in their original insertion order,
  * leaving out invalidated blocks (tombstones), with table_used and blocks keeping matching
  * indices; returns false if allocation fails, leaving the original table unchanged. Lock held */
-static void table_rebuild(struct appine_dbt *d, struct table *table);
+static void table_rebuild(struct kazeterm_dbt *d, struct table *table);
 
-static bool table_resize(struct appine_dbt *d, unsigned bits)
+static bool table_resize(struct kazeterm_dbt *d, unsigned bits)
 {
     struct table *table = table_new(bits);
     if (!table)
@@ -2562,7 +2562,7 @@ static bool table_resize(struct appine_dbt *d, unsigned bits)
 }
 
 /* Fill the newly allocated table from blocks and install it (table_resize) */
-static void table_rebuild(struct appine_dbt *d, struct table *table)
+static void table_rebuild(struct kazeterm_dbt *d, struct table *table)
 {
     size_t occupied = 0;
     for (size_t k = 0; k < d->table_count; k++) {
@@ -2585,7 +2585,7 @@ static void table_rebuild(struct appine_dbt *d, struct table *table)
 
 /* Insert only when pc is not in the table (a private block belongs to member `tag`), using only
  * empty slots (see struct table). Lock held */
-static void table_insert(struct appine_dbt *d, uint64_t pc, unsigned tag, uint32_t *code,
+static void table_insert(struct kazeterm_dbt *d, uint64_t pc, unsigned tag, uint32_t *code,
                          const uint32_t *guest, uint32_t nguest)
 {
     struct table *t = d->table;
@@ -2595,7 +2595,7 @@ static void table_insert(struct appine_dbt *d, uint64_t pc, unsigned tag, uint32
     d->table_occupied++;
     __atomic_store_n(&t->slots[i].pc, tagged(pc, tag), __ATOMIC_RELAXED);
     __atomic_store_n(&t->slots[i].code, code, __ATOMIC_RELEASE);
-    unsigned h = page_bucket(pc >> APPINE_PAGE_SHIFT);
+    unsigned h = page_bucket(pc >> KAZETERM_PAGE_SHIFT);
     memcpy(d->words + d->words_used, guest, nguest * 4);
     d->blocks[d->table_count] =
         (struct block){pc, code, d->page_head[h], (uint32_t)d->words_used, (uint8_t)nguest, 0, (uint16_t)tag, 0};
@@ -2609,7 +2609,7 @@ static void table_insert(struct appine_dbt *d, uint64_t pc, unsigned tag, uint32
  * hits. Old entries in the threads' jump caches need not be removed: they point to the
  * invalidated block's entry, which jumps to the forwarding stub. Lock held
  */
-static void table_remove(struct appine_dbt *d, uint64_t key)
+static void table_remove(struct kazeterm_dbt *d, uint64_t key)
 {
     struct table *t = d->table;
     for (size_t i = table_index(t, key); t->slots[i].code; i = (i + 1) & table_mask(t)) {
@@ -2632,7 +2632,7 @@ static uint64_t jc_empty(unsigned i)
     return (uint64_t)((i + 1) & (JC_SIZE - 1)) << 2 | 1;
 }
 
-static void clear_jump_cache(struct appine_dbt_thread *t)
+static void clear_jump_cache(struct kazeterm_dbt_thread *t)
 {
     for (unsigned i = 0; i < JC_SIZE; i++)
         t->jc[i] = (struct slot){jc_empty(i), NULL};
@@ -2641,7 +2641,7 @@ static void clear_jump_cache(struct appine_dbt_thread *t)
 
 /* Replace the whole shadow return stack with empty entries: the code holding the landing pads is
  * about to be overwritten */
-static void rs_reset(struct appine_dbt_thread *t)
+static void rs_reset(struct kazeterm_dbt_thread *t)
 {
     for (unsigned i = 0; i < RS_ENTRIES; i++) {
         t->rs[i][0] = 1; /* misaligned, never a RET target; if matched, rs_miss still looks up */
@@ -2651,7 +2651,7 @@ static void rs_reset(struct appine_dbt_thread *t)
 
 /* The code cache has been fully flushed (generation changed): the thread's own jump cache and
  * shadow return stack point to old code */
-static void thread_catch_up(struct appine_dbt_thread *t)
+static void thread_catch_up(struct kazeterm_dbt_thread *t)
 {
     uint64_t g = __atomic_load_n(&t->d->generation, __ATOMIC_ACQUIRE);
     if (t->generation != g) {
@@ -2669,7 +2669,7 @@ static void thread_catch_up(struct appine_dbt_thread *t)
  * in the code cache, and their entries still jump to the forwarding stubs. Lock held; returns
  * false if allocating the new table fails
  */
-static bool compact_blocks(struct appine_dbt *d)
+static bool compact_blocks(struct kazeterm_dbt *d)
 {
     struct table *table = table_new(d->table->bits);
     if (!table)
@@ -2683,7 +2683,7 @@ static bool compact_blocks(struct appine_dbt *d)
         memmove(d->words + words, d->words + b.words, b.nguest * 4);
         b.words = (uint32_t)words;
         words += b.nguest;
-        unsigned h = page_bucket(b.pc >> APPINE_PAGE_SHIFT);
+        unsigned h = page_bucket(b.pc >> KAZETERM_PAGE_SHIFT);
         b.next = d->page_head[h];
         d->blocks[n++] = b;
         d->page_head[h] = (uint32_t)n;
@@ -2700,7 +2700,7 @@ static bool compact_blocks(struct appine_dbt *d)
  * the table without the lock: they have all stopped in the dispatcher, or are not in dbt_run
  * (flush_world).
  */
-static void flush_locked(struct appine_dbt *d)
+static void flush_locked(struct kazeterm_dbt *d)
 {
     if (d->used_words > d->high_words)
         d->high_words = d->used_words;
@@ -2708,8 +2708,8 @@ static void flush_locked(struct appine_dbt *d)
     for (size_t i = 0; i < d->table_count; i++) {
         if (d->table_used[i] != SLOT_NONE)
             t->slots[d->table_used[i]] = (struct slot){0, NULL};
-        d->page_head[page_bucket(d->blocks[i].pc >> APPINE_PAGE_SHIFT)] = 0;
-        d->page_parked[page_bucket(d->blocks[i].pc >> APPINE_PAGE_SHIFT)] = 0;
+        d->page_head[page_bucket(d->blocks[i].pc >> KAZETERM_PAGE_SHIFT)] = 0;
+        d->page_parked[page_bucket(d->blocks[i].pc >> KAZETERM_PAGE_SHIFT)] = 0;
     }
     d->table_count = d->table_occupied = d->table_dead = d->blocks_dead = d->nparked = 0;
     d->words_used = 0;
@@ -2744,7 +2744,7 @@ struct retire_batch {
     uint32_t *fwd_start;
 };
 
-static void retire_flush(struct appine_dbt *d, struct retire_batch *r)
+static void retire_flush(struct kazeterm_dbt *d, struct retire_batch *r)
 {
     if (!r->n)
         return;
@@ -2770,7 +2770,7 @@ static void retire_flush(struct appine_dbt *d, struct retire_batch *r)
         if (r->park[i]) {
             b->parked = 1;
             d->nparked++;
-            d->page_parked[page_bucket(b->pc >> APPINE_PAGE_SHIFT)]++;
+            d->page_parked[page_bucket(b->pc >> KAZETERM_PAGE_SHIFT)]++;
             continue;
         }
         b->code = NULL;
@@ -2781,12 +2781,12 @@ static void retire_flush(struct appine_dbt *d, struct retire_batch *r)
 }
 
 /* Invalidate a parked block: its entry already jumps to the forwarding stub */
-static void kill_parked(struct appine_dbt *d, struct block *b)
+static void kill_parked(struct kazeterm_dbt *d, struct block *b)
 {
     b->parked = 0;
     b->code = NULL;
     d->nparked--;
-    d->page_parked[page_bucket(b->pc >> APPINE_PAGE_SHIFT)]--;
+    d->page_parked[page_bucket(b->pc >> KAZETERM_PAGE_SHIFT)]--;
     d->blocks_dead++;
     d->st->invalidated++;
 }
@@ -2794,7 +2794,7 @@ static void kill_parked(struct appine_dbt *d, struct block *b)
 /* Invalidate b: write its forwarding stub first (16 words each), and leave the entry for
  * retire_flush to change together with the others. With `park` it is only parked (revive).
  * Returns false if the code cache has no room for the forwarding stub */
-static bool retire_add(struct appine_dbt *d, struct retire_batch *r, struct block *b, bool park)
+static bool retire_add(struct kazeterm_dbt *d, struct retire_batch *r, struct block *b, bool park)
 {
     if (r->n == RETIRE_BATCH)
         retire_flush(d, r);
@@ -2816,7 +2816,7 @@ static bool retire_add(struct appine_dbt *d, struct retire_batch *r, struct bloc
     return true;
 }
 
-static bool block_matches(const struct appine_dbt *d, const struct appine_mmu *mmu,
+static bool block_matches(const struct kazeterm_dbt *d, const struct kazeterm_mmu *mmu,
                           const struct block *b, uint64_t *page, const uint32_t **host);
 
 /*
@@ -2832,14 +2832,14 @@ static bool block_matches(const struct appine_dbt *d, const struct appine_mmu *m
  * Parked blocks are left alone: they are checked anyway when revived. Without `mmu` every block
  * in the range is invalidated, parked ones included. Lock held
  */
-static void invalidate_locked(struct appine_dbt *d, const struct appine_mmu *mmu, uint64_t start,
+static void invalidate_locked(struct kazeterm_dbt *d, const struct kazeterm_mmu *mmu, uint64_t start,
                               uint64_t len)
 {
     if (!len)
         return;
-    uint64_t end = start + len - 1, first = start >> APPINE_PAGE_SHIFT, last = end >> APPINE_PAGE_SHIFT;
+    uint64_t end = start + len - 1, first = start >> KAZETERM_PAGE_SHIFT, last = end >> KAZETERM_PAGE_SHIFT;
     if (end < start)
-        last = UINT64_MAX >> APPINE_PAGE_SHIFT;
+        last = UINT64_MAX >> KAZETERM_PAGE_SHIFT;
     /* A very large range (unmapping a library): look at every block in turn, which is cheaper
      * than a full flush, and other threads need not retranslate either. Blocks do not cross pages,
      * so compare page by page */
@@ -2849,7 +2849,7 @@ static void invalidate_locked(struct appine_dbt *d, const struct appine_mmu *mmu
     if (end < start || last - first >= INVALIDATE_MAX_PAGES) {
         for (size_t i = 0; i < d->table_count; i++) {
             struct block *b = &d->blocks[i];
-            uint64_t page = b->pc >> APPINE_PAGE_SHIFT;
+            uint64_t page = b->pc >> KAZETERM_PAGE_SHIFT;
             if (!b->code || page < first || page > last)
                 continue;
             if (b->parked) {
@@ -2874,7 +2874,7 @@ static void invalidate_locked(struct appine_dbt *d, const struct appine_mmu *mmu
                 continue;
             }
             link = &b->next;
-            if (b->pc >> APPINE_PAGE_SHIFT != page)
+            if (b->pc >> KAZETERM_PAGE_SHIFT != page)
                 continue;
             if (b->parked) {
                 if (!mmu)
@@ -2900,7 +2900,7 @@ full:
  * containing it are invalidated (blocks do not cross pages, so they are all in its page's
  * bucket), and on retranslation it is no longer grouped. Lock held
  */
-static void ungroup(struct appine_dbt *d, uint64_t pc)
+static void ungroup(struct kazeterm_dbt *d, uint64_t pc)
 {
     uint64_t *strike = &d->strikes[(pc >> 2) % STRIKES];
     if (*strike != pc) {
@@ -2910,7 +2910,7 @@ static void ungroup(struct appine_dbt *d, uint64_t pc)
     *strike = 0;
     d->nogroup[d->nogroup_count++ % NOGROUP_MAX] = pc;
     d->st->ungrouped++;
-    uint64_t page = pc >> APPINE_PAGE_SHIFT;
+    uint64_t page = pc >> KAZETERM_PAGE_SHIFT;
     struct retire_batch r = {.n = 0};
     for (uint32_t i = d->page_head[page_bucket(page)]; i; i = d->blocks[i - 1].next) {
         struct block *b = &d->blocks[i - 1];
@@ -2996,13 +2996,13 @@ static pthread_mutex_t *template_lock(uint64_t pc)
 {
     pthread_mutex_t *lock = &templates.shards[template_index(pc) % TEMPLATE_SHARDS].lock;
     pthread_mutex_lock(lock);
-    appine_guard_hold(lock, false);
+    kazeterm_guard_hold(lock, false);
     return lock;
 }
 
 static void template_unlock(pthread_mutex_t *lock)
 {
-    appine_guard_drop();
+    kazeterm_guard_drop();
     pthread_mutex_unlock(lock);
 }
 
@@ -3011,7 +3011,7 @@ static void template_unlock(pthread_mutex_t *lock)
  * that affect leaders after pc in this page): if the instance's records differ, the translated
  * block may differ too, so translation templates are versioned by it. 0 if there are none.
  */
-static uint64_t nogroup_key(const struct appine_dbt *d, uint64_t pc)
+static uint64_t nogroup_key(const struct kazeterm_dbt *d, uint64_t pc)
 {
     uint64_t key = 0, end = (pc | PAGE_MASK) + 1;
     unsigned n = d->nogroup_count < NOGROUP_MAX ? d->nogroup_count : NOGROUP_MAX;
@@ -3058,7 +3058,7 @@ struct prep {
 /* If there is a template matching `guest` (the instruction words read at translation), copy it
  * into the thread's scratch area and record it in p */
 static bool template_fetch(uint64_t pc, const uint32_t *guest, uint64_t key, const struct regs *r,
-                           bool shared, struct prep *p, uint32_t *scratch, struct appine_dbt_stats *st)
+                           bool shared, struct prep *p, uint32_t *scratch, struct kazeterm_dbt_stats *st)
 {
     pthread_mutex_t *lock = template_lock(pc);
     struct template *t = template_find(pc, guest, key, r, shared);
@@ -3092,7 +3092,7 @@ static void *template_alloc(size_t bytes)
 {
     void *p = NULL;
     pthread_mutex_lock(&templates.arena_lock);
-    appine_guard_hold(&templates.arena_lock, false);
+    kazeterm_guard_hold(&templates.arena_lock, false);
     if (!templates.arena) {
         void *m = mmap(NULL, TEMPLATE_BYTES, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         templates.arena = m == MAP_FAILED ? NULL : m;
@@ -3103,7 +3103,7 @@ static void *template_alloc(size_t bytes)
     } else if (templates.arena) {
         templates.full = true;
     }
-    appine_guard_drop();
+    kazeterm_guard_drop();
     pthread_mutex_unlock(&templates.arena_lock);
     return p;
 }
@@ -3125,22 +3125,22 @@ static void template_clear(bool if_full)
     for (unsigned i = 0; i < TEMPLATE_SHARDS; i++)
         pthread_mutex_lock(&templates.shards[i].lock);
     pthread_mutex_lock(&templates.arena_lock);
-    appine_guard_hold_fn(NULL, template_unlock_all);
+    kazeterm_guard_hold_fn(NULL, template_unlock_all);
     if (templates.full || !if_full) {
         memset(templates.buckets, 0, sizeof(templates.buckets));
         templates.used = 0;
         templates.full = false;
     }
-    appine_guard_drop();
+    kazeterm_guard_drop();
     template_unlock_all(NULL);
 }
 
 /* Store a just-translated block whose links have not been patched yet as a template */
 static void template_store(uint64_t pc, const uint32_t *guest, uint32_t nguest, uint64_t key,
-                           const struct xlate *x, const struct appine_dbt_stats *before,
+                           const struct xlate *x, const struct kazeterm_dbt_stats *before,
                            const struct link *links, unsigned nlinks)
 {
-    const struct appine_dbt_stats *after = x->st;
+    const struct kazeterm_dbt_stats *after = x->st;
     size_t bytes = sizeof(struct template) + 4 * (nguest + x->n + x->nrelocs + 4 * nlinks);
     bytes = (bytes + 7) & ~(size_t)7;
     pthread_mutex_t *lock = template_lock(pc);
@@ -3191,7 +3191,7 @@ static void template_store(uint64_t pc, const uint32_t *guest, uint32_t nguest, 
 }
 
 /*
- * For profiling: when the environment variable APPINE_PERF_MAP is set, write each block's
+ * For profiling: when the environment variable KAZETERM_PERF_MAP is set, write each block's
  * location in the code cache to /tmp/perf-<pid>.map, which perf report uses to attribute samples
  * to guest pcs (g_<pc>). Without the variable it costs only one extra check.
  */
@@ -3203,9 +3203,9 @@ static void perf_map(const void *code, size_t bytes, uint64_t pc)
     if (__atomic_load_n(&enabled, __ATOMIC_RELAXED) == 0)
         return;
     pthread_mutex_lock(&lock);
-    appine_guard_hold(&lock, false);
+    kazeterm_guard_hold(&lock, false);
     if (__atomic_load_n(&enabled, __ATOMIC_RELAXED) < 0) {
-        int on = getenv("APPINE_PERF_MAP") != NULL;
+        int on = getenv("KAZETERM_PERF_MAP") != NULL;
         if (on) {
             char path[64];
             snprintf(path, sizeof path, "/tmp/perf-%d.map", (int)getpid());
@@ -3218,7 +3218,7 @@ static void perf_map(const void *code, size_t bytes, uint64_t pc)
                 (unsigned long)pc);
         fflush(file);
     }
-    appine_guard_drop();
+    kazeterm_guard_drop();
     pthread_mutex_unlock(&lock);
 }
 
@@ -3245,18 +3245,18 @@ struct fresh {
  * instruction words are copied first and then translated, and the copy is compared with memory
  * before installing (install). Returns false if the instructions cannot be fetched.
  */
-static bool prepare(struct appine_dbt_thread *t, struct appine_cpu *c, uint64_t pc)
+static bool prepare(struct kazeterm_dbt_thread *t, struct kazeterm_cpu *c, uint64_t pc)
 {
-    struct appine_dbt *d = t->d;
+    struct kazeterm_dbt *d = t->d;
     struct prep *p = t->prep;
     /* A block does not cross a page (it ends at a page boundary), and the whole page has the same
      * permissions */
     const uint32_t *page = NULL;
     if (!(pc & 3))
-        page = appine_mmu_translate(c->mmu, pc & ~PAGE_MASK, APPINE_PROT_EXEC);
+        page = kazeterm_mmu_translate(c->mmu, pc & ~PAGE_MASK, KAZETERM_PROT_EXEC);
     if (!page)
         return false;
-    unsigned limit = (unsigned)((APPINE_PAGE_SIZE - (pc & PAGE_MASK)) / 4);
+    unsigned limit = (unsigned)((KAZETERM_PAGE_SIZE - (pc & PAGE_MASK)) / 4);
     if (limit > MAX_BLOCK_INSNS)
         limit = MAX_BLOCK_INSNS;
     p->pc = pc;
@@ -3274,7 +3274,7 @@ static bool prepare(struct appine_dbt_thread *t, struct appine_cpu *c, uint64_t 
     if (template_fetch(pc, guest, key, d->r, !p->tag, p, t->scratch, &t->stats))
         return true;
 
-    struct appine_dbt_stats before = t->stats;
+    struct kazeterm_dbt_stats before = t->stats;
     struct xlate *x = t->xlate;
     x->d = d;
     x->buf = t->scratch;
@@ -3297,7 +3297,7 @@ static bool prepare(struct appine_dbt_thread *t, struct appine_cpu *c, uint64_t 
     x->t2_group = -1;
 
     /* Check for a kick at the block entry, so that linked loops can be kicked too */
-    emit(x, enc_ldr_x(T0, CTX, offsetof(struct appine_cpu, pending)));
+    emit(x, enc_ldr_x(T0, CTX, offsetof(struct kazeterm_cpu, pending)));
     emit_to_stub(x, enc_cbnz_x(T0), FIX_IMM19, R_KICK, pc);
     _Static_assert(ENTRY_CHECK_WORDS == 2, "the length of the block entry check");
 
@@ -3319,7 +3319,7 @@ static bool prepare(struct appine_dbt_thread *t, struct appine_cpu *c, uint64_t 
     /* A wrong upper-bound estimate is an engine bug: stop before writing out of bounds */
     if (x->nstubs > MAX_STUBS || x->nfixups > MAX_FIXUPS ||
         x->n + (size_t)x->nstubs * MAX_STUB_WORDS > MAX_BLOCK_WORDS)
-        appine_guard_fail();
+        kazeterm_guard_fail();
     for (unsigned i = 0; i < x->nstubs; i++)
         x->stubs[i].sites = 0;
     for (unsigned k = 0; k < x->nfixups; k++) {
@@ -3351,7 +3351,7 @@ static bool prepare(struct appine_dbt_thread *t, struct appine_cpu *c, uint64_t 
     }
 
     if (x->nrelocs > MAX_RELOCS)
-        appine_guard_fail();
+        kazeterm_guard_fail();
     template_store(pc, guest, nguest, key, x, &before, p->links, p->nlinks);
     p->nguest = nguest;
     p->host = x->buf;
@@ -3367,7 +3367,7 @@ static bool prepare(struct appine_dbt_thread *t, struct appine_cpu *c, uint64_t 
  * and the caller puts it in the translation table (table_insert) after syncing the instruction
  * cache.
  */
-static uint32_t *install(struct appine_dbt *d, const struct prep *p, struct syncs *sync, struct fresh *f)
+static uint32_t *install(struct kazeterm_dbt *d, const struct prep *p, struct syncs *sync, struct fresh *f)
 {
     /* Another thread rewrote this code during translation (this block was not in the table yet
      * when it invalidated): retranslate */
@@ -3417,19 +3417,19 @@ static void emit_to_fail(struct xlate *x, struct refill_fails *f, uint32_t insn)
 /*
  * Walk the page table with mmu.c's structure and fill the page containing address `a` (T0 or x3)
  * into the TLB: the tags of the read and write halves are filled separately according to the leaf
- * entry's permissions, and tlb_used is recorded at the same time, as in Tier 0's appine_tlb_fill.
+ * entry's permissions, and tlb_used is recorded at the same time, as in Tier 0's kazeterm_tlb_fill.
  * Jumps to failure if unmapped or lacking the permission this access needs. Afterwards
  * x2 = addend; uses up x0, x1, x4 and T2, and preserves x3, T0 and T1.
  */
 static void emit_fill(struct xlate *x, unsigned a, bool write, struct refill_fails *f)
 {
-    size_t used = offsetof(struct appine_cpu, tlb_used);
-    emit(x, enc_ldr_x(0, CTX, offsetof(struct appine_cpu, mmu)));
-    emit(x, enc_ldr_x(0, 0, offsetof(struct appine_mmu, root)));
+    size_t used = offsetof(struct kazeterm_cpu, tlb_used);
+    emit(x, enc_ldr_x(0, CTX, offsetof(struct kazeterm_cpu, mmu)));
+    emit(x, enc_ldr_x(0, 0, offsetof(struct kazeterm_mmu, root)));
     /* An intermediate entry is the address of the next level's table; loads through the address
      * dependency are ordered just like mmu.c's acquire loads */
     for (unsigned level = 0; level < MMU_LEVELS; level++) {
-        emit(x, enc_ubfx(1, a, APPINE_PAGE_SHIFT + MMU_LEVEL_BITS * (MMU_LEVELS - 1 - level),
+        emit(x, enc_ubfx(1, a, KAZETERM_PAGE_SHIFT + MMU_LEVEL_BITS * (MMU_LEVELS - 1 - level),
                          MMU_LEVEL_BITS));
         emit(x, enc_ldr_x_index(0, 0, 1));
         if (level < MMU_LEVELS - 1)
@@ -3440,12 +3440,12 @@ static void emit_fill(struct xlate *x, unsigned a, bool write, struct refill_fai
     emit_to_fail(x, f, enc_tbz(0, 0));
     if (write) /* the write half also serves atomic and grouped reads */
         emit_to_fail(x, f, enc_tbz(0, 1));
-    _Static_assert(APPINE_PROT_READ == 1 && APPINE_PROT_WRITE == 2, "the positions of the permission bits");
-    emit(x, enc_and_clear_low(1, a, APPINE_PAGE_SHIFT));
-    emit(x, enc_and_clear_low(2, 0, APPINE_PAGE_SHIFT));
+    _Static_assert(KAZETERM_PROT_READ == 1 && KAZETERM_PROT_WRITE == 2, "the positions of the permission bits");
+    emit(x, enc_and_clear_low(1, a, KAZETERM_PAGE_SHIFT));
+    emit(x, enc_and_clear_low(2, 0, KAZETERM_PAGE_SHIFT));
     emit(x, enc_sub_reg(2, 2, 1)); /* addend */
-    emit(x, enc_ubfx(4, a, APPINE_PAGE_SHIFT, 64 - APPINE_PAGE_SHIFT)); /* page number */
-    emit(x, enc_ubfx(1, a, APPINE_PAGE_SHIFT, TLB_BITS));
+    emit(x, enc_ubfx(4, a, KAZETERM_PAGE_SHIFT, 64 - KAZETERM_PAGE_SHIFT)); /* page number */
+    emit(x, enc_ubfx(1, a, KAZETERM_PAGE_SHIFT, TLB_BITS));
     emit(x, enc_add_lsl(1, CTX, 1, 5));
     for (unsigned half = 0; half < 2; half++) {
         /* tag = (0 - 1) & ~page number with the permission, else 0 & ~page number = TLB_INVALID */
@@ -3455,11 +3455,11 @@ static void emit_fill(struct xlate *x, unsigned a, bool write, struct refill_fai
         emit(x, enc_stp_x(T2, 2, 1, (int)(TLB_OFF + 16 * half)));
     }
     /* tlb_used[index / 64] |= 1 << (index % 64) */
-    emit(x, enc_ubfx(1, a, APPINE_PAGE_SHIFT + 6, TLB_BITS - 6));
+    emit(x, enc_ubfx(1, a, KAZETERM_PAGE_SHIFT + 6, TLB_BITS - 6));
     emit(x, enc_add_lsl(1, CTX, 1, 3));
     emit_add_const(x, 1, 1, (int64_t)(used & ~(size_t)0xfff));
     emit(x, enc_ldr_x(T2, 1, used & 0xfff));
-    emit(x, enc_ubfx(4, a, APPINE_PAGE_SHIFT, 6));
+    emit(x, enc_ubfx(4, a, KAZETERM_PAGE_SHIFT, 6));
     emit(x, enc_movz(0, 1, 0));
     emit(x, enc_lslv(0, 0, 4));
     emit(x, enc_orr_reg(T2, T2, 0));
@@ -3470,10 +3470,10 @@ static void emit_fill(struct xlate *x, unsigned a, bool write, struct refill_fai
  * jump to `miss` (offset patched later); uses up x0 */
 static uint32_t *emit_probe(struct xlate *x, unsigned a, unsigned addend, bool write)
 {
-    emit(x, enc_ubfx(0, a, APPINE_PAGE_SHIFT, TLB_BITS));
+    emit(x, enc_ubfx(0, a, KAZETERM_PAGE_SHIFT, TLB_BITS));
     emit(x, enc_add_lsl(0, CTX, 0, 5));
     emit(x, enc_ldp_x(0, addend, 0, (int)TLB_OFF + (write ? 16 : 0)));
-    emit(x, enc_eon_lsr(0, 0, a, APPINE_PAGE_SHIFT));
+    emit(x, enc_eon_lsr(0, 0, a, KAZETERM_PAGE_SHIFT));
     uint32_t *miss = here(x);
     emit(x, enc_cbnz_x(0));
     return miss;
@@ -3501,7 +3501,7 @@ static uint32_t *emit_probe(struct xlate *x, unsigned a, unsigned addend, bool w
  */
 static uint32_t *emit_refill(struct xlate *x, bool write)
 {
-    size_t x0 = offsetof(struct appine_cpu, x);
+    size_t x0 = offsetof(struct kazeterm_cpu, x);
     uint32_t *entry = here(x);
     struct refill_fails f = {.n = 0};
 
@@ -3510,8 +3510,8 @@ static uint32_t *emit_refill(struct xlate *x, bool write)
     emit(x, enc_str_x(4, CTX, x0 + 32));
     /* With watchpoints (set by ptrace), do not fill from the page table: watched pages must not
      * enter the TLB. Tier 0 executes this instruction instead; it checks the watchpoints and fills
-     * the TLB by appine_tlb_fill's rules, so unwatched pages hit as usual afterwards */
-    size_t nwatch = offsetof(struct appine_cpu, nwatch);
+     * the TLB by kazeterm_tlb_fill's rules, so unwatched pages hit as usual afterwards */
+    size_t nwatch = offsetof(struct kazeterm_cpu, nwatch);
     emit_add_const(x, 0, CTX, (int64_t)(nwatch & ~(size_t)0xfff));
     emit(x, enc_ldr_w(0, 0, nwatch & 0xfff));
     emit_to_fail(x, &f, enc_cbnz_x(0));
@@ -3520,10 +3520,10 @@ static uint32_t *emit_refill(struct xlate *x, bool write)
     emit(x, enc_add_lsl(3, T0, 3, 0)); /* last byte */
     /* Check both ends: adding the byte count can carry into or out of the address space. */
     emit(x, enc_orr_reg(0, T0, 3));
-    emit(x, enc_ubfx(0, 0, APPINE_VA_BITS, DATA_TAG_SHIFT - APPINE_VA_BITS));
+    emit(x, enc_ubfx(0, 0, KAZETERM_VA_BITS, DATA_TAG_SHIFT - KAZETERM_VA_BITS));
     emit_to_fail(x, &f, enc_cbnz_x(0));
     emit(x, enc_eor_lsr(0, T0, 3, 0));
-    emit(x, enc_ubfx(0, 0, APPINE_PAGE_SHIFT, 64 - APPINE_PAGE_SHIFT));
+    emit(x, enc_ubfx(0, 0, KAZETERM_PAGE_SHIFT, 64 - KAZETERM_PAGE_SHIFT));
     uint32_t *cross = here(x);
     emit(x, enc_cbnz_x(0));
 
@@ -3569,7 +3569,7 @@ static uint32_t *emit_refill(struct xlate *x, bool write)
 /* Increment the cpu's dbt_lookup_seq (uses up x1 and x2); see table_lookup */
 static void emit_seq_step(struct xlate *x)
 {
-    size_t seq = offsetof(struct appine_cpu, dbt_lookup_seq);
+    size_t seq = offsetof(struct kazeterm_cpu, dbt_lookup_seq);
     emit(x, enc_ldr_w(2, CTX, seq));
     emit(x, enc_add_imm(2, 2, 1, 0));
     emit_add_const(x, 1, CTX, (int64_t)seq);
@@ -3584,9 +3584,9 @@ static void emit_seq_step(struct xlate *x)
  * in one Maven build for JIT workloads. Borrows the x0–x3 slots in the cpu struct to save host
  * x0–x3; see emit_refill.
  */
-static uint32_t *emit_lookup(struct xlate *x, struct appine_dbt *d)
+static uint32_t *emit_lookup(struct xlate *x, struct kazeterm_dbt *d)
 {
-    size_t x0 = offsetof(struct appine_cpu, x);
+    size_t x0 = offsetof(struct kazeterm_cpu, x);
     uint32_t *entry = here(x);
     emit(x, enc_stp_x(0, 1, CTX, (int)x0));
     emit(x, enc_stp_x(2, 3, CTX, (int)x0 + 16));
@@ -3603,7 +3603,7 @@ static uint32_t *emit_lookup(struct xlate *x, struct appine_dbt *d)
     emit(x, enc_cbz_x(T0));
     /* x1 = this member's tag << TAG_SHIFT: an entry whose key XOR pc is 0 is a shared block, and
      * one where it equals x1 is this member's private block */
-    emit(x, enc_ldr_w(1, CTX, offsetof(struct appine_cpu, dbt_tag)));
+    emit(x, enc_ldr_w(1, CTX, offsetof(struct kazeterm_cpu, dbt_tag)));
     emit(x, enc_orr_lsl(1, 31, 1, TAG_SHIFT));
     emit_mov_const(x, 0, (uint64_t)(uintptr_t)&d->table);
     emit(x, enc_ldar(3, 0, 0));
@@ -3633,7 +3633,7 @@ static uint32_t *emit_lookup(struct xlate *x, struct appine_dbt *d)
     patch_branch(x->wdelta, found[0], here(x));
     patch_branch(x->wdelta, found[1], here(x));
     emit_seq_step(x);
-    emit(x, enc_ldr_x(0, CTX, offsetof(struct appine_cpu, dbt_jump_cache)));
+    emit(x, enc_ldr_x(0, CTX, offsetof(struct kazeterm_cpu, dbt_jump_cache)));
     emit(x, enc_ubfx(1, T0, 2, JC_BITS));
     emit(x, enc_add_lsl(0, 0, 1, 4));
     emit(x, enc_stp_x(T0, T2, 0, 0));
@@ -3672,12 +3672,12 @@ static void move_guest_regs(struct xlate *x, unsigned base, bool store)
 
 /* The enter and exit routines: placed at the start of the code cache, so that every exit stub can
  * reach them with one b */
-static void emit_routines(struct appine_dbt *d)
+static void emit_routines(struct kazeterm_dbt *d)
 {
     struct xlate routines = {.d = d, .buf = d->cache, .wdelta = d->rw_delta, .st = d->st}, *x = &routines;
-    size_t x0 = offsetof(struct appine_cpu, x), v0 = offsetof(struct appine_cpu, v);
+    size_t x0 = offsetof(struct kazeterm_cpu, x), v0 = offsetof(struct kazeterm_cpu, v);
 
-    /* uint64_t enter(struct appine_cpu *cpu, uint32_t *code): save the callee-saved registers
+    /* uint64_t enter(struct kazeterm_cpu *cpu, uint32_t *code): save the callee-saved registers
      * (including d8–d15) and the host FPCR. Frame layout: x29/x30, the five pairs of x27–x19, 8
      * unused bytes, host FPCR (+104), d8–d15 (+112) */
     d->enter = here(x);
@@ -3694,18 +3694,18 @@ static void emit_routines(struct appine_dbt *d)
     emit(x, enc_mov(CTX, 0));
     emit(x, enc_mov(T0, 1));
     /* The guest's FP state stays in host registers throughout translated code (the engine map) */
-    emit(x, enc_ldr_x(T1, CTX, offsetof(struct appine_cpu, fpcr)));
+    emit(x, enc_ldr_x(T1, CTX, offsetof(struct kazeterm_cpu, fpcr)));
     emit(x, enc_msr_fpcr(T1));
-    emit(x, enc_ldr_x(T1, CTX, offsetof(struct appine_cpu, fpsr)));
+    emit(x, enc_ldr_x(T1, CTX, offsetof(struct kazeterm_cpu, fpsr)));
     emit(x, enc_msr_fpsr(T1));
-    emit(x, enc_ldr_x(T1, CTX, offsetof(struct appine_cpu, nzcv)));
+    emit(x, enc_ldr_x(T1, CTX, offsetof(struct kazeterm_cpu, nzcv)));
     emit(x, enc_msr_nzcv(T1));
     emit_add_const(x, T1, CTX, (int64_t)v0);
     for (unsigned q = 0; q < 32; q += 2)
         emit(x, enc_ldp_q(q, q + 1, T1, (int)(16 * q)));
     emit_add_const(x, T1, CTX, (int64_t)x0);
     move_guest_regs(x, T1, false);
-    emit(x, enc_ldr_x(SP_HOST, CTX, offsetof(struct appine_cpu, sp)));
+    emit(x, enc_ldr_x(SP_HOST, CTX, offsetof(struct kazeterm_cpu, sp)));
     emit(x, enc_br(T0));
 
     /* The two entries used by stubs: T1 points to the adr in the stub, and the pc is in the data
@@ -3722,19 +3722,19 @@ static void emit_routines(struct appine_dbt *d)
     emit(x, enc_sub_imm(T1, T1, 4, 0));
     /* Exit: T0 = guest pc, T1 = patch site (meaningful only for link stubs), T2 = reason */
     d->exit = here(x);
-    emit(x, enc_str_x(T0, CTX, offsetof(struct appine_cpu, pc)));
-    emit(x, enc_str_x(T1, CTX, offsetof(struct appine_cpu, dbt_site)));
-    emit(x, enc_str_x(T2, CTX, offsetof(struct appine_cpu, dbt_reason)));
+    emit(x, enc_str_x(T0, CTX, offsetof(struct kazeterm_cpu, pc)));
+    emit(x, enc_str_x(T1, CTX, offsetof(struct kazeterm_cpu, dbt_site)));
+    emit(x, enc_str_x(T2, CTX, offsetof(struct kazeterm_cpu, dbt_reason)));
     emit(x, enc_mrs_nzcv(T0));
-    emit(x, enc_str_x(T0, CTX, offsetof(struct appine_cpu, nzcv)));
+    emit(x, enc_str_x(T0, CTX, offsetof(struct kazeterm_cpu, nzcv)));
     emit_add_const(x, T1, CTX, (int64_t)x0);
     move_guest_regs(x, T1, true);
-    emit(x, enc_str_x(SP_HOST, CTX, offsetof(struct appine_cpu, sp)));
+    emit(x, enc_str_x(SP_HOST, CTX, offsetof(struct kazeterm_cpu, sp)));
     emit_add_const(x, T1, CTX, (int64_t)v0);
     for (unsigned q = 0; q < 32; q += 2)
         emit(x, enc_stp_q(q, q + 1, T1, (int)(16 * q)));
     emit(x, enc_mrs_fpsr(T0));
-    emit(x, enc_str_x(T0, CTX, offsetof(struct appine_cpu, fpsr)));
+    emit(x, enc_str_x(T0, CTX, offsetof(struct kazeterm_cpu, fpsr)));
     emit(x, enc_ldr_x(T0, 31, 104));
     emit(x, enc_msr_fpcr(T0));
     emit(x, enc_mov(0, T2));
@@ -3785,31 +3785,31 @@ static void emit_routines(struct appine_dbt *d)
 static struct {
     pthread_mutex_t lock;
     struct pooled {
-        struct appine_dbt *d;
+        struct kazeterm_dbt *d;
         uint64_t key;  /* which program's translations are kept; 0 if emptied */
         uint64_t when; /* order of arrival, to remove the least recently used */
     } free[POOL_SIZE];
     unsigned n;
     uint64_t clock;
     size_t kept_words; /* code kept in the pool */
-    struct appine_dbt_thread *threads[THREAD_POOL_SIZE];
+    struct kazeterm_dbt_thread *threads[THREAD_POOL_SIZE];
     unsigned nthreads;
-    struct appine_dbt *all; /* all instances */
+    struct kazeterm_dbt *all; /* all instances */
 } pool = {.lock = PTHREAD_MUTEX_INITIALIZER};
 
 /* Take entry i out of the pool. Pool lock held */
-static struct appine_dbt *pool_take(unsigned i)
+static struct kazeterm_dbt *pool_take(unsigned i)
 {
-    struct appine_dbt *d = pool.free[i].d;
+    struct kazeterm_dbt *d = pool.free[i].d;
     if (pool.free[i].key)
         pool.kept_words -= d->used_words - d->routine_words;
     pool.free[i] = pool.free[--pool.n];
     return d;
 }
 
-/* Free the registered ranges (appine_dbt_share), the current list and every replaced one, and
+/* Free the registered ranges (kazeterm_dbt_share), the current list and every replaced one, and
  * clear d->shared; no thread is using this instance */
-static void drop_shared(struct appine_dbt *d)
+static void drop_shared(struct kazeterm_dbt *d)
 {
     for (struct shared_ranges *s = d->shared, *older; s; s = older) {
         older = s->older;
@@ -3818,7 +3818,7 @@ static void drop_shared(struct appine_dbt *d)
     d->shared = NULL;
 }
 
-static void release(struct appine_dbt *d)
+static void release(struct kazeterm_dbt *d)
 {
     drop_shared(d);
     pthread_mutex_lock(&pool.lock);
@@ -3829,7 +3829,7 @@ static void release(struct appine_dbt *d)
     }
     pthread_mutex_unlock(&pool.lock);
     if (d->cache)
-        appine_unmap_code(d->cache, CODE_CACHE_BYTES, d->rw_delta);
+        kazeterm_unmap_code(d->cache, CODE_CACHE_BYTES, d->rw_delta);
     zfree(d->written, sizeof(*d->written));
     if (d->table)
         zfree(d->table, TABLE_BYTES(d->table->bits));
@@ -3845,9 +3845,9 @@ static void release(struct appine_dbt *d)
 
 /* Statistics of an instance itself while no threads are attached (flushing and checking when it
  * is taken out of or put back into the pool) */
-static struct appine_dbt_stats spare_stats;
+static struct kazeterm_dbt_stats spare_stats;
 
-struct appine_dbt *appine_dbt_new(uint64_t key, enum appine_dbt_regs regs)
+struct kazeterm_dbt *kazeterm_dbt_new(uint64_t key, enum kazeterm_dbt_regs regs)
 {
     const struct regs *r = &reg_sets[regs];
     pthread_mutex_lock(&pool.lock);
@@ -3859,7 +3859,7 @@ struct appine_dbt *appine_dbt_new(uint64_t key, enum appine_dbt_regs regs)
             (empty && best < 0))
             best = (int)i;
     }
-    struct appine_dbt *d = best >= 0 ? pool_take((unsigned)best) : NULL;
+    struct kazeterm_dbt *d = best >= 0 ? pool_take((unsigned)best) : NULL;
     pthread_mutex_unlock(&pool.lock);
     if (d && d->r != r) { /* an empty instance: regenerate the routines for this register set */
         d->r = r;
@@ -3874,7 +3874,7 @@ struct appine_dbt *appine_dbt_new(uint64_t key, enum appine_dbt_regs regs)
     pthread_mutex_init(&d->lock, NULL);
     pthread_cond_init(&d->flushed, NULL);
     d->st = &spare_stats;
-    d->cache = appine_map_code(CODE_CACHE_BYTES, &d->rw_delta);
+    d->cache = kazeterm_map_code(CODE_CACHE_BYTES, &d->rw_delta);
     if (d->cache && d->rw_delta)
         d->written = zalloc(sizeof(*d->written));
     d->table = table_new(TABLE_MIN_BITS);
@@ -3908,7 +3908,7 @@ struct appine_dbt *appine_dbt_new(uint64_t key, enum appine_dbt_regs regs)
  * (shared blocks do not link to private blocks), and no threads are attached, so no forwarding
  * stubs are needed
  */
-static void drop_private(struct appine_dbt *d)
+static void drop_private(struct kazeterm_dbt *d)
 {
     for (size_t i = 0; i < d->table_count; i++) {
         struct block *b = &d->blocks[i];
@@ -3925,7 +3925,7 @@ static void drop_private(struct appine_dbt *d)
 }
 
 /* Put back into the pool: no threads are attached, so it can be flushed directly */
-void appine_dbt_free(struct appine_dbt *d, uint64_t key)
+void kazeterm_dbt_free(struct kazeterm_dbt *d, uint64_t key)
 {
     if (!d)
         return;
@@ -3980,7 +3980,7 @@ void appine_dbt_free(struct appine_dbt *d, uint64_t key)
     d->next_tag = 1; /* all tagged blocks have been removed */
     /* Make room: the pool is full, or the kept code exceeds the limit. Remove empty ones first
      * (rebuilding them is cheap), then the least recently used */
-    struct appine_dbt *evicted[POOL_SIZE];
+    struct kazeterm_dbt *evicted[POOL_SIZE];
     unsigned nevicted = 0;
     pthread_mutex_lock(&pool.lock);
     while (pool.n && (pool.n == POOL_SIZE || pool.kept_words + words > POOL_KEEP_WORDS)) {
@@ -4012,21 +4012,21 @@ void appine_dbt_free(struct appine_dbt *d, uint64_t key)
 
 /* Drop the pages written in the writable view of every instance's code cache (see the comment
  * before struct written) */
-void appine_dbt_unmap_written(void)
+void kazeterm_dbt_unmap_written(void)
 {
     pthread_mutex_lock(&pool.lock);
-    for (struct appine_dbt *d = pool.all; d; d = d->next_instance)
+    for (struct kazeterm_dbt *d = pool.all; d; d = d->next_instance)
         drop_written(d);
     pthread_mutex_unlock(&pool.lock);
 }
 
 /* Total bytes of the pages written in the writable view and not dropped yet: they count twice in
  * the host's RSS */
-uint64_t appine_dbt_written_bytes(void)
+uint64_t kazeterm_dbt_written_bytes(void)
 {
     uint64_t pages = 0;
     pthread_mutex_lock(&pool.lock);
-    for (struct appine_dbt *d = pool.all; d; d = d->next_instance)
+    for (struct kazeterm_dbt *d = pool.all; d; d = d->next_instance)
         if (d->written)
             pages += __atomic_load_n(&d->written->pages, __ATOMIC_RELAXED);
     pthread_mutex_unlock(&pool.lock);
@@ -4035,9 +4035,9 @@ uint64_t appine_dbt_written_bytes(void)
 
 /* Release every instance in the pool (when the app is short of memory; kept translations can be
  * rebuilt) */
-void appine_dbt_trim(void)
+void kazeterm_dbt_trim(void)
 {
-    struct appine_dbt *evicted[POOL_SIZE];
+    struct kazeterm_dbt *evicted[POOL_SIZE];
     pthread_mutex_lock(&pool.lock);
     unsigned n = 0;
     while (pool.n)
@@ -4047,10 +4047,10 @@ void appine_dbt_trim(void)
         release(evicted[i]);
 }
 
-static void release_thread(struct appine_dbt_thread *t)
+static void release_thread(struct kazeterm_dbt_thread *t)
 {
     zfree(t->jc, JC_SIZE * sizeof(*t->jc));
-    zfree(t->rs, APPINE_PAGE_SIZE);
+    zfree(t->rs, KAZETERM_PAGE_SIZE);
     free(t->xlate);
     zfree(t->scratch, MAX_BLOCK_WORDS * sizeof(*t->scratch));
     zfree(t->probe, sizeof(*t->probe));
@@ -4063,7 +4063,7 @@ static void release_thread(struct appine_dbt_thread *t)
  * lock is always held only briefly (installing a block, invalidating a batch of blocks), so spin
  * for a while first rather than sleep and be woken again (tens of microseconds each time in a
  * virtual machine) */
-static void lock_dbt(struct appine_dbt *d, struct appine_dbt_stats *st)
+static void lock_dbt(struct kazeterm_dbt *d, struct kazeterm_dbt_stats *st)
 {
     unsigned spin = 0;
     while (pthread_mutex_trylock(&d->lock) != 0) {
@@ -4073,17 +4073,17 @@ static void lock_dbt(struct appine_dbt *d, struct appine_dbt_stats *st)
         }
         __asm__ volatile("yield");
     }
-    appine_guard_hold(&d->lock, false);
+    kazeterm_guard_hold(&d->lock, false);
     d->st = st;
 }
 
-static void unlock_dbt(struct appine_dbt *d)
+static void unlock_dbt(struct kazeterm_dbt *d)
 {
-    appine_guard_drop();
+    kazeterm_guard_drop();
     pthread_mutex_unlock(&d->lock);
 }
 
-unsigned appine_dbt_new_tag(struct appine_dbt *d)
+unsigned kazeterm_dbt_new_tag(struct kazeterm_dbt *d)
 {
     pthread_mutex_lock(&d->lock);
     unsigned tag = d->next_tag <= TAG_MAX ? d->next_tag++ : 0;
@@ -4097,7 +4097,7 @@ static int range_cmp(const void *a, const void *b)
     return x < y ? -1 : x > y;
 }
 
-void appine_dbt_share(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_share(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     struct shared_ranges *r = malloc(sizeof(*r) + n * sizeof(r->r[0]));
     if (!r) /* keep the old ranges: blocks outside them count as private, only less is shared */
@@ -4125,17 +4125,17 @@ void appine_dbt_share(struct appine_dbt *d, const struct appine_dbt_source *s, s
     pthread_mutex_unlock(&d->lock);
 }
 
-struct appine_dbt_thread *appine_dbt_attach(struct appine_dbt *d, unsigned tag)
+struct kazeterm_dbt_thread *kazeterm_dbt_attach(struct kazeterm_dbt *d, unsigned tag)
 {
     pthread_mutex_lock(&pool.lock);
-    struct appine_dbt_thread *t = pool.nthreads ? pool.threads[--pool.nthreads] : NULL;
+    struct kazeterm_dbt_thread *t = pool.nthreads ? pool.threads[--pool.nthreads] : NULL;
     pthread_mutex_unlock(&pool.lock);
     if (!t) {
         t = zalloc(sizeof(*t));
         if (!t)
             return NULL;
         t->jc = zalloc(JC_SIZE * sizeof(*t->jc));
-        t->rs = zalloc(APPINE_PAGE_SIZE); /* page-aligned, and so also 1 KB-aligned */
+        t->rs = zalloc(KAZETERM_PAGE_SIZE); /* page-aligned, and so also 1 KB-aligned */
         t->xlate = malloc(sizeof(*t->xlate));
         t->scratch = zalloc(MAX_BLOCK_WORDS * sizeof(*t->scratch));
         t->probe = zalloc(sizeof(*t->probe)); /* TLB is over 100 KB; unused pages take no memory */
@@ -4145,14 +4145,14 @@ struct appine_dbt_thread *appine_dbt_attach(struct appine_dbt *d, unsigned tag)
             release_thread(t);
             return NULL;
         }
-        appine_cpu_init(t->probe, NULL);
+        kazeterm_cpu_init(t->probe, NULL);
         t->jc_dirty = true;
     }
     t->d = d;
     t->tag = tag;
     t->cpu = NULL;
     t->parked = false;
-    t->stats = (struct appine_dbt_stats){0};
+    t->stats = (struct kazeterm_dbt_stats){0};
     if (t->jc_dirty)
         clear_jump_cache(t);
     lock_dbt(d, &t->stats);
@@ -4165,13 +4165,13 @@ struct appine_dbt_thread *appine_dbt_attach(struct appine_dbt *d, unsigned tag)
     return t;
 }
 
-void appine_dbt_detach(struct appine_dbt_thread *t)
+void kazeterm_dbt_detach(struct kazeterm_dbt_thread *t)
 {
     if (!t)
         return;
-    struct appine_dbt *d = t->d;
+    struct kazeterm_dbt *d = t->d;
     lock_dbt(d, &spare_stats);
-    for (struct appine_dbt_thread **p = &d->threads; *p; p = &(*p)->next) {
+    for (struct kazeterm_dbt_thread **p = &d->threads; *p; p = &(*p)->next) {
         if (*p == t) {
             *p = t->next;
             __atomic_store_n(&d->nthreads, d->nthreads - 1, __ATOMIC_RELAXED);
@@ -4188,19 +4188,19 @@ void appine_dbt_detach(struct appine_dbt_thread *t)
         release_thread(t);
 }
 
-void appine_dbt_flush(struct appine_dbt_thread *t)
+void kazeterm_dbt_flush(struct kazeterm_dbt_thread *t)
 {
     __atomic_store_n(&t->d->flush_wanted, true, __ATOMIC_SEQ_CST);
 }
 
-void appine_dbt_recheck(struct appine_dbt_thread *t)
+void kazeterm_dbt_recheck(struct kazeterm_dbt_thread *t)
 {
     lock_dbt(t->d, &t->stats);
     t->d->stale = t->d->table_count > 0;
     unlock_dbt(t->d);
 }
 
-void appine_dbt_invalidate(struct appine_dbt_thread *t, const struct appine_cpu *cpu, uint64_t start,
+void kazeterm_dbt_invalidate(struct kazeterm_dbt_thread *t, const struct kazeterm_cpu *cpu, uint64_t start,
                            uint64_t len)
 {
     lock_dbt(t->d, &t->stats);
@@ -4210,22 +4210,22 @@ void appine_dbt_invalidate(struct appine_dbt_thread *t, const struct appine_cpu 
 
 /* Whether a block's guest instruction words at translation equal those at the same address in
  * `mmu` now; `page`/`host` remember the page looked up last time */
-static bool block_matches(const struct appine_dbt *d, const struct appine_mmu *mmu,
+static bool block_matches(const struct kazeterm_dbt *d, const struct kazeterm_mmu *mmu,
                           const struct block *b, uint64_t *page, const uint32_t **host)
 {
     uint64_t p = b->pc & ~PAGE_MASK;
     if (p != *page) {
         *page = p;
-        *host = appine_mmu_translate(mmu, p, APPINE_PROT_EXEC);
+        *host = kazeterm_mmu_translate(mmu, p, KAZETERM_PROT_EXEC);
     }
     return *host && memcmp(*host + (b->pc & PAGE_MASK) / 4, d->words + b->words, b->nguest * 4) == 0;
 }
 
 /* The block lies entirely within one of the previous user's file mappings (recorded by
- * appine_dbt_trust): while its page is not mapped yet it is worth parking, since the same content
+ * kazeterm_dbt_trust): while its page is not mapped yet it is worth parking, since the same content
  * will most likely be mapped back later; blocks in anonymous memory (JIT-generated code) will
  * most likely not match next time */
-static bool block_parkable(const struct appine_dbt *d, const struct block *b)
+static bool block_parkable(const struct kazeterm_dbt *d, const struct block *b)
 {
     for (unsigned i = 0; i < d->nparkable; i++) {
         if (b->pc >= d->parkable[i][0] && b->pc + (uint64_t)b->nguest * 4 <= d->parkable[i][1])
@@ -4234,8 +4234,8 @@ static bool block_parkable(const struct appine_dbt *d, const struct block *b)
     return false;
 }
 
-/* The block lies entirely within a range given by appine_dbt_trust */
-static bool block_trusted(const struct appine_dbt *d, const struct block *b)
+/* The block lies entirely within a range given by kazeterm_dbt_trust */
+static bool block_trusted(const struct kazeterm_dbt *d, const struct block *b)
 {
     for (unsigned i = 0; i < d->ntrusted; i++) {
         if (b->pc >= d->trusted[i][0] && b->pc + (uint64_t)b->nguest * 4 <= d->trusted[i][1])
@@ -4251,7 +4251,7 @@ static bool block_trusted(const struct appine_dbt *d, const struct block *b)
  * and instruction-cache syncing. When most do not match (another program was exec'd), request a
  * full flush. Lock held
  */
-static void recheck(struct appine_dbt *d, const struct appine_cpu *c)
+static void recheck(struct kazeterm_dbt *d, const struct kazeterm_cpu *c)
 {
     d->stale = false;
     size_t live = 0, bad = 0, unmapped = 0;
@@ -4308,7 +4308,7 @@ static void recheck(struct appine_dbt *d, const struct appine_cpu *c)
  * reviving and flushing, the table would fill up, and neither insertion nor lookup would find an
  * empty slot. Lock held
  */
-static void table_relink(struct appine_dbt *d, size_t k)
+static void table_relink(struct kazeterm_dbt *d, size_t k)
 {
     struct table *t = d->table;
     const struct block *b = &d->blocks[k];
@@ -4340,7 +4340,7 @@ static void table_relink(struct appine_dbt *d, size_t k)
  */
 /* Sync the revived batch first, then put it into the table; only then can other threads jump
  * there */
-static void revive_flush(struct appine_dbt *d, const uint32_t *idx, unsigned n)
+static void revive_flush(struct kazeterm_dbt *d, const uint32_t *idx, unsigned n)
 {
     if (!n)
         return;
@@ -4354,18 +4354,18 @@ static void revive_flush(struct appine_dbt *d, const uint32_t *idx, unsigned n)
         table_relink(d, idx[k]);
 }
 
-static void revive(struct appine_dbt *d, const struct appine_cpu *c, uint64_t pc)
+static void revive(struct kazeterm_dbt *d, const struct kazeterm_cpu *c, uint64_t pc)
 {
-    uint64_t page = pc >> APPINE_PAGE_SHIFT, p = 1;
+    uint64_t page = pc >> KAZETERM_PAGE_SHIFT, p = 1;
     const uint32_t *host = NULL;
     uint32_t idx[RETIRE_BATCH];
     unsigned n = 0;
     /* The first instruction of the entry check is the same for every block (prepare), so it need
      * not be recorded separately */
-    uint32_t check = enc_ldr_x(d->r->t0, d->r->ctx, offsetof(struct appine_cpu, pending));
+    uint32_t check = enc_ldr_x(d->r->t0, d->r->ctx, offsetof(struct kazeterm_cpu, pending));
     for (uint32_t i = d->page_head[page_bucket(page)]; i; i = d->blocks[i - 1].next) {
         struct block *b = &d->blocks[i - 1];
-        if (!b->parked || b->pc >> APPINE_PAGE_SHIFT != page)
+        if (!b->parked || b->pc >> KAZETERM_PAGE_SHIFT != page)
             continue;
         if (!block_matches(d, c->mmu, b, &p, &host)) {
             /* The page has no entry yet (large mappings fill entries on demand): keep it; when
@@ -4392,22 +4392,22 @@ static void revive(struct appine_dbt *d, const struct appine_cpu *c, uint64_t pc
     revive_flush(d, idx, n);
 }
 
-void appine_dbt_set_sources(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_set_sources(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     pthread_mutex_lock(&d->lock);
     /* What does not fit is not recorded: blocks in unrecorded mappings are checked as usual */
-    d->nsources = n < APPINE_DBT_SOURCES ? (unsigned)n : APPINE_DBT_SOURCES;
+    d->nsources = n < KAZETERM_DBT_SOURCES ? (unsigned)n : KAZETERM_DBT_SOURCES;
     memcpy(d->sources, s, d->nsources * sizeof(*s));
     pthread_mutex_unlock(&d->lock);
 }
 
-void appine_dbt_trust(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_trust(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     pthread_mutex_lock(&d->lock);
     d->ntrusted = 0;
     for (size_t i = 0; d->stale && i < n; i++) {
         for (unsigned j = 0; j < d->nsources; j++) {
-            if (!memcmp(&s[i], &d->sources[j], sizeof(*s)) && d->ntrusted < APPINE_DBT_SOURCES) {
+            if (!memcmp(&s[i], &d->sources[j], sizeof(*s)) && d->ntrusted < KAZETERM_DBT_SOURCES) {
                 d->trusted[d->ntrusted][0] = s[i].start;
                 d->trusted[d->ntrusted][1] = s[i].start + s[i].len;
                 d->ntrusted++;
@@ -4426,7 +4426,7 @@ void appine_dbt_trust(struct appine_dbt *d, const struct appine_dbt_source *s, s
     pthread_mutex_unlock(&d->lock);
 }
 
-void appine_dbt_retire_outside(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_retire_outside(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     pthread_mutex_lock(&d->lock);
     d->st = &spare_stats; /* the previous thread holding the lock may have detached already */
@@ -4452,7 +4452,7 @@ void appine_dbt_retire_outside(struct appine_dbt *d, const struct appine_dbt_sou
 }
 
 /* Stop and wait for another thread to finish a full flush. Lock held, released while waiting */
-static void park(struct appine_dbt *d, struct appine_dbt_thread *self)
+static void park(struct kazeterm_dbt *d, struct kazeterm_dbt_thread *self)
 {
     self->parked = true;
     while (__atomic_load_n(&d->flushing, __ATOMIC_ACQUIRE) && !d->poisoned)
@@ -4461,9 +4461,9 @@ static void park(struct appine_dbt *d, struct appine_dbt_thread *self)
 }
 
 /* Whether a thread other than self is in dbt_run and not stopped in park. Lock held */
-static bool others_running(const struct appine_dbt *d, const struct appine_dbt_thread *self)
+static bool others_running(const struct kazeterm_dbt *d, const struct kazeterm_dbt_thread *self)
 {
-    for (const struct appine_dbt_thread *t = d->threads; t; t = t->next)
+    for (const struct kazeterm_dbt_thread *t = d->threads; t; t = t->next)
         if (t != self && !t->parked && __atomic_load_n(&t->cpu, __ATOMIC_SEQ_CST))
             return true;
     return false;
@@ -4486,17 +4486,17 @@ static bool others_running(const struct appine_dbt *d, const struct appine_dbt_t
  * threads reading the clock at the same time each read went from 94 ns to 844 ns. Now entry and
  * exit only write the thread's own cpu.
  */
-static void flush_world(struct appine_dbt *d, struct appine_dbt_thread *self)
+static void flush_world(struct kazeterm_dbt *d, struct kazeterm_dbt_thread *self)
 {
     if (__atomic_load_n(&d->flushing, __ATOMIC_RELAXED)) {
         park(d, self);
         return;
     }
     __atomic_store_n(&d->flushing, true, __ATOMIC_SEQ_CST);
-    for (struct appine_dbt_thread *t = d->threads; t; t = t->next) {
-        struct appine_cpu *c = __atomic_load_n(&t->cpu, __ATOMIC_SEQ_CST);
+    for (struct kazeterm_dbt_thread *t = d->threads; t; t = t->next) {
+        struct kazeterm_cpu *c = __atomic_load_n(&t->cpu, __ATOMIC_SEQ_CST);
         if (t != self && c)
-            appine_cpu_kick(c);
+            kazeterm_cpu_kick(c);
     }
     while (others_running(d, self)) {
         unlock_dbt(d);
@@ -4510,19 +4510,19 @@ static void flush_world(struct appine_dbt *d, struct appine_dbt_thread *self)
 
 /* The guest changed code in the page containing `addr` (ic ivau): invalidate the blocks in it
  * whose instruction words changed */
-static void code_changed(struct appine_dbt_thread *t, const struct appine_cpu *c, uint64_t addr)
+static void code_changed(struct kazeterm_dbt_thread *t, const struct kazeterm_cpu *c, uint64_t addr)
 {
     lock_dbt(t->d, &t->stats);
-    invalidate_locked(t->d, c->mmu, addr & ~(uint64_t)PAGE_MASK, APPINE_PAGE_SIZE);
+    invalidate_locked(t->d, c->mmu, addr & ~(uint64_t)PAGE_MASK, KAZETERM_PAGE_SIZE);
     unlock_dbt(t->d);
 }
 
-static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
+static enum kazeterm_exit dbt_run(void *ctx, struct kazeterm_cpu *c)
 {
-    struct appine_dbt_thread *t = ctx;
-    struct appine_dbt *d = t->d;
-    uint64_t (*enter)(struct appine_cpu *, uint32_t *) =
-        (uint64_t(*)(struct appine_cpu *, uint32_t *))(uintptr_t)d->enter;
+    struct kazeterm_dbt_thread *t = ctx;
+    struct kazeterm_dbt *d = t->d;
+    uint64_t (*enter)(struct kazeterm_cpu *, uint32_t *) =
+        (uint64_t(*)(struct kazeterm_cpu *, uint32_t *))(uintptr_t)d->enter;
     uint32_t *patch_site = NULL, *patch_branch_site = NULL;
     uint64_t patch_generation = 0;
     bool patch_forward = false, patch_shared = false;
@@ -4554,12 +4554,12 @@ static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
         thread_catch_up(t);
         if (UNLIKELY(__atomic_load_n(&c->pending, __ATOMIC_RELAXED)) &&
             __atomic_exchange_n(&c->pending, 0, __ATOMIC_ACQUIRE))
-            return APPINE_EXIT_KICK;
+            return KAZETERM_EXIT_KICK;
 
         /* Tag of the found block: shared blocks do not link to private blocks (LINK_SHARED) */
         unsigned found;
         uint32_t *code = table_lookup(d, c, c->pc, &found);
-        if (!code && __atomic_load_n(&d->page_parked[page_bucket(c->pc >> APPINE_PAGE_SHIFT)],
+        if (!code && __atomic_load_n(&d->page_parked[page_bucket(c->pc >> KAZETERM_PAGE_SHIFT)],
                                      __ATOMIC_RELAXED)) {
             lock_dbt(d, &t->stats);
             if (!__atomic_load_n(&d->flushing, __ATOMIC_RELAXED) && !d->flush_wanted) {
@@ -4661,8 +4661,8 @@ static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
             patch_site = NULL;
         }
         if (!code) { /* cannot fetch: let Tier 0 report the precise fault */
-            enum appine_exit r = appine_interp_step(c);
-            if (r != APPINE_EXIT_NONE)
+            enum kazeterm_exit r = kazeterm_interp_step(c);
+            if (r != KAZETERM_EXIT_NONE)
                 return r;
             continue;
         }
@@ -4700,7 +4700,7 @@ static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
             /* fallthrough */
         case R_INTERP: {
             t->stats.exits_interp++;
-            enum appine_exit r = appine_interp_step(c);
+            enum kazeterm_exit r = kazeterm_interp_step(c);
             /*
              * When Tier 0 executes ic ivau on a second page, invalidate both pages. The
              * translations are shared, so invalidating once in place by content is enough, without
@@ -4711,9 +4711,9 @@ static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
              * build, and exiting for each one would take the BKL and log the change before coming
              * back to invalidate
              */
-            if (r == APPINE_EXIT_CODE)
+            if (r == KAZETERM_EXIT_CODE)
                 code_changed(t, c, c->fault_addr);
-            else if (r != APPINE_EXIT_NONE)
+            else if (r != KAZETERM_EXIT_NONE)
                 return r;
             if (LIKELY(!c->ivau_page))
                 break;
@@ -4727,7 +4727,7 @@ static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
             t->stats.exits_svc++;
             c->exit_info = 0;
             c->excl_size = 0; /* as in Tier 0: an exception return clears the exclusive marker */
-            return APPINE_EXIT_SVC;
+            return KAZETERM_EXIT_SVC;
         default:
             t->stats.exits_kick++;
             break;
@@ -4735,18 +4735,18 @@ static enum appine_exit dbt_run(void *ctx, struct appine_cpu *c)
     }
 }
 
-enum appine_exit appine_dbt_run(struct appine_dbt_thread *t, struct appine_cpu *c)
+enum kazeterm_exit kazeterm_dbt_run(struct kazeterm_dbt_thread *t, struct kazeterm_cpu *c)
 {
-    struct appine_dbt *d = t->d;
+    struct kazeterm_dbt *d = t->d;
     /* A host fault poisoned this instance: the remaining threads run in Tier 0 until the process
      * is killed */
     if (UNLIKELY(d->poisoned))
-        return appine_cpu_run(c);
-    appine_sync_dit(c);
+        return kazeterm_cpu_run(c);
+    kazeterm_sync_dit(c);
     /* Register the cpu first, then look at flushing (see flush_world) */
     __atomic_store_n(&t->cpu, c, __ATOMIC_SEQ_CST);
-    enum appine_exit r = appine_guard_run(dbt_run, t, c);
-    if (UNLIKELY(r == APPINE_EXIT_HOST_FAULT)) {
+    enum kazeterm_exit r = kazeterm_guard_run(dbt_run, t, c);
+    if (UNLIKELY(r == KAZETERM_EXIT_HOST_FAULT)) {
         /* The guard has already released the locks held. Threads stopped waiting for a flush
          * must not wait forever */
         pthread_mutex_lock(&d->lock);
@@ -4760,96 +4760,96 @@ enum appine_exit appine_dbt_run(struct appine_dbt_thread *t, struct appine_cpu *
     return r;
 }
 
-void appine_dbt_get_stats(const struct appine_dbt_thread *t, struct appine_dbt_stats *out)
+void kazeterm_dbt_get_stats(const struct kazeterm_dbt_thread *t, struct kazeterm_dbt_stats *out)
 {
     *out = t->stats;
 }
 
 #else /* !DBT_SUPPORTED */
 
-struct appine_dbt *appine_dbt_new(uint64_t key, enum appine_dbt_regs regs)
+struct kazeterm_dbt *kazeterm_dbt_new(uint64_t key, enum kazeterm_dbt_regs regs)
 {
     (void)key;
     (void)regs;
     return NULL;
 }
 
-void appine_dbt_free(struct appine_dbt *d, uint64_t key)
+void kazeterm_dbt_free(struct kazeterm_dbt *d, uint64_t key)
 {
     (void)d;
     (void)key;
 }
 
-void appine_dbt_trim(void)
+void kazeterm_dbt_trim(void)
 {
 }
 
-void appine_dbt_unmap_written(void)
+void kazeterm_dbt_unmap_written(void)
 {
 }
 
-uint64_t appine_dbt_written_bytes(void)
+uint64_t kazeterm_dbt_written_bytes(void)
 {
     return 0;
 }
 
-void appine_dbt_set_sources(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_set_sources(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     (void)d;
     (void)s;
     (void)n;
 }
 
-void appine_dbt_trust(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_trust(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     (void)d;
     (void)s;
     (void)n;
 }
 
-void appine_dbt_retire_outside(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_retire_outside(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     (void)d;
     (void)s;
     (void)n;
 }
 
-unsigned appine_dbt_new_tag(struct appine_dbt *d)
+unsigned kazeterm_dbt_new_tag(struct kazeterm_dbt *d)
 {
     (void)d;
     return 0;
 }
 
-void appine_dbt_share(struct appine_dbt *d, const struct appine_dbt_source *s, size_t n)
+void kazeterm_dbt_share(struct kazeterm_dbt *d, const struct kazeterm_dbt_source *s, size_t n)
 {
     (void)d;
     (void)s;
     (void)n;
 }
 
-struct appine_dbt_thread *appine_dbt_attach(struct appine_dbt *d, unsigned tag)
+struct kazeterm_dbt_thread *kazeterm_dbt_attach(struct kazeterm_dbt *d, unsigned tag)
 {
     (void)d;
     (void)tag;
     return NULL;
 }
 
-void appine_dbt_detach(struct appine_dbt_thread *t)
+void kazeterm_dbt_detach(struct kazeterm_dbt_thread *t)
 {
     (void)t;
 }
 
-void appine_dbt_flush(struct appine_dbt_thread *t)
+void kazeterm_dbt_flush(struct kazeterm_dbt_thread *t)
 {
     (void)t;
 }
 
-void appine_dbt_recheck(struct appine_dbt_thread *t)
+void kazeterm_dbt_recheck(struct kazeterm_dbt_thread *t)
 {
     (void)t;
 }
 
-void appine_dbt_invalidate(struct appine_dbt_thread *t, const struct appine_cpu *cpu, uint64_t start,
+void kazeterm_dbt_invalidate(struct kazeterm_dbt_thread *t, const struct kazeterm_cpu *cpu, uint64_t start,
                            uint64_t len)
 {
     (void)t;
@@ -4858,13 +4858,13 @@ void appine_dbt_invalidate(struct appine_dbt_thread *t, const struct appine_cpu 
     (void)len;
 }
 
-enum appine_exit appine_dbt_run(struct appine_dbt_thread *t, struct appine_cpu *c)
+enum kazeterm_exit kazeterm_dbt_run(struct kazeterm_dbt_thread *t, struct kazeterm_cpu *c)
 {
     (void)t;
-    return appine_cpu_run(c);
+    return kazeterm_cpu_run(c);
 }
 
-void appine_dbt_get_stats(const struct appine_dbt_thread *t, struct appine_dbt_stats *out)
+void kazeterm_dbt_get_stats(const struct kazeterm_dbt_thread *t, struct kazeterm_dbt_stats *out)
 {
     (void)t;
     memset(out, 0, sizeof(*out));

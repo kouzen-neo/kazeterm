@@ -34,8 +34,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use appine_engine::Cpu;
-use appine_hal::Event;
+use kazeterm_engine::Cpu;
+use kazeterm_hal::Event;
 
 use crate::cell::RefCell;
 use crate::errno::Errno;
@@ -75,7 +75,7 @@ mod ret {
 mod flag {
     pub const TSYNC: u32 = 1;
     pub const LOG: u32 = 2;
-    /// Do not apply the speculative-execution mitigations (on the host, out of Appine's control):
+    /// Do not apply the speculative-execution mitigations (on the host, out of KazeTerm's control):
     /// only checked.
     pub const SPEC_ALLOW: u32 = 4;
     pub const NEW_LISTENER: u32 = 8;
@@ -96,7 +96,7 @@ const MAX_INSNS_PER_PATH: usize = (1 << 18) / 8;
 /// The size of `struct seccomp_data`.
 const DATA_SIZE: usize = 64;
 /// How many numbers the per-number cache bitmap covers (on Linux, the number of arm64 syscalls;
-/// 512 here, which covers every number Appine implements), and how many words it has.
+/// 512 here, which covers every number KazeTerm implements), and how many words it has.
 const CACHED_NRS: usize = 512;
 pub(crate) const CACHE_WORDS: usize = CACHED_NRS / 64;
 /// SIGSYS's `si_code`.
@@ -556,7 +556,7 @@ fn set_filter(cx: &mut Cx<'_>, flags: u32, args: u64) -> Result<u64, Errno> {
 /// notifications).
 fn random_id() -> u64 {
     let mut b = [0u8; 8];
-    let _ = appine_hal::fill_random(&mut b);
+    let _ = kazeterm_hal::fill_random(&mut b);
     u64::from_le_bytes(b)
 }
 
@@ -1051,7 +1051,7 @@ fn send(cx: &mut Cx<'_>, f: &Filter, arg: u64) -> Result<u64, Errno> {
 /// here it is installed directly while holding the BKL, with the same effect, and it cannot fail
 /// at the moment that thread is interrupted (Linux returns ESRCH).
 fn addfd(cx: &mut Cx<'_>, f: &Filter, arg: u64, size: usize) -> Result<u64, Errno> {
-    if !(ADDFD_SIZE_VER0..appine_engine::PAGE_SIZE as usize).contains(&size) {
+    if !(ADDFD_SIZE_VER0..kazeterm_engine::PAGE_SIZE as usize).contains(&size) {
         return Err(Errno::EINVAL);
     }
     let mut b = vec![0u8; size];

@@ -9,7 +9,7 @@
 //!   syscall path run on them. Clocks it does not handle fall back to a real syscall, as on Linux.
 //!   (Starnix fills a vvar page of its own from Zircon's clock transformations, which are exact
 //!   there; parameters of our own would drift from the host's NTP-adjusted clocks.) The copy is
-//!   changed only where Appine's contract needs it: the `Linux` version note says 6.1.0, and
+//!   changed only where KazeTerm's contract needs it: the `Linux` version note says 6.1.0, and
 //!   symbols other than the four below (newer kernels' `__kernel_getrandom`, whose data is not
 //!   mapped) are hidden. Before it is used, its clock functions run once in the interpreter and
 //!   must return what the host returns ([`host_works`]).
@@ -33,7 +33,7 @@
 
 use std::sync::OnceLock;
 
-use appine_engine::PAGE_SIZE;
+use kazeterm_engine::PAGE_SIZE;
 
 /// The image every process maps.
 struct Image {
@@ -142,7 +142,7 @@ fn get() -> &'static Image {
 /// space: tracers do not see it and seccomp does not check it, as on Linux. The syscalls the
 /// host's vDSO code makes are real ones, as on Linux, and so are the stubs' for clocks Linux's
 /// vDSO leaves to the kernel (CPU-time clocks, alarm clocks, invalid ones).
-pub(crate) fn clock_stub(cx: &crate::kernel::Cx<'_>, cpu: &appine_engine::Cpu, nr: u64) -> bool {
+pub(crate) fn clock_stub(cx: &crate::kernel::Cx<'_>, cpu: &kazeterm_engine::Cpu, nr: u64) -> bool {
     let mm = cx.mm();
     let s = cpu.state();
     clock_stub_at((mm.vdso, mm.vdso_svc), s.pc, nr, s.orig_x0)
@@ -170,12 +170,12 @@ fn linux_vdso_clock(clock: i32) -> bool {
 /// reason in the debug log.
 #[cfg(target_arch = "aarch64")]
 fn from_host() -> Option<Image> {
-    let host = appine_hal::host_vdso()?;
+    let host = kazeterm_hal::host_vdso()?;
     let reject = |why: &str| {
         crate::debug::log(format_args!("host vDSO not used: {why}"));
         None
     };
-    let page = appine_hal::page_size() as u64;
+    let page = kazeterm_hal::page_size() as u64;
     let vvar_len = (host.vdso.as_ptr() as usize - host.vvar.as_ptr() as usize) as u64;
     if host.vdso_len > 16 * PAGE_SIZE as usize || vvar_len < page || !vvar_len.is_multiple_of(page)
     {
@@ -313,22 +313,22 @@ fn set_version_note(b: &mut [u8]) {
 fn host_works(image: &[u8], vvar: Vvar, clocks: &[(u64, u32); 3]) -> bool {
     use std::ptr::NonNull;
 
-    use appine_engine::{Cpu, Exit, Mmu, prot};
+    use kazeterm_engine::{Cpu, Exit, Mmu, prot};
 
     /// Host memory of the check: a page whose svc marks the return, a stack page, then the code.
     struct Pages(NonNull<u8>, usize);
     impl Drop for Pages {
         fn drop(&mut self) {
-            // SAFETY: mapped by appine_hal::map_anonymous below and no longer used
-            unsafe { appine_hal::unmap(self.0, self.1) }
+            // SAFETY: mapped by kazeterm_hal::map_anonymous below and no longer used
+            unsafe { kazeterm_hal::unmap(self.0, self.1) }
         }
     }
     const DONE: u64 = 0x1000_0000;
     const STACK: u64 = 0x2000_0000;
     const TEXT: u64 = 0x4000_0000;
-    let page = appine_hal::page_size();
+    let page = kazeterm_hal::page_size();
     let text_len = image.len().next_multiple_of(page);
-    let Ok(base) = appine_hal::map_anonymous(2 * page + text_len, false) else {
+    let Ok(base) = kazeterm_hal::map_anonymous(2 * page + text_len, false) else {
         return false;
     };
     let _pages = Pages(base, 2 * page + text_len);
@@ -387,11 +387,11 @@ fn host_works(image: &[u8], vvar: Vvar, clocks: &[(u64, u32); 3]) -> bool {
     let [gettime, gettimeofday, getres] = clocks.map(|(at, _)| at);
     // Realtime, monotonic, monotonic raw, the coarse ones, boottime and TAI
     for clock in [0, 1, 4, 5, 6, 7, 11] {
-        let Ok(before) = appine_hal::clock_gettime(clock) else {
+        let Ok(before) = kazeterm_hal::clock_gettime(clock) else {
             continue;
         };
         let r = call(&mut cpu, gettime, [clock as u64, buf]);
-        let Ok(after) = appine_hal::clock_gettime(clock) else {
+        let Ok(after) = kazeterm_hal::clock_gettime(clock) else {
             return false;
         };
         let got = read(&cpu, buf);
@@ -402,21 +402,21 @@ fn host_works(image: &[u8], vvar: Vvar, clocks: &[(u64, u32); 3]) -> bool {
     // gettimeofday: microseconds, and the host's timezone as two 32-bit fields
     let micros = |(sec, nsec): (i64, i64)| (sec, nsec / 1000);
     let (Ok(before), r, Ok(after)) = (
-        appine_hal::clock_gettime(0).map(micros),
+        kazeterm_hal::clock_gettime(0).map(micros),
         call(&mut cpu, gettimeofday, [buf, buf + 16]),
-        appine_hal::clock_gettime(0).map(micros),
+        kazeterm_hal::clock_gettime(0).map(micros),
     ) else {
         return false;
     };
     let (tv, tz) = (read(&cpu, buf), read(&cpu, buf + 16));
-    let (west, dst) = appine_hal::timezone();
+    let (west, dst) = kazeterm_hal::timezone();
     let tz_ok = tz.is_some_and(|(t, _)| t as i32 == west && (t >> 32) as i32 == dst);
     if r != Some(0) || !tv.is_some_and(|t| before <= t && t <= after) || !tz_ok {
         return false;
     }
     for clock in [1, 5] {
         let r = call(&mut cpu, getres, [clock as u64, buf]);
-        if r != Some(0) || read(&cpu, buf) != appine_hal::clock_getres(clock).ok() {
+        if r != Some(0) || read(&cpu, buf) != kazeterm_hal::clock_getres(clock).ok() {
             return false;
         }
     }
@@ -426,7 +426,7 @@ fn host_works(image: &[u8], vvar: Vvar, clocks: &[(u64, u32); 3]) -> bool {
 /// Answers a syscall the host's vDSO code made during [`host_works`] (a clock it leaves to the
 /// kernel) with the host's own call; None for anything else.
 #[cfg(target_arch = "aarch64")]
-fn fall_back(cpu: &mut appine_engine::Cpu) -> Option<()> {
+fn fall_back(cpu: &mut kazeterm_engine::Cpu) -> Option<()> {
     let s = cpu.state();
     let (a0, a1) = (s.x[0], s.x[1]);
     let both = |(a, b): (i64, i64)| {
@@ -437,10 +437,10 @@ fn fall_back(cpu: &mut appine_engine::Cpu) -> Option<()> {
     };
     // (where, what) to write
     let writes = match s.x[8] as u32 {
-        CLOCK_GETTIME => appine_hal::clock_gettime(a0 as i32).map(|t| vec![(a1, both(t))]),
-        CLOCK_GETRES => appine_hal::clock_getres(a0 as i32).map(|t| vec![(a1, both(t))]),
-        GETTIMEOFDAY => appine_hal::clock_gettime(0).map(|(sec, nsec)| {
-            let (west, dst) = appine_hal::timezone();
+        CLOCK_GETTIME => kazeterm_hal::clock_gettime(a0 as i32).map(|t| vec![(a1, both(t))]),
+        CLOCK_GETRES => kazeterm_hal::clock_getres(a0 as i32).map(|t| vec![(a1, both(t))]),
+        GETTIMEOFDAY => kazeterm_hal::clock_gettime(0).map(|(sec, nsec)| {
+            let (west, dst) = kazeterm_hal::timezone();
             let tz = [west.to_le_bytes(), dst.to_le_bytes()].concat();
             vec![(a0, both((sec, nsec / 1000))), (a1, tz)]
         }),
@@ -462,8 +462,8 @@ fn fall_back(cpu: &mut appine_engine::Cpu) -> Option<()> {
 /// Copies between `buf` and guest memory at `at` (into guest memory with `write`) during
 /// [`host_works`], within one page.
 #[cfg(target_arch = "aarch64")]
-fn guest_copy(cpu: &appine_engine::Cpu, at: u64, buf: &mut [u8], write: bool) -> Option<()> {
-    use appine_engine::prot;
+fn guest_copy(cpu: &kazeterm_engine::Cpu, at: u64, buf: &mut [u8], write: bool) -> Option<()> {
+    use kazeterm_engine::prot;
     let end = at.checked_add(buf.len() as u64)?;
     if (end - 1) / PAGE_SIZE != at / PAGE_SIZE {
         return None;
@@ -848,7 +848,7 @@ mod tests {
     }
 
     /// The development and CI hosts are arm64 Linux: their own vDSO is used, with its notes and
-    /// symbols changed only as Appine's contract needs.
+    /// symbols changed only as KazeTerm's contract needs.
     #[cfg(target_arch = "aarch64")]
     #[test]
     fn the_host_vdso_is_used() {

@@ -5,7 +5,7 @@
 # /proc/net, epoll and poll. Run by tests/diff/gtest/run.sh, one process per test. Tests that
 # differ for a reason recorded in a map, or that cannot be compared, are skipped, with the reason
 # above them.
-# Cannot be compared: Appine hands the malformed destination to the host socket, and in this VM
+# Cannot be compared: KazeTerm hands the malformed destination to the host socket, and in this VM
 # the host's AppArmor answers EAFNOSUPPORT before Linux's own EINVAL check
 SKIP="IPUnboundSockets/IPUnboundSocketTest.InsufficientBufferTOS/*"
 # kernel/net D3 and the kernel/netlink map: host interfaces, addresses and routes in the initial
@@ -36,10 +36,10 @@ SKIP="$SKIP:NetlinkRouteTest.NewRouteGatewayOnLink:NetlinkRouteTest.NewRouteLink
 SKIP="$SKIP:$R.RouteMulticastGroupReplace/*:$R.NewRouteWithoutOif/1:$R.NewRouteViaAddress/1"
 # kernel/net D7: the SNMP error counters are always 0
 SKIP="$SKIP:ProcNetSnmp.TcpEstab:ProcNetSnmp.TcpReset:ProcNetSnmp.UdpNoPorts"
-# Cannot be compared: runs only on a kernel 7 or newer (CI's), skipping itself on 6.8 and Appine
+# Cannot be compared: runs only on a kernel 7 or newer (CI's), skipping itself on 6.8 and KazeTerm
 SKIP="$SKIP:NetlinkRouteTest.VethAddRefusedPeerNetnsLeavesNothing"
 # Cannot be compared: skips itself on a kernel without Linux 5d39580f68e6 (the dev VM's 6.8), while
-# Appine refuses SO_ATTACH_FILTER on TCP without CAP_NET_ADMIN as 6.1.y does
+# KazeTerm refuses SO_ATTACH_FILTER on TCP without CAP_NET_ADMIN as 6.1.y does
 SKIP="$SKIP:AllInetTests/SimpleTcpSocketTest.SetSocketAttachFilterWithoutNetAdmin/*"
 sh /tmp/difftest-files/gtest/run.sh gvisor "$SKIP" tcp_socket_test bind_test \
     socket_ip_unbound_test socket_netlink_test socket_netlink_route_test proc_net_test epoll_test \

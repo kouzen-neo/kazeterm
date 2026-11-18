@@ -7,7 +7,7 @@
 # itself an overlay, which Linux refuses as an upper layer. Run by tests/diff/gtest/run.sh, one
 # process per test.
 # Cannot be compared on CI: its kernel defaults to redirect_dir=on, so a merged directory renames
-# in place there, where 6.1's default (follow, as in Appine and on 6.8) refuses it with EXDEV
+# in place there, where 6.1's default (follow, as in KazeTerm and on 6.8) refuses it with EXDEV
 SKIP="OverlayFsTest.RenameDir"
 mkdir -p /tmp/starnix-overlay
 mount -t tmpfs tmpfs /tmp/starnix-overlay

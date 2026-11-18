@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use appine_engine::DbtStats;
+use kazeterm_engine::DbtStats;
 
 use crate::cell::RefCell;
 use crate::cred::{Cred, MAY_EXEC};
@@ -202,7 +202,7 @@ pub struct RunOptions {
     /// shutdown, instead of ending all processes directly.
     pub init: bool,
     /// A host fd from which each byte read is a signal the host process was asked to stop with
-    /// (`appine-run`'s handlers for SIGINT, SIGTERM and SIGHUP write them): the first is passed on
+    /// (`kazeterm-run`'s handlers for SIGINT, SIGTERM and SIGHUP write them): the first is passed on
     /// to the first process, one at least a second later ends every process. Either way the run then ends as usual,
     /// with the shutdown, the final store sync and the host terminal restored.
     pub stop: Option<i32>,
@@ -579,11 +579,11 @@ fn default_rlimits() -> [(u64, u64); RLIM_NLIMITS] {
 pub(crate) fn default_threads_max() -> usize {
     static MAX: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     *MAX.get_or_init(|| {
-        let by_memory = match appine_hal::memory_info().0 {
+        let by_memory = match kazeterm_hal::memory_info().0 {
             0 => 4096,
             total => (total >> 20) as usize,
         };
-        let by_fds = usize::try_from(appine_hal::fd_limit() / 2).unwrap_or(usize::MAX);
+        let by_fds = usize::try_from(kazeterm_hal::fd_limit() / 2).unwrap_or(usize::MAX);
         by_memory.min(by_fds).max(MIN_THREADS)
     })
 }

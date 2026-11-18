@@ -40,9 +40,9 @@ SKIP="$SKIP:DetachedMountTest.SubmountFails:DetachedMountTest.UnsharePreservesDe
 # supports it)
 SKIP="$SKIP:OtmpfileTest.TmpFileLinkIntoAfter:OtmpfileTest.TmpFileWithOExclShouldFailLinkInto"
 # Cannot be compared on CI's newer kernel: tmpfs casefolding (6.13) runs there and skips itself on
-# 6.8 and Appine; the newer kernel refuses changing a detached mount's propagation; musl's pwrite
+# 6.8 and KazeTerm; the newer kernel refuses changing a detached mount's propagation; musl's pwrite
 # asks for RWF_NOAPPEND (6.9), which 6.8 lacks (EOPNOTSUPP), and the O_APPEND writes the test
-# expects happen natively on CI on docker's overlay root, while Appine writes at the offset
+# expects happen natively on CI on docker's overlay root, while KazeTerm writes at the offset
 SKIP="$SKIP:FsCasefold/*/tmpfs:DetachedMountTest.ChangePropagationSucceeds"
 SKIP="$SKIP:ReadWriteTest.PwriteOAppendAtomicity"
 sh /tmp/difftest-files/gtest/run.sh starnix "$SKIP" fs_test fcntl_test fallocate_test read_write_test \

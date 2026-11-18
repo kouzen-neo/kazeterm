@@ -9,7 +9,7 @@
 
 ## Responsibilities
 
-`website/` owns Appine's minimal homepage, English privacy-policy page and maintenance
+`website/` owns KazeTerm's minimal homepage, English privacy-policy page and maintenance
 and local-preview instructions. Android modules own the behavior described by the
 policy; changing this page does not change permission enforcement or data handling.
 
@@ -26,9 +26,9 @@ asset adapted from the Android launcher foreground and colors.
 - `dist/privacy.html`, reached through the homepage's relative Privacy Policy link or
   opened directly; Cloudflare Pages redirects its extension to `/privacy`.
 - Both pages reference the local `favicon.svg` with an SVG icon link.
-- Production is the Cloudflare Pages Direct Upload project `appine`, available at
-  `https://appine.sh/` and `https://appine.pages.dev/`; the policy URL is `/privacy`.
-- Android Settings About opens `https://appine.sh/privacy` through its shared
+- Production is the Cloudflare Pages Direct Upload project `kazeterm`, available at
+  `https://kazeterm.sh/` and `https://kazeterm.pages.dev/`; the policy URL is `/privacy`.
+- Android Settings About opens `https://kazeterm.sh/privacy` through its shared
   Custom Tabs link action; the entry is implemented in `android/setup`.
 - The contact email link opens the visitor's mail handler for Matthew Lee at
   `matthewlee0725@gmail.com`; loading the page does not send email.

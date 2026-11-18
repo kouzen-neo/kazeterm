@@ -80,12 +80,12 @@ jobs:
       # easy to tell a network problem from a kernel one when it fails
       - name: Network (apk add, git clone)
         env:
-          APPINE_REQUIRE_ROOTFS: "1"
-          APPINE_NETWORK_TESTS: "1"
-        run: cargo test -p appine-run --test rootfs_programs -- --exact apk_installs_packages_and_git_clones_over_https
+          KAZETERM_REQUIRE_ROOTFS: "1"
+          KAZETERM_NETWORK_TESTS: "1"
+        run: cargo test -p kazeterm-run --test rootfs_programs -- --exact apk_installs_packages_and_git_clones_over_https
 
       - name: Lockstep (extended)
-        run: cargo run --release -p appine-lockstep -- --iterations 200000
+        run: cargo run --release -p kazeterm-lockstep -- --iterations 200000
 
       # Fuchsia Starnix's syscall tests, which the starnix-* differential cases run (without them those
       # cases only print that they are missing). The Fuchsia commit and googletest version are fixed
@@ -129,18 +129,18 @@ jobs:
           path: target/gvisor-tests
           key: ${{ steps.gvisor-cache.outputs.cache-primary-key }}
 
-      # scripts/difftest does not build: it runs target/release/appine-run, which no other step builds
-      - name: Build appine-run
-        run: cargo build --release -p appine-run
+      # scripts/difftest does not build: it runs target/release/kazeterm-run, which no other step builds
+      - name: Build kazeterm-run
+        run: cargo build --release -p kazeterm-run
 
-      # M7's exit criterion: the same scripts give the same output on Appine (Tier 1) and on native
+      # M7's exit criterion: the same scripts give the same output on KazeTerm (Tier 1) and on native
       # Alpine in docker. The first run installs the packages the test cases need with apk, which
-      # depends on the internet. Appine turns the guest's raw ICMP sockets into host ping sockets:
+      # depends on the internet. KazeTerm turns the guest's raw ICMP sockets into host ping sockets:
       # Ubuntu does not let regular users create those by default (ping_group_range is "1 0"), while
       # Android and the Docker container on the native side both allow all groups. rust-cache caches
       # the whole target/ and would restore part of a store left by an earlier run, so the store is
       # created afresh each time and deleted after the run, so that it is not saved into the cache
-      # again. vmstat samples the runner every 10 s meanwhile: Appine's side of some cases has
+      # again. vmstat samples the runner every 10 s meanwhile: KazeTerm's side of some cases has
       # taken tens of times its usual time on some runs only. -R runs a failed group once more, so
       # a group that fails only sometimes is reported as flaky instead of failing the run
       - name: Differential tests
@@ -151,14 +151,14 @@ jobs:
           trap "kill $!" EXIT
           scripts/difftest -R
 
-      # Every case's appine-run stderr (internal errors, BKL watchdog reports), the outputs of
+      # Every case's kazeterm-run stderr (internal errors, BKL watchdog reports), the outputs of
       # failed cases and the vmstat samples, whether the cases passed or not
       - if: always()
         uses: actions/upload-artifact@v7
         with:
           name: difftest
           path: |
-            target/difftest/*.appine.err
+            target/difftest/*.kazeterm.err
             target/difftest/failed/
             target/vmstat.log
           if-no-files-found: ignore
@@ -172,4 +172,4 @@ jobs:
         env:
           CC: clang
           CARGO_TARGET_DIR: target/clang
-        run: cargo test -p appine-engine -p appine-lockstep
+        run: cargo test -p kazeterm-engine -p kazeterm-lockstep

@@ -1,4 +1,4 @@
-# Appine website
+# KazeTerm website
 
 A minimal homepage in `dist/index.html` links to the English privacy policy in
 `dist/privacy.html`. Both use inline CSS and a local SVG favicon with no JavaScript,
@@ -21,12 +21,12 @@ For static hosting, use `website/dist/` as the site root; no build step is neede
 
 For Cloudflare Pages Direct Upload, upload the `website/dist/` folder.
 
-The current Direct Upload project is `appine`, served at
-<https://appine.sh> and <https://appine.pages.dev>. To update its production
+The current Direct Upload project is `kazeterm`, served at
+<https://kazeterm.sh> and <https://kazeterm.pages.dev>. To update its production
 deployment from the repository root using a logged-in Wrangler session:
 
 ```sh
-npx wrangler pages deploy website/dist --project-name appine --branch main
+npx wrangler pages deploy website/dist --project-name kazeterm --branch main
 ```
 
 For Cloudflare Pages Git integration, set the root directory to `website`, the
@@ -34,7 +34,7 @@ framework preset to `None`, the output directory to `dist`, and the build comman
 to `exit 0`.
 
 Cloudflare Pages redirects `/privacy.html` to `/privacy`; use
-`https://appine.sh/privacy` as the public policy URL.
+`https://kazeterm.sh/privacy` as the public policy URL.
 See [Serving Pages](https://developers.cloudflare.com/pages/configuration/serving-pages/).
 
 ## Favicon
@@ -83,7 +83,7 @@ Before submitting a release:
 
 1. Publish this page at a stable public URL, accessible without sign-in or geographic
    restrictions, and enter that URL in Play Console. Visitors must not be able to edit it.
-2. Verify that Settings → About → Privacy policy opens `https://appine.sh/privacy`
+2. Verify that Settings → About → Privacy policy opens `https://kazeterm.sh/privacy`
    in the release build. Privacy mode is a separate feature.
 3. Check the final release artifact and all SDK behavior against this policy and
    complete the Data safety form. Local processing, user-initiated sharing and

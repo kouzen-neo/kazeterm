@@ -18,10 +18,10 @@ license = "AGPL-3.0-or-later"
 publish = false
 
 [workspace.dependencies]
-appine-bench = { path = "tests/bench" }
-appine-engine = { path = "core/engine" }
-appine-hal = { path = "core/hal" }
-appine-kernel = { path = "core/kernel" }
+kazeterm-bench = { path = "tests/bench" }
+kazeterm-engine = { path = "core/engine" }
+kazeterm-hal = { path = "core/hal" }
+kazeterm-kernel = { path = "core/kernel" }
 cc = "1"
 flate2 = "1"
 libc = "0.2"

@@ -10,10 +10,10 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use appine_engine::{
+use kazeterm_engine::{
     Access, Cpu, CpuState, Dbt, DbtStats, Exit, FaultKind, Kicker, PAGE_SIZE, prot,
 };
-use appine_hal::Event;
+use kazeterm_hal::Event;
 
 use crate::bug::Trap;
 use crate::cell::RefCell;
@@ -391,7 +391,7 @@ impl Task {
     /// no need to read /proc (which used to take a fifth of thread exit).
     pub fn cpu_self(&self) -> CpuTime {
         let total_ns = self.cpu_ns();
-        let sys_ns = appine_hal::thread_system_ns_self().saturating_sub(self.cpu_base.get().1);
+        let sys_ns = kazeterm_hal::thread_system_ns_self().saturating_sub(self.cpu_base.get().1);
         self.cpu_adjust(total_ns, sys_ns)
     }
 
@@ -400,7 +400,7 @@ impl Task {
     /// layer itself does in host user mode is not counted, so it is an underestimate.
     pub fn cpu(&self) -> CpuTime {
         let total_ns = self.cpu_ns();
-        let sys_ns = appine_hal::thread_system_ns(self.host_tid.get())
+        let sys_ns = kazeterm_hal::thread_system_ns(self.host_tid.get())
             .unwrap_or(0)
             .saturating_sub(self.cpu_base.get().1);
         self.cpu_adjust(total_ns, sys_ns)
@@ -415,7 +415,7 @@ impl Task {
     fn host_cpu_ns(&self) -> u64 {
         self.clock
             .get()
-            .and_then(|c| appine_hal::clock_gettime(c).ok())
+            .and_then(|c| kazeterm_hal::clock_gettime(c).ok())
             .map_or(0, |(s, ns)| s as u64 * 1_000_000_000 + ns as u64)
     }
 
@@ -460,7 +460,7 @@ pub(crate) fn start(
     // No JoinHandle is kept: at the end of a session what is waited for is kernel.tasks becoming
     // empty, and after that the thread only has its own Cpu and translation cache left to free
     pool::spawn(Box::new(move |reused| {
-        appine_hal::set_thread_name(&format!("guest-{tid}"));
+        kazeterm_hal::set_thread_name(&format!("guest-{tid}"));
         thread_main(thread_shared, tid, cpu, reused)
     }))
     .map_err(|_| Errno::EAGAIN)?;
@@ -600,7 +600,7 @@ fn thread_main(shared: Arc<Shared>, tid: Tid, mut cpu: Cpu, reused: bool) {
         // A kernel-layer bug, and not in a place that contains it (crate::bug): the thread cannot
         // find itself, or the cleanup after an error failed in turn. State protected by the BKL
         // may already be inconsistent, so other threads must not go on
-        eprintln!("appine: internal error in guest thread {tid}, aborting");
+        eprintln!("kazeterm: internal error in guest thread {tid}, aborting");
         std::process::abort();
     }
 }
@@ -624,12 +624,12 @@ fn run(shared: &Arc<Shared>, tid: Tid, cpu: &mut Cpu, reused: bool) {
     // (crate::bug)
     let started = crate::bug::catch(|| {
         crate::bug::trap(Trap::Start, task.tgid);
-        task.clock.set(appine_hal::thread_cpu_clock());
+        task.clock.set(kazeterm_hal::thread_cpu_clock());
         task.cpu_base
-            .set((task.host_cpu_ns(), appine_hal::thread_system_ns_self()));
-        task.host_tid.set(appine_hal::gettid());
+            .set((task.host_cpu_ns(), kazeterm_hal::thread_system_ns_self()));
+        task.host_tid.set(kazeterm_hal::gettid());
         task.ctxt_base
-            .set(appine_hal::thread_ctxt_switches_self().unwrap_or((0, 0)));
+            .set(kazeterm_hal::thread_ctxt_switches_self().unwrap_or((0, 0)));
         crate::syscall::host_started(&task, reused);
         task.state.borrow().mm.borrow().generations()
     });

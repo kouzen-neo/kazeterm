@@ -1,8 +1,8 @@
 /*
  * The BKL watchdog (the kernel/process map): a hold of the BKL longer than the watchdog's
  * threshold is reported on the host's stderr while it lasts and in the kernel log once it has
- * ended. The hold is simulated with the test hooks of debug builds: appine-run must set
- * APPINE_TEST_HOOKS=1 and a threshold of 1 s (APPINE_BKL_WATCHDOG=1). Holds the BKL for 2.5 s,
+ * ended. The hold is simulated with the test hooks of debug builds: kazeterm-run must set
+ * KAZETERM_TEST_HOOKS=1 and a threshold of 1 s (KAZETERM_BKL_WATCHDOG=1). Holds the BKL for 2.5 s,
  * then reads the kernel log until the watchdog's record appears and prints it.
  *
  * With the argument "hold" it only holds the BKL (for the Machine tests). With "twice" a second

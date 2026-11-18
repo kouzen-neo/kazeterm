@@ -7,9 +7,9 @@
 //! after reaching one has probably failed because of it.
 //!
 //! - Reports of kernel bugs carry the paths reached most often ([`top`], [`crate::bug`]), so the
-//!   report the app copies for developers also shows what the workload asked for that Appine lacks.
-//! - With `APPINE_LOG=1` the first hit of each path is written to the host's stderr
-//!   (`appine: unimplemented <path>, first by <comm> (pid <pid>)`), which `scripts/survey`
+//!   report the app copies for developers also shows what the workload asked for that KazeTerm lacks.
+//! - With `KAZETERM_LOG=1` the first hit of each path is written to the host's stderr
+//!   (`kazeterm: unimplemented <path>, first by <comm> (pid <pid>)`), which `scripts/survey`
 //!   collects per workload.
 //!
 //! Nothing reaches the guest: its kernel log stays what Linux would write. Where a default arm also

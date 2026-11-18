@@ -4,7 +4,7 @@
 # (uid, gid, mode, ptmxmode, max); bind mounts share the instance; fd links and ttyname give the
 # path inside the mount the terminal was opened through; a ptmx device node outside devpts uses
 # the instance mounted at pts in the same directory; TIOCGPTPEER. The native side is a privileged
-# container; the container's /dev/pts is its own instance and Appine's is the boot-time one, and
+# container; the container's /dev/pts is its own instance and KazeTerm's is the boot-time one, and
 # both start with no terminals
 cd /tmp
 rm -rf p1 p2 p3 d e f x
@@ -107,7 +107,7 @@ int main(void)
     info("slave p3/0", s3);
     info("master p1", m1);
     // The link of /dev/ptmx itself is not compared: in a docker container it is a symlink to
-    // pts/ptmx, in Appine a device node
+    // pts/ptmx, in KazeTerm a device node
     close(m0);
     char *n = ttyname(s1);
     printf("ttyname p1/0: %s\n", n ? n : strerror(errno));

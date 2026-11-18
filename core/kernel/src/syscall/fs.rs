@@ -116,7 +116,7 @@ const OVERLAYFS_SUPER_MAGIC: u64 = 0x794c_7630;
 /// Device number of the PTY master device (`/dev/ptmx`).
 const PTMX_RDEV: u64 = rdev(5, 2);
 
-/// ioctls that can be passed through to a host fd (the terminal, or the pipe or file `appine-run`
+/// ioctls that can be passed through to a host fd (the terminal, or the pipe or file `kazeterm-run`
 /// was given): number, argument size, whether the argument is an output.
 const HOST_IOCTLS: [(u32, usize, bool); 15] = [
     (0x5401, 36, true),       // TCGETS
@@ -330,7 +330,7 @@ pub(super) fn openat2(cx: &mut Cx<'_>, dirfd: i32, path: u64, how: u64, size: us
         return Err(Errno::EINVAL);
     }
     // RESOLVE_CACHED: creation, truncation and O_TMPFILE (which includes O_DIRECTORY, so
-    // O_DIRECTORY counts too) are not tried; everything else resolves as usual, since Appine's
+    // O_DIRECTORY counts too) are not tried; everything else resolves as usual, since KazeTerm's
     // resolution waits for nothing but host I/O
     let busy = (oflags::O_TRUNC | oflags::O_CREAT | oflags::O_DIRECTORY) as u64 | O_TMPFILE_BIT;
     if res & resolve::CACHED != 0 && f & busy != 0 {
@@ -2331,7 +2331,7 @@ pub(super) fn ioctl(cx: &mut Cx<'_>, fd: i32, request: u32, arg: u64) -> SysResu
     if !out {
         cx.mm().read(UserSlice::new(arg, size), &mut buf)?;
     }
-    let rc = appine_hal::ioctl(host_fd, request as u64, &mut buf).map_err(Errno)?;
+    let rc = kazeterm_hal::ioctl(host_fd, request as u64, &mut buf).map_err(Errno)?;
     if out {
         cx.mm().write(UserSlice::new(arg, size), &buf)?;
     }
@@ -3205,7 +3205,7 @@ fn stream_vectored(
 
 /// Whether host fd `fd` (host stdio) is a regular file on the host.
 fn host_regular(fd: i32) -> bool {
-    appine_hal::fstat(fd).is_ok_and(|st| st.st_mode & mode::S_IFMT == mode::S_IFREG)
+    kazeterm_hal::fstat(fd).is_ok_and(|st| st.st_mode & mode::S_IFMT == mode::S_IFREG)
 }
 
 /// readv on a pipe, terminal, eventfd or `/dev/fuse`: one read of up to `step` bytes, scattered
@@ -3709,7 +3709,7 @@ fn copy_range_checks(
 }
 
 /// When sendfile and copy_file_range copy between two regular files, the copy is left to the
-/// host kernel ([`appine_hal::copy_file`]): the data does not pass through the kernel layer, and
+/// host kernel ([`kazeterm_hal::copy_file`]): the data does not pass through the kernel layer, and
 /// it takes only one host call, without the BKL. With `src`/`dst` None the file positions are
 /// used and advanced; the output fd's host position is also used, so the output's position is
 /// always taken as [`unlocked_io`] does, and while waiting neither is taken, so copies in the
@@ -3777,7 +3777,7 @@ fn copy_regular(
         input.borrow_mut().pos_busy = 1;
     }
     output.borrow_mut().pos_busy = 1;
-    let r = cx.unlocked(|| appine_hal::copy_file(fd_in, from, fd_out, to, len));
+    let r = cx.unlocked(|| kazeterm_hal::copy_file(fd_in, from, fd_out, to, len));
     let mut wake = false;
     for (f, used, dst, at) in [(input, src.is_none(), src, from), (output, true, dst, to)] {
         if used {
@@ -3976,7 +3976,7 @@ pub(super) fn write_sync(cx: &mut Cx<'_>, file: &FileRef, rwf: u32) -> Result<()
         (std::os::fd::AsRawFd::as_raw_fd(host), !full)
     };
     // The open file is kept alive by file and not touched while the BKL is released
-    cx.unlocked(|| appine_hal::fsync(fd, data_only))
+    cx.unlocked(|| kazeterm_hal::fsync(fd, data_only))
         .map_err(Errno)
 }
 
@@ -3999,7 +3999,7 @@ pub(super) fn read_bytes(
     match path {
         IoPath::Host(fd) => {
             wait_host(cx, fd, POLLIN, nonblock)?;
-            cx.unlocked(|| appine_hal::read(fd, buf)).map_err(Errno)
+            cx.unlocked(|| kazeterm_hal::read(fd, buf)).map_err(Errno)
         }
         IoPath::Pipe(pipe) => pipe_read(cx, &pipe, nonblock, buf),
         IoPath::Pty(t, side) => tty::read(cx, &t, side, nonblock, buf),
@@ -4048,7 +4048,7 @@ pub(super) fn read_bytes(
             let regular = regular_fd(&file.borrow());
             let n = match regular {
                 Some(fd) => unlocked_io(cx, file, fd, (offset, false), |fd, pos| {
-                    appine_hal::pread(fd, buf, pos)
+                    kazeterm_hal::pread(fd, buf, pos)
                 })?,
                 None => {
                     refresh_pseudo(cx, file, offset)?;
@@ -4063,14 +4063,14 @@ pub(super) fn read_bytes(
     }
 }
 
-/// Waits until a host fd (the host stdio `appine-run` gives the guest) is readable or writable;
+/// Waits until a host fd (the host stdio `kazeterm-run` gives the guest) is readable or writable;
 /// does not wait when nonblocking. Waits only on the host fd itself and registers no object:
 /// nothing in the process can make it ready, and previously every pipe or PTY read or write in
 /// the system woke the threads blocked on host stdin once.
 fn wait_host(cx: &mut Cx<'_>, fd: i32, events: i16, nonblock: bool) -> Result<(), Errno> {
     let mut pfd = [(fd, events, 0)];
     loop {
-        appine_hal::poll(&mut pfd, Some(Duration::ZERO)).map_err(Errno)?;
+        kazeterm_hal::poll(&mut pfd, Some(Duration::ZERO)).map_err(Errno)?;
         if pfd[0].2 != 0 {
             return Ok(());
         }
@@ -4258,7 +4258,7 @@ fn local_read(f: &mut OpenFile, buf: &mut [u8], offset: Option<u64>) -> Result<u
                 buf.len()
             }
             Device::Random => {
-                appine_hal::fill_random(buf).map_err(Errno)?;
+                kazeterm_hal::fill_random(buf).map_err(Errno)?;
                 buf.len()
             }
             Device::Kmsg => return Err(Errno::EBADF),
@@ -4318,7 +4318,7 @@ pub(super) fn write_bytes(
         (path, f.nonblocking())
     };
     match path {
-        IoPath::Host(fd) => match cx.unlocked(|| appine_hal::write(fd, data)) {
+        IoPath::Host(fd) => match cx.unlocked(|| kazeterm_hal::write(fd, data)) {
             Ok(n) => Ok(n),
             Err(e) if e == Errno::EPIPE.0 => Err(broken_pipe(cx)),
             Err(e) => Err(Errno(e)),
@@ -4434,7 +4434,7 @@ fn write_local(
         regular_fd(&file.borrow()).filter(|_| file.borrow().flags & oflags::O_APPEND == 0);
     let n = match regular {
         Some(fd) => unlocked_io(cx, file, fd, (offset, held), |fd, pos| {
-            appine_hal::pwrite(fd, data, pos)
+            kazeterm_hal::pwrite(fd, data, pos)
         })?,
         None => local_write(&mut file.borrow_mut(), data, offset)?.min(written),
     };
@@ -5071,7 +5071,7 @@ pub(super) fn lseek(cx: &mut Cx<'_>, fd: i32, offset: i64, whence: u32) -> SysRe
     let mut f = file.borrow_mut();
     let OpenFile { kind, pos, .. } = &mut *f;
     let base = match kind {
-        FileKind::Host(fd) => return appine_hal::lseek(*fd, offset, whence as i32).map_err(Errno),
+        FileKind::Host(fd) => return kazeterm_hal::lseek(*fd, offset, whence as i32).map_err(Errno),
         FileKind::Path(_) => return Err(Errno::EBADF),
         FileKind::Pipe(_)
         | FileKind::Pty(_)
@@ -5164,7 +5164,7 @@ pub(super) fn lseek(cx: &mut Cx<'_>, fd: i32, offset: i64, whence: u32) -> SysRe
                 // host filesystem that cannot tell has data everywhere (a hole only at the end)
                 SEEK_DATA | SEEK_HOLE => {
                     let fd = std::os::fd::AsRawFd::as_raw_fd(file);
-                    let found = match appine_hal::lseek(fd, offset, whence as i32) {
+                    let found = match kazeterm_hal::lseek(fd, offset, whence as i32) {
                         Ok(at) => at,
                         Err(e) if e == Errno::ENXIO.0 => return Err(Errno::ENXIO),
                         Err(_) if whence == SEEK_DATA => offset as u64,
@@ -5225,7 +5225,7 @@ pub(super) fn cache_hint(
                 FileKind::Regular { file: host, .. } if flags != 0 => {
                     let fd = std::os::fd::AsRawFd::as_raw_fd(host);
                     drop(f);
-                    cx.unlocked(|| appine_hal::sync_file_range(fd, offset, len, flags))
+                    cx.unlocked(|| kazeterm_hal::sync_file_range(fd, offset, len, flags))
                         .map(|()| 0)
                         .map_err(Errno)
                 }
@@ -5244,7 +5244,7 @@ pub(super) fn cache_hint(
 }
 
 /// cachestat (Linux 6.5): the state of a file in the page cache. Files in the store look at the
-/// host file's page cache ([`appine_hal::cachestat`], only the number of pages in the cache);
+/// host file's page cache ([`kazeterm_hal::cachestat`], only the number of pages in the cache);
 /// other files have no page cache and get all 0s.
 pub(super) fn cachestat(cx: &mut Cx<'_>, fd: i32, range: u64, out: u64, flags: u32) -> SysResult {
     let file = cx.fds().get(fd)?;
@@ -5259,7 +5259,7 @@ pub(super) fn cachestat(cx: &mut Cx<'_>, fd: i32, range: u64, out: u64, flags: u
     let len = u64::from_le_bytes(r[8..].try_into().unwrap());
     let stats = match &file.borrow().kind {
         FileKind::Regular { file, .. } => {
-            appine_hal::cachestat(std::os::fd::AsRawFd::as_raw_fd(file), off, len).map_err(Errno)?
+            kazeterm_hal::cachestat(std::os::fd::AsRawFd::as_raw_fd(file), off, len).map_err(Errno)?
         }
         _ => [0; 5],
     };
@@ -5310,7 +5310,7 @@ pub(super) fn fsync(cx: &mut Cx<'_>, fd: i32, data_only: bool) -> SysResult {
     };
     // The open file is kept alive by file and not touched while the BKL is released
     if let Some(fd) = host {
-        cx.unlocked(|| appine_hal::fsync(fd, data_only))
+        cx.unlocked(|| kazeterm_hal::fsync(fd, data_only))
             .map_err(Errno)?;
     }
     durable(cx, false)
@@ -5683,7 +5683,7 @@ pub(super) fn fstatfs(cx: &mut Cx<'_>, fd: i32, buf: u64) -> SysResult {
     };
     // Message queue fds are in the mqueue filesystem
     if matches!(file.borrow().kind, FileKind::MessageQueue(_)) {
-        let empty = appine_hal::FsStats {
+        let empty = kazeterm_hal::FsStats {
             block_size: 4096,
             ..Default::default()
         };
@@ -5692,7 +5692,7 @@ pub(super) fn fstatfs(cx: &mut Cx<'_>, fd: i32, buf: u64) -> SysResult {
     let b = match (pipe, node) {
         (true, _) => encode_statfs(
             PIPEFS_MAGIC,
-            &appine_hal::FsStats {
+            &kazeterm_hal::FsStats {
                 block_size: 4096,
                 ..Default::default()
             },
@@ -5706,7 +5706,7 @@ pub(super) fn fstatfs(cx: &mut Cx<'_>, fd: i32, buf: u64) -> SysResult {
 
 /// statfs of the filesystem a node is in.
 fn statfs_of(cx: &mut Cx<'_>, node: &Node) -> Result<[u8; 120], Errno> {
-    let empty = appine_hal::FsStats {
+    let empty = kazeterm_hal::FsStats {
         block_size: 4096,
         ..Default::default()
     };
@@ -5722,7 +5722,7 @@ fn statfs_of(cx: &mut Cx<'_>, node: &Node) -> Result<[u8; 120], Errno> {
     if let Some(dev) = vfs.tmpfs_dev(node) {
         let (p, pages, inodes) = vfs.tmpfs_usage(dev, true)?;
         let free = p.blocks.saturating_sub(pages);
-        let s = appine_hal::FsStats {
+        let s = kazeterm_hal::FsStats {
             block_size: TMPFS_PAGE,
             blocks: p.blocks,
             free,
@@ -5765,7 +5765,7 @@ fn statfs_of(cx: &mut Cx<'_>, node: &Node) -> Result<[u8; 120], Errno> {
     })
 }
 
-fn encode_statfs(magic: u64, s: &appine_hal::FsStats, flags: u64) -> [u8; 120] {
+fn encode_statfs(magic: u64, s: &kazeterm_hal::FsStats, flags: u64) -> [u8; 120] {
     // asm-generic's struct statfs (64-bit)
     let mut b = [0u8; 120];
     let words = [
@@ -5946,7 +5946,7 @@ pub(super) fn file_stat(cx: &Cx<'_>, file: &FileRef) -> Result<[u8; 128], Errno>
 // The st_* fields have different widths on different hosts
 #[allow(clippy::unnecessary_cast)]
 fn host_stat(fd: i32) -> Result<[u8; 128], Errno> {
-    let s = appine_hal::fstat(fd).map_err(Errno)?;
+    let s = kazeterm_hal::fstat(fd).map_err(Errno)?;
     let st = Stat {
         ino: s.st_ino as u64,
         mode: s.st_mode as u32,
@@ -7706,7 +7706,7 @@ pub(super) fn fallocate(cx: &mut Cx<'_>, fd: i32, mode: u32, offset: i64, len: i
     // hole's storage) or zeroes; on a host filesystem that cannot, a hole or zeroed range is
     // written with zeros and a reservation only lengthens the file
     let fd = std::os::fd::AsRawFd::as_raw_fd(host);
-    match appine_hal::fallocate(fd, mode as i32, offset, len) {
+    match kazeterm_hal::fallocate(fd, mode as i32, offset, len) {
         Ok(()) => {}
         Err(e) if e == Errno::EOPNOTSUPP.0 => {
             if zero {
@@ -8214,7 +8214,7 @@ fn pages_needed(
         let data = if at >= size {
             end
         } else {
-            match appine_hal::lseek(fd, at as i64, SEEK_DATA as i32) {
+            match kazeterm_hal::lseek(fd, at as i64, SEEK_DATA as i32) {
                 Ok(d) => d / TMPFS_PAGE,
                 Err(e) if e == Errno::ENXIO.0 => end,
                 Err(_) => page,
@@ -8228,7 +8228,7 @@ fn pages_needed(
         if data >= end {
             break;
         }
-        let hole = appine_hal::lseek(fd, (data * TMPFS_PAGE) as i64, SEEK_HOLE as i32)
+        let hole = kazeterm_hal::lseek(fd, (data * TMPFS_PAGE) as i64, SEEK_HOLE as i32)
             .unwrap_or(size)
             .div_ceil(TMPFS_PAGE);
         page = hole.max(data + 1);
@@ -8245,7 +8245,7 @@ fn reserved_unwritten(host: &std::fs::File, size: u64, own: u64) -> u64 {
     let mut data = 0;
     let mut at = 0;
     while at < size {
-        let d = match appine_hal::lseek(fd, at as i64, SEEK_DATA as i32) {
+        let d = match kazeterm_hal::lseek(fd, at as i64, SEEK_DATA as i32) {
             Ok(d) => d,
             Err(e) if e == Errno::ENXIO.0 => break,
             // A host that cannot tell: data everywhere
@@ -8254,7 +8254,7 @@ fn reserved_unwritten(host: &std::fs::File, size: u64, own: u64) -> u64 {
                 break;
             }
         };
-        let h = appine_hal::lseek(fd, d as i64, SEEK_HOLE as i32).unwrap_or(size);
+        let h = kazeterm_hal::lseek(fd, d as i64, SEEK_HOLE as i32).unwrap_or(size);
         data += h.div_ceil(TMPFS_PAGE) - d / TMPFS_PAGE;
         at = h.max(d + 1);
     }

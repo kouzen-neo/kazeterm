@@ -244,6 +244,6 @@ primitives, the OOM killer and victim selection (`kernel/oom`); poll and inotify
 ## To verify
 
 - Linux 6.1's permission rules for cgroup device program attach/detach (believed to need no
-  capability since CAP_BPF; Appine checks nothing on the target cgroup).
+  capability since CAP_BPF; KazeTerm checks nothing on the target cgroup).
 - `ENODEV` from removed cgroups was observed on native 6.8 and attributed to Linux 6.1 from
   knowledge of the kernel; the version-specific behavior remains unverified.

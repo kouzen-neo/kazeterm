@@ -12,7 +12,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define CONFIG_PATH "/etc/appine/browser"
+#define CONFIG_PATH "/etc/kazeterm/browser"
 #define MAX_URL_BYTES 8192
 
 static int fail(const char *message) {
@@ -50,23 +50,23 @@ int main(int argc, char **argv) {
     }
 
     FILE *config = fopen(CONFIG_PATH, "r");
-    if (config == NULL) return fail("Appine browser bridge is unavailable");
+    if (config == NULL) return fail("KazeTerm browser bridge is unavailable");
     char port_line[16], token[66];
     int valid = fgets(port_line, sizeof(port_line), config) != NULL &&
                 fgets(token, sizeof(token), config) != NULL && fgetc(config) == EOF;
     fclose(config);
-    if (!valid) return fail("invalid Appine browser configuration");
+    if (!valid) return fail("invalid KazeTerm browser configuration");
     char *end;
     errno = 0;
     unsigned long port = strtoul(port_line, &end, 10);
     size_t token_length = strlen(token);
     if (errno != 0 || end == port_line || strcmp(end, "\n") != 0 || port == 0 || port > 65535 ||
         token_length != 37 || token[36] != '\n')
-        return fail("invalid Appine browser configuration");
+        return fail("invalid KazeTerm browser configuration");
     for (size_t i = 0; i < 36; i++) {
         char c = token[i];
         if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c == '-'))
-            return fail("invalid Appine browser configuration");
+            return fail("invalid KazeTerm browser configuration");
     }
 
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
@@ -82,13 +82,13 @@ int main(int argc, char **argv) {
     int connected = connect(fd, (struct sockaddr *)&address, sizeof(address));
     if (connected != 0 && (errno != EINPROGRESS || !wait_fd(fd, POLLOUT, deadline))) {
         close(fd);
-        return fail("cannot connect to Appine browser bridge");
+        return fail("cannot connect to KazeTerm browser bridge");
     }
     int error = 0;
     socklen_t error_length = sizeof(error);
     if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &error_length) != 0 || error != 0) {
         close(fd);
-        return fail("Appine browser bridge is unavailable");
+        return fail("KazeTerm browser bridge is unavailable");
     }
     char request[66 + MAX_URL_BYTES + 1];
     memcpy(request, token, token_length);

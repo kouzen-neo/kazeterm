@@ -1,19 +1,19 @@
 //! Tier 0's instruction whitelist compared one by one with the LLVM disassembler (the engine
 //! map).
 //!
-//! Needs a Linux aarch64 host and llvm-mc (`APPINE_LLVM_MC` or llvm-mc in PATH); skipped when
-//! either is missing. The number of samples can be adjusted with `APPINE_WHITELIST_SAMPLES`.
+//! Needs a Linux aarch64 host and llvm-mc (`KAZETERM_LLVM_MC` or llvm-mc in PATH); skipped when
+//! either is missing. The number of samples can be adjusted with `KAZETERM_WHITELIST_SAMPLES`.
 
 #[cfg(lockstep_native)]
 #[test]
 fn whitelist_matches_llvm() {
-    use appine_lockstep::whitelist::{check, find_llvm_mc};
+    use kazeterm_lockstep::whitelist::{check, find_llvm_mc};
 
     let Some(llvm_mc) = find_llvm_mc() else {
         eprintln!("skipped: llvm-mc not found");
         return;
     };
-    let samples = std::env::var("APPINE_WHITELIST_SAMPLES")
+    let samples = std::env::var("KAZETERM_WHITELIST_SAMPLES")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(50_000);

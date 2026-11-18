@@ -1,7 +1,7 @@
 /*
  * Guest test program for System V IPC, POSIX timers, clocks and CPU times, signalfd, splice,
  * mremap, credentials, scheduling settings and ptrace (M6): build with musl-gcc -static and run
- * directly in appine-run (no rootfs needed). Each check that passes prints a line "ok <name>"; a
+ * directly in kazeterm-run (no rootfs needed). Each check that passes prints a line "ok <name>"; a
  * failure prints the reason and exits with 1; when all pass it prints "all ok" at the end.
  */
 #define _GNU_SOURCE

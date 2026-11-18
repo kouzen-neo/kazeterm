@@ -3,7 +3,7 @@
 //! are in `syscall::ptrace`.
 //!
 //! Tracees are threads, and the tracer is recorded as a process (tgid). Linux accepts requests
-//! only from the tracer thread itself, while any thread in the thread group may wait; Appine does
+//! only from the tracer thread itself, while any thread in the thread group may wait; KazeTerm does
 //! not record which thread forked (the tracer of PTRACE_TRACEME is the parent process), so this is
 //! relaxed to any thread in the tracer process.
 //!
@@ -27,7 +27,7 @@
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 
-use appine_engine::{Cpu, CpuState};
+use kazeterm_engine::{Cpu, CpuState};
 
 use crate::cell::RefCell;
 use crate::kernel::{Cx, Kernel, Tid, request_wake_on, wake};
@@ -149,7 +149,7 @@ pub(crate) fn set_pstate(s: &mut CpuState, pstate: u64) {
 /// plus DIT when DIT is advertised (Linux's `valid_native_regs` only clears the RES0 bits and
 /// restores DIT as given; on hardware without DIT the bit has no effect).
 pub(crate) fn user_pstate(pstate: u64) -> u64 {
-    let dit = appine_engine::guest_hwcap() & appine_engine::hwcap::DIT != 0;
+    let dit = kazeterm_engine::guest_hwcap() & kazeterm_engine::hwcap::DIT != 0;
     pstate & (PSTATE_NZCV | if dit { PSTATE_DIT } else { 0 })
 }
 

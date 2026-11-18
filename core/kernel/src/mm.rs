@@ -45,7 +45,7 @@ use std::rc::{Rc, Weak};
 use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
-use appine_engine::{MapError, Mmu, PAGE_SIZE, VA_BITS, prot};
+use kazeterm_engine::{MapError, Mmu, PAGE_SIZE, VA_BITS, prot};
 
 use crate::cell::RefCell;
 use crate::errno::Errno;
@@ -513,7 +513,7 @@ pub struct Mm {
     pub exe: Option<u64>,
     /// Which register set Tier 1 uses when translating this program, chosen per program at
     /// execve (Go gets a different one).
-    pub dbt_regs: appine_engine::DbtRegs,
+    pub dbt_regs: kazeterm_engine::DbtRegs,
     /// Load address of the vDSO (signal handlers return to the sigreturn trampoline in it by
     /// default).
     pub vdso: u64,
@@ -587,7 +587,7 @@ impl Mm {
             lock_future: false,
             lock_onfault: false,
             exe: None,
-            dbt_regs: appine_engine::DbtRegs::Default,
+            dbt_regs: kazeterm_engine::DbtRegs::Default,
             vdso: 0,
             vdso_svc: false,
             code: (0, 0),
@@ -799,7 +799,7 @@ impl Mm {
             let space = match self.join_group(groups) {
                 Some(space) => space,
                 None => {
-                    let space = appine_engine::DbtSpace::new(self.exe.unwrap_or(0), self.dbt_regs)?;
+                    let space = kazeterm_engine::DbtSpace::new(self.exe.unwrap_or(0), self.dbt_regs)?;
                     // With translations a previous user left in the pool, blocks in program files
                     // of the same version need no further check
                     space.trust(&self.code_sources());
@@ -817,7 +817,7 @@ impl Mm {
     }
 
     /// Joins a consistently mapped group of the same program and returns its translations.
-    fn join_group(&mut self, groups: &CodeGroups) -> Option<Arc<appine_engine::DbtSpace>> {
+    fn join_group(&mut self, groups: &CodeGroups) -> Option<Arc<kazeterm_engine::DbtSpace>> {
         let key = self.exe.filter(|_| !self.unshareable)?;
         let (layout, private) = self.exec_split();
         let candidates: Vec<_> = groups
@@ -850,13 +850,13 @@ impl Mm {
     }
 
     /// Executable mappings whose contents are determined by the file and version
-    /// ([`appine_engine::DbtSource`]): private file mappings never written that have a trusted
+    /// ([`kazeterm_engine::DbtSource`]): private file mappings never written that have a trusted
     /// version ([`content::version`]). They are recorded before the translations go back to the
     /// pool, and when the next user's mapping at the same place is the same piece of the same
     /// version of the file, the blocks in it need no block-by-block check (which reads every
     /// page of the program's and the dynamic linker's code segments, every time the shell spawns
     /// a process).
-    fn code_sources(&self) -> Vec<appine_engine::DbtSource> {
+    fn code_sources(&self) -> Vec<kazeterm_engine::DbtSource> {
         self.vmas
             .iter()
             .filter(|(_, v)| {
@@ -864,19 +864,19 @@ impl Mm {
             })
             .filter_map(|(&start, v)| {
                 let ((dev, ino, offset), (ctime, size)) = (v.file_id?, v.content?);
-                Some(appine_engine::DbtSource {
+                Some(kazeterm_engine::DbtSource {
                     start,
                     len: v.len,
                     id: [dev, ino, offset, ctime, size],
                 })
             })
-            .take(appine_engine::DbtSpace::SOURCES)
+            .take(kazeterm_engine::DbtSpace::SOURCES)
             .collect()
     }
 
     /// Just created its own translations: opens a group for other address spaces of the same
     /// program to join.
-    fn found_group(&mut self, groups: &CodeGroups, space: &Arc<appine_engine::DbtSpace>) {
+    fn found_group(&mut self, groups: &CodeGroups, space: &Arc<kazeterm_engine::DbtSpace>) {
         let Some(key) = self.exe.filter(|_| !self.unshareable) else {
             return;
         };
@@ -993,7 +993,7 @@ impl Mm {
 
     /// All executable mappings: the trusted identities ([`Mm::exec_source`]) and the remaining
     /// ranges `[start, end)` (JIT output, code that was written; adjacent ones merged).
-    fn exec_split(&self) -> (Vec<appine_engine::DbtSource>, Vec<(u64, u64)>) {
+    fn exec_split(&self) -> (Vec<kazeterm_engine::DbtSource>, Vec<(u64, u64)>) {
         let (mut trusted, mut private) = (Vec::new(), Vec::<(u64, u64)>::new());
         for (&start, v) in self.vmas.iter().filter(|(_, v)| v.prot & prot::EXEC != 0) {
             match self.exec_source(start, v) {
@@ -1010,14 +1010,14 @@ impl Mm {
     /// Whether an executable mapping can share translations with other address spaces: if so,
     /// returns its identity. Trusted are private file mappings that were never written and have a
     /// version, and an unmodified vDSO (the same in every process).
-    fn exec_source(&self, start: u64, v: &Vma) -> Option<appine_engine::DbtSource> {
+    fn exec_source(&self, start: u64, v: &Vma) -> Option<kazeterm_engine::DbtSource> {
         if start == self.vdso && v.backing == Backing::Anonymous {
             // Read through the page table: a forked child's pages are borrowed from the parent and
             // its own host memory is still zero
             let image = crate::vdso::image();
             let mut bytes = vec![0; image.len()];
             let read = self.read(UserSlice::new(start, image.len()), &mut bytes);
-            return (read.is_ok() && bytes == image).then_some(appine_engine::DbtSource {
+            return (read.is_ok() && bytes == image).then_some(kazeterm_engine::DbtSource {
                 start,
                 len: v.len,
                 id: [u64::MAX; 5],
@@ -1027,7 +1027,7 @@ impl Mm {
             return None;
         }
         let ((dev, ino, offset), (ctime, size)) = (v.file_id?, v.content?);
-        Some(appine_engine::DbtSource {
+        Some(kazeterm_engine::DbtSource {
             start,
             len: v.len,
             id: [dev, ino, offset, ctime, size],
@@ -1662,7 +1662,7 @@ impl Mm {
             }
         };
 
-        let st = file.and_then(|(fd, ..)| appine_hal::fstat(fd).ok());
+        let st = file.and_then(|(fd, ..)| kazeterm_hal::fstat(fd).ok());
         let file_id = st
             .as_ref()
             .zip(file)
@@ -1723,8 +1723,8 @@ impl Mm {
                     (backing, true, region, host)
                 } else {
                     let m = match key {
-                        Some(_) => appine_hal::map_file_read_only(fd, offset, host_len),
-                        None => appine_hal::map_file(fd, offset, host_len, shared, writable),
+                        Some(_) => kazeterm_hal::map_file_read_only(fd, offset, host_len),
+                        None => kazeterm_hal::map_file(fd, offset, host_len, shared, writable),
                     }
                     .map_err(Errno)?;
                     let region = Arc::new(HostRegion {
@@ -2107,7 +2107,7 @@ impl Mm {
                 let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
                 let file_offset = start + offset;
                 let raw = std::os::fd::AsRawFd::as_raw_fd(&**fd);
-                let m = appine_hal::map_file(raw, file_offset, host_len, true, template.may_write)
+                let m = kazeterm_hal::map_file(raw, file_offset, host_len, true, template.may_write)
                     .map_err(Errno)?;
                 let region = Arc::new(HostRegion {
                     base: m.base,
@@ -2126,7 +2126,7 @@ impl Mm {
                 let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
                 let file_offset = template.file_id.map_or(0, |(_, _, o)| o) + offset;
                 let m =
-                    appine_hal::map_file(fd, file_offset, host_len, false, true).map_err(Errno)?;
+                    kazeterm_hal::map_file(fd, file_offset, host_len, false, true).map_err(Errno)?;
                 let region = Arc::new(HostRegion {
                     base: m.base,
                     len: m.len,
@@ -2181,7 +2181,7 @@ impl Mm {
         let fill = v.fill.as_ref().ok_or(Errno::EFAULT)?;
         let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
         let shared = v.backing == Backing::Shared;
-        let m = appine_hal::map_file(fill.fd(), offset, host_len, shared, false).map_err(Errno)?;
+        let m = kazeterm_hal::map_file(fill.fd(), offset, host_len, shared, false).map_err(Errno)?;
         let region = Arc::new(HostRegion {
             base: m.base,
             len: m.len,
@@ -3004,7 +3004,7 @@ impl Mm {
                 // SAFETY: [from, to) is inside this VMA, which holds the host memory, and before
                 // the end of the file
                 unsafe {
-                    appine_hal::populate(
+                    kazeterm_hal::populate(
                         v.host.as_ptr().add((from - s) as usize),
                         (to - from) as usize,
                     )
@@ -3024,7 +3024,7 @@ impl Mm {
     /// pages (msync's `MS_SYNC`: the host maps the object itself, so the host writes it back).
     pub fn shared_file_ranges(&self, addr: u64, len: u64) -> Vec<(usize, usize)> {
         let end = addr.saturating_add(len);
-        let page = appine_hal::page_size();
+        let page = kazeterm_hal::page_size();
         self.vmas
             .iter()
             .filter(|&(&s, v)| {
@@ -3102,7 +3102,7 @@ impl Mm {
             }
             // SAFETY: [cursor, stop) is inside this VMA, which holds the host memory
             let host = unsafe { v.host.as_ptr().add((cursor - s) as usize) };
-            out.extend(appine_hal::page_residency(host, (stop - cursor) as usize));
+            out.extend(kazeterm_hal::page_residency(host, (stop - cursor) as usize));
             cursor = stop;
         }
         // Borrowed pages are in the owner's host memory
@@ -3127,7 +3127,7 @@ impl Mm {
     /// space outside guest code ([`Mm::quiesce`]).
     pub fn fork(&mut self) -> Result<Rc<RefCell<Mm>>, Errno> {
         if OVERCOMMIT_MEMORY.load(Ordering::Relaxed) != 1
-            && self.commit_too_big(appine_hal::ram_and_swap())
+            && self.commit_too_big(kazeterm_hal::ram_and_swap())
         {
             return Err(Errno::ENOMEM);
         }
@@ -3201,7 +3201,7 @@ impl Mm {
                     v.written.get()
                         && *private.entry(Arc::as_ptr(&v.region)).or_insert_with(|| {
                             let r = &v.region;
-                            appine_hal::has_private_pages(r.base.as_ptr(), r.len).unwrap_or(true)
+                            kazeterm_hal::has_private_pages(r.base.as_ptr(), r.len).unwrap_or(true)
                         })
                 }
             };
@@ -3321,10 +3321,10 @@ impl Mm {
     /// Before fork, like Linux's `dup_mmap`, checks every commit-accounted VMA (writable private
     /// mappings without `MAP_NORESERVE`) against the commit estimate (`vm.overcommit_memory` is
     /// 0): if one exceeds `limit`, the total of memory and swap (in bytes, 0 if unknown), it is
-    /// ENOMEM. In Appine every mmap is its own piece of host memory and VMAs cannot merge, while
+    /// ENOMEM. In KazeTerm every mmap is its own piece of host memory and VMAs cannot merge, while
     /// Linux merges adjacent ones with the same flags, so they are counted merged. LTP's fork14
     /// maps 1 GB more each time and forks: natively, fork fails once the merged one exceeds total
-    /// memory, while Appine used to always succeed, with the child's page table growing ever
+    /// memory, while KazeTerm used to always succeed, with the child's page table growing ever
     /// larger (2 MB per GB in the soft-MMU).
     ///
     /// Unlike Linux: Linux's `VM_ACCOUNT` stays set once the mapping has been writable, while
@@ -3379,7 +3379,7 @@ impl Mm {
     /// single request failing when it exceeds total memory. Returns each start's piece and its
     /// host address.
     fn carve(vmas: &BTreeMap<u64, Vma>, pieces: &[u64]) -> Result<Carved, Errno> {
-        let page = appine_hal::page_size() as u64;
+        let page = kazeterm_hal::page_size() as u64;
         let mut out = BTreeMap::new();
         let total: u64 = pieces
             .iter()
@@ -3525,7 +3525,7 @@ impl Mm {
                 let at = offset.checked_sub(inside).ok_or(Errno::EINVAL)?;
                 // SAFETY: the region is a host file mapping owned by these VMAs
                 unsafe {
-                    appine_hal::map_file_over(
+                    kazeterm_hal::map_file_over(
                         region.base,
                         region.len,
                         to.as_raw_fd(),
@@ -3708,11 +3708,11 @@ impl Mm {
                 if lo < hi {
                     let (host, n) = (Self::own_page(s, v, lo).as_ptr(), (hi - lo) as usize);
                     let mapped = (v.file_id.is_some())
-                        .then(|| appine_hal::touched_pages(host, n))
+                        .then(|| kazeterm_hal::touched_pages(host, n))
                         .flatten();
                     total += match mapped {
                         Some(pages) => pages.iter().filter(|&&p| p).count() as u64,
-                        None => appine_hal::resident_pages(host, n) as u64,
+                        None => kazeterm_hal::resident_pages(host, n) as u64,
                     };
                 }
             }
@@ -3726,14 +3726,14 @@ impl Mm {
                     Some((start, n + PAGE_SIZE as usize))
                 }
                 Some((start, n)) => {
-                    total += appine_hal::resident_pages(start, n) as u64;
+                    total += kazeterm_hal::resident_pages(start, n) as u64;
                     Some((b, PAGE_SIZE as usize))
                 }
                 None => Some((b, PAGE_SIZE as usize)),
             };
         }
         if let Some((start, n)) = run {
-            total += appine_hal::resident_pages(start, n) as u64;
+            total += kazeterm_hal::resident_pages(start, n) as u64;
         }
         total
     }
@@ -3792,7 +3792,7 @@ impl Mm {
             };
             // SAFETY: [from, to) is inside this VMA
             let host = unsafe { v.host.as_ptr().add((from - s) as usize) };
-            let resident = appine_hal::page_residency(host, (to - from) as usize);
+            let resident = kazeterm_hal::page_residency(host, (to - from) as usize);
             let at = ((from - addr) / PAGE_SIZE) as usize;
             for (i, r) in resident.into_iter().enumerate() {
                 if r {
@@ -3856,7 +3856,7 @@ impl Mm {
         let (mut anon, mut file, mut shmem) = (self.cow.borrow().borrowed.len() as u64, 0, 0);
         let now = std::time::Instant::now();
         let mincore = |host: usize, len: u64| {
-            appine_hal::resident_pages(host as *const u8, len as usize) as u64
+            kazeterm_hal::resident_pages(host as *const u8, len as usize) as u64
         };
         for (&s, v) in &self.vmas {
             let pages = match (v.backing, v.file_id) {
@@ -3871,7 +3871,7 @@ impl Mm {
                     if !(v.backing == Backing::PrivateFile && v.written.get()) =>
                 {
                     FileResidency::get((id.0, id.1, id.2, v.len), now, || {
-                        appine_hal::resident_pages(v.host.as_ptr(), v.len as usize) as u64
+                        kazeterm_hal::resident_pages(v.host.as_ptr(), v.len as usize) as u64
                     })
                 }
                 _ => mincore(v.host.as_ptr() as usize, v.len),
@@ -3947,7 +3947,7 @@ impl Mm {
                     let piece = (dev, ino, offset, v.len);
                     if counted.as_mut().is_none_or(|c| c.insert(piece)) {
                         total += FileResidency::get(piece, now, || {
-                            appine_hal::resident_pages(v.host.as_ptr(), span.1) as u64
+                            kazeterm_hal::resident_pages(v.host.as_ptr(), span.1) as u64
                         });
                     }
                 }
@@ -4067,7 +4067,7 @@ impl Mm {
     /// no VMA and is leaked on purpose.
     #[cfg(any(debug_assertions, feature = "test-hooks"))]
     pub fn break_page(&mut self, addr: u64) -> Result<(), Errno> {
-        let host = appine_hal::map_inaccessible(PAGE_SIZE as usize).map_err(Errno)?;
+        let host = kazeterm_hal::map_inaccessible(PAGE_SIZE as usize).map_err(Errno)?;
         let page = addr & !(PAGE_SIZE - 1);
         // SAFETY: accessing this host page is exactly the bug being simulated; it is never freed
         unsafe {
@@ -4199,7 +4199,7 @@ impl Mm {
         let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
         let base = match recycled::take(host_len, reserve) {
             Some(base) => base,
-            None => appine_hal::map_anonymous(host_len, reserve).map_err(|_| Errno::ENOMEM)?,
+            None => kazeterm_hal::map_anonymous(host_len, reserve).map_err(|_| Errno::ENOMEM)?,
         };
         Ok((
             Arc::new(HostRegion {
@@ -4577,7 +4577,7 @@ pub struct Generations {
 /// An address space's Tier 1 translations, shared by the threads of that address space
 /// ([`Mm::code_space`]).
 pub struct CodeSpace {
-    pub space: Arc<appine_engine::DbtSpace>,
+    pub space: Arc<kazeterm_engine::DbtSpace>,
     /// This address space's tag in its translation-sharing group ([`CodeGroup`]); 0 outside a
     /// group.
     pub tag: u16,
@@ -4594,10 +4594,10 @@ pub struct CodeSpace {
 /// map the same code at the same addresses, the blocks are valid for all of them. A member's
 /// trusted executable mappings (private file mappings never written that have a version, and the
 /// vDSO) must agree with what the group has registered: one address range can only be the same
-/// piece of the same version of a file (Appine has no ASLR, so processes of the same program map
+/// piece of the same version of a file (KazeTerm has no ASLR, so processes of the same program map
 /// at the same addresses). Blocks in registered mappings are shared by all members; other
 /// executable memory (JIT output, code that was written) is private to a member: the engine keeps
-/// blocks there apart by member tag ([`appine_engine::DbtSpace::share`]), private ranges may not
+/// blocks there apart by member tag ([`kazeterm_engine::DbtSpace::share`]), private ranges may not
 /// overlap registered ones, and registered ones may not overlap ranges private to other members
 /// ([`CodeGroup::admit`]). Each node process has its own JIT code, while V8's interpreter, its
 /// builtins and ICU, which live in the node program file, are still shared. The check runs after
@@ -4610,11 +4610,11 @@ pub struct CodeSpace {
 pub struct CodeGroup {
     /// The program (the executable's inode, the same as the pool key).
     key: u64,
-    space: Arc<appine_engine::DbtSpace>,
+    space: Arc<kazeterm_engine::DbtSpace>,
     members: Cell<usize>,
     /// Executable mappings members have mapped; one identity is registered per address range
     /// ([`CodeGroup::extend`]).
-    ranges: RefCell<Vec<appine_engine::DbtSource>>,
+    ranges: RefCell<Vec<kazeterm_engine::DbtSource>>,
     /// Executable memory private to a member, `(tag, start, end)` ([`CodeGroup::admit`]).
     claims: RefCell<Vec<(u16, u64, u64)>>,
     /// No longer accepts new members.
@@ -4632,7 +4632,7 @@ impl CodeGroup {
     /// and not overlap ranges private to other members, and private must not overlap registered
     /// ranges: if so, registers layout, installs this member's private ranges and returns true;
     /// otherwise changes nothing.
-    fn admit(&self, tag: u16, layout: &[appine_engine::DbtSource], private: &[(u64, u64)]) -> bool {
+    fn admit(&self, tag: u16, layout: &[kazeterm_engine::DbtSource], private: &[(u64, u64)]) -> bool {
         let overlap = |start: u64, end: u64, s: u64, e: u64| start < e && s < end;
         let ranges = self.ranges.borrow();
         if private.iter().any(|&(s, e)| {
@@ -4667,7 +4667,7 @@ impl CodeGroup {
     /// pieces agree when they are the same version of the same file with the same address minus
     /// file offset: the dynamic linker first maps the span of the whole file and then maps the
     /// later segments over it, so a library's executable mappings come long first, then short.
-    fn extend(&self, layout: &[appine_engine::DbtSource]) -> bool {
+    fn extend(&self, layout: &[kazeterm_engine::DbtSource]) -> bool {
         let mut ranges = self.ranges.borrow_mut();
         let mut new = Vec::new();
         for s in layout {
@@ -4693,7 +4693,7 @@ impl CodeGroup {
 
     /// The mappings in `layout` that agree with what is registered (every overlapping registration
     /// is the same piece of file): the group's blocks there are valid for this address space.
-    fn consistent(&self, layout: &[appine_engine::DbtSource]) -> Vec<appine_engine::DbtSource> {
+    fn consistent(&self, layout: &[kazeterm_engine::DbtSource]) -> Vec<kazeterm_engine::DbtSource> {
         let ranges = self.ranges.borrow();
         layout
             .iter()
@@ -4709,7 +4709,7 @@ impl CodeGroup {
 
     /// Two overlapping trusted mappings are the same version of the same file with the same
     /// address minus file offset.
-    fn same_file(r: &appine_engine::DbtSource, s: &appine_engine::DbtSource) -> bool {
+    fn same_file(r: &kazeterm_engine::DbtSource, s: &kazeterm_engine::DbtSource) -> bool {
         let (ri, si) = (r.id, s.id);
         (ri[0], ri[1], ri[3], ri[4]) == (si[0], si[1], si[3], si[4])
             && r.start.wrapping_sub(ri[2]) == s.start.wrapping_sub(si[2])
@@ -4884,7 +4884,7 @@ impl Mm {
             let touched = (!small)
                 .then(|| {
                     let host = Self::own_page(start, v, lo);
-                    appine_hal::touched_pages(host.as_ptr(), (hi - lo) as usize)
+                    kazeterm_hal::touched_pages(host.as_ptr(), (hi - lo) as usize)
                 })
                 .flatten();
             loans.reserve(
@@ -5357,7 +5357,7 @@ impl RssPlan {
                     next
                 })
                 .count();
-            total += appine_hal::resident_pages(start as *const u8, len) as u64;
+            total += kazeterm_hal::resident_pages(start as *const u8, len) as u64;
             rest = &rest[1 + n..];
         }
         total
@@ -5497,7 +5497,7 @@ impl Drop for HostRegion {
             UNMAPPING.fetch_add(len, Ordering::Relaxed);
         } else {
             // SAFETY: this host memory belongs to this HostRegion and is no longer used by anyone
-            unsafe { appine_hal::unmap(base, len) }
+            unsafe { kazeterm_hal::unmap(base, len) }
         }
     }
 }
@@ -5688,7 +5688,7 @@ pub(crate) mod spare {
                 s.maps.retain(|&(l, base)| {
                     if l == old {
                         // SAFETY: host memory mapped in advance and never used
-                        unsafe { appine_hal::unmap(NonNull::new(base as *mut u8).unwrap(), l) };
+                        unsafe { kazeterm_hal::unmap(NonNull::new(base as *mut u8).unwrap(), l) };
                     }
                     l != old
                 });
@@ -5703,7 +5703,7 @@ pub(crate) mod spare {
             .or_else(|| super::recycled::take(host_len, false))
         {
             Some(base) => base,
-            None => appine_hal::map_anonymous(host_len, false).map_err(|_| Errno::ENOMEM)?,
+            None => kazeterm_hal::map_anonymous(host_len, false).map_err(|_| Errno::ENOMEM)?,
         };
         Ok((
             Arc::new(HostRegion {
@@ -5730,7 +5730,7 @@ pub(crate) mod spare {
             let Some(len) = need else {
                 return;
             };
-            let Ok(base) = appine_hal::map_anonymous(len, false) else {
+            let Ok(base) = kazeterm_hal::map_anonymous(len, false) else {
                 return;
             };
             let mut s = SPARES.lock().unwrap_or_else(PoisonError::into_inner);
@@ -5739,7 +5739,7 @@ pub(crate) mod spare {
             } else {
                 drop(s);
                 // SAFETY: just mapped and never used
-                unsafe { appine_hal::unmap(base, len) };
+                unsafe { kazeterm_hal::unmap(base, len) };
             }
         }
     }
@@ -5813,11 +5813,11 @@ pub(crate) fn release_unmapped() {
         if unsafe { run.0.add(run.1) } == base {
             run.1 += len;
         } else {
-            unsafe { appine_hal::unmap(run.0, run.1) };
+            unsafe { kazeterm_hal::unmap(run.0, run.1) };
             run = (base, len);
         }
     }
-    unsafe { appine_hal::unmap(run.0, run.1) };
+    unsafe { kazeterm_hal::unmap(run.0, run.1) };
     UNMAPPING.fetch_sub(total, Ordering::Release);
 }
 
@@ -5863,7 +5863,7 @@ mod recycled {
     ///
     /// # Safety
     ///
-    /// The host memory was allocated by [`appine_hal::map_anonymous`] and nobody uses it any more.
+    /// The host memory was allocated by [`kazeterm_hal::map_anonymous`] and nobody uses it any more.
     pub(super) unsafe fn put(base: NonNull<u8>, len: usize, reserve: bool) {
         {
             let mut cache = CACHE
@@ -5877,7 +5877,7 @@ mod recycled {
             if c.bytes + len <= MAX_BYTES && list.len() < MAX_EACH {
                 // SAFETY: guaranteed by the caller; after discarding it reads as zero, like a new
                 // mapping
-                if unsafe { appine_hal::discard(base, len) }.is_ok() {
+                if unsafe { kazeterm_hal::discard(base, len) }.is_ok() {
                     list.push(base.as_ptr() as usize);
                     c.bytes += len;
                     return;
@@ -5885,7 +5885,7 @@ mod recycled {
             }
         }
         // SAFETY: guaranteed by the caller
-        unsafe { appine_hal::unmap(base, len) }
+        unsafe { kazeterm_hal::unmap(base, len) }
     }
 }
 
@@ -5905,7 +5905,7 @@ fn mmu_prot(p: u32) -> u32 {
 
 /// Bytes of the file that still have contents from `offset`, rounded up to a page, at most `len`.
 fn file_extent(fd: i32, offset: u64, len: u64) -> u64 {
-    extent(appine_hal::fstat(fd).map_or(0, |s| s.st_size), offset, len)
+    extent(kazeterm_hal::fstat(fd).map_or(0, |s| s.st_size), offset, len)
 }
 
 /// Bytes of a file of size `size` that still have contents from `offset` ([`file_extent`]).
@@ -5942,12 +5942,12 @@ unsafe fn discard_host(ptr: NonNull<u8>, len: usize) {
 /// `[ptr, ptr + len)` is private host memory (anonymous or a private file mapping) held by an
 /// [`Mm`].
 unsafe fn discard_file_host(ptr: NonNull<u8>, len: usize) -> Vec<(usize, usize)> {
-    let page = appine_hal::page_size();
+    let page = kazeterm_hal::page_size();
     let addr = ptr.as_ptr() as usize;
     let head = (addr.next_multiple_of(page) - addr).min(len);
     let tail = ((addr + len) & !(page - 1)).max(addr + head) - addr;
     // SAFETY: all offsets are in [0, len]; [head, tail) is aligned to host pages
-    if head < tail && unsafe { appine_hal::discard(ptr.add(head), tail - head) }.is_ok() {
+    if head < tail && unsafe { kazeterm_hal::discard(ptr.add(head), tail - head) }.is_ok() {
         [(0, head), (tail, len - tail)]
             .into_iter()
             .filter(|&(_, l)| l > 0)
@@ -5965,7 +5965,7 @@ unsafe fn discard_file_host(ptr: NonNull<u8>, len: usize) -> Vec<(usize, usize)>
 ///
 /// `[ptr, ptr + len)` is writable shared host memory held by an [`Mm`].
 unsafe fn remove_host(ptr: *mut u8, len: usize) {
-    let page = appine_hal::page_size();
+    let page = kazeterm_hal::page_size();
     let addr = ptr as usize;
     let head = (addr.next_multiple_of(page) - addr).min(len);
     let tail = ((addr + len) & !(page - 1)).max(addr + head) - addr;
@@ -5973,7 +5973,7 @@ unsafe fn remove_host(ptr: *mut u8, len: usize) {
     unsafe {
         let removed = head < tail
             && NonNull::new(ptr.add(head))
-                .is_some_and(|p| appine_hal::remove(p, tail - head).is_ok());
+                .is_some_and(|p| kazeterm_hal::remove(p, tail - head).is_ok());
         if removed {
             std::ptr::write_bytes(ptr, 0, head);
             std::ptr::write_bytes(ptr.add(tail), 0, len - tail);
@@ -5996,7 +5996,7 @@ fn map_err(e: MapError) -> Errno {
 ///
 /// `src` and `dst` must both point to at least `len` bytes of accessible, non-overlapping memory,
 /// and `len` must be a multiple of the page size. `touched` tells whether each page was touched
-/// ([`appine_hal::touched_pages`]); untouched pages are not looked at.
+/// ([`kazeterm_hal::touched_pages`]); untouched pages are not looked at.
 unsafe fn copy_nonzero_pages(src: *const u8, dst: *mut u8, len: usize, touched: Option<&[bool]>) {
     const PAGE: usize = PAGE_SIZE as usize;
     for (i, off) in (0..len).step_by(PAGE).enumerate() {
@@ -6023,10 +6023,10 @@ mod tests {
     #[test]
     fn code_groups_register_only_consistent_mappings() {
         // Without Tier 1 support on the host there are no translations to share
-        let Some(space) = appine_engine::DbtSpace::new(0, appine_engine::DbtRegs::Default) else {
+        let Some(space) = kazeterm_engine::DbtSpace::new(0, kazeterm_engine::DbtRegs::Default) else {
             return;
         };
-        let src = |start: u64, len: u64, ino: u64, offset: u64| appine_engine::DbtSource {
+        let src = |start: u64, len: u64, ino: u64, offset: u64| kazeterm_engine::DbtSource {
             start,
             len,
             id: [1, ino, offset, 7, 8],
@@ -6083,10 +6083,10 @@ mod tests {
 
     #[test]
     fn code_groups_keep_private_code_apart_from_registered_files() {
-        let Some(space) = appine_engine::DbtSpace::new(0, appine_engine::DbtRegs::Default) else {
+        let Some(space) = kazeterm_engine::DbtSpace::new(0, kazeterm_engine::DbtRegs::Default) else {
             return;
         };
-        let src = |start: u64, len: u64, ino: u64| appine_engine::DbtSource {
+        let src = |start: u64, len: u64, ino: u64| kazeterm_engine::DbtSource {
             start,
             len,
             id: [1, ino, 0, 7, 8],
@@ -6378,7 +6378,7 @@ mod tests {
 
     #[test]
     fn fill_reads_ahead_after_pages_read() {
-        let host = appine_hal::memfd(c"appine-mm-fill").unwrap();
+        let host = kazeterm_hal::memfd(c"kazeterm-mm-fill").unwrap();
         let source = crate::fd::OpenFile::new(crate::fd::FileKind::Host(-1), 0);
         let f = Fill::new(host, 2048 * PAGE_SIZE, source);
         let window = |page: u64| {
@@ -6402,7 +6402,7 @@ mod tests {
     #[test]
     fn mappings_read_on_demand_map_only_pages_read() {
         let size = 100 * PAGE_SIZE + 100;
-        let host = appine_hal::memfd(c"appine-mm-fill").unwrap();
+        let host = kazeterm_hal::memfd(c"kazeterm-mm-fill").unwrap();
         host.set_len(size).unwrap();
         let source = crate::fd::OpenFile::new(crate::fd::FileKind::Host(-1), 0);
         let fill = Fill::new(host, size, source);
@@ -6497,7 +6497,7 @@ mod tests {
     fn fork_never_reads_private_file_mappings_past_the_end() {
         use std::io::Write;
         use std::os::fd::AsRawFd;
-        let path = std::env::temp_dir().join(format!("appine-mm-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("kazeterm-mm-{}", std::process::id()));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(&[7u8; 5000]).unwrap();
         let f = std::fs::File::open(&path).unwrap();
@@ -6567,7 +6567,7 @@ mod tests {
     #[test]
     fn shared_file_mappings_follow_the_end_of_the_file() {
         use std::os::fd::AsRawFd;
-        let path = std::env::temp_dir().join(format!("appine-eof-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("kazeterm-eof-{}", std::process::id()));
         let f = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -6603,7 +6603,7 @@ mod tests {
     fn truncation_removes_pages_past_the_new_end() {
         use std::os::fd::AsRawFd;
         use std::os::unix::fs::MetadataExt;
-        let path = std::env::temp_dir().join(format!("appine-trunc-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("kazeterm-trunc-{}", std::process::id()));
         let f = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -7096,7 +7096,7 @@ mod tests {
     fn mremap_extends_shared_file_mappings_with_the_file() {
         use std::io::Write;
         use std::os::fd::AsRawFd;
-        let path = std::env::temp_dir().join(format!("appine-mremap-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("kazeterm-mremap-{}", std::process::id()));
         let mut f = std::fs::File::options()
             .read(true)
             .write(true)

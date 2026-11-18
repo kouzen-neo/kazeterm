@@ -176,7 +176,7 @@ int main(void)
     printf("eventfd count %llu\n", count(efd));
     events(1, "poll with eventfd");
 
-    /* The same for a poll on a listening TCP socket (a host socket in Appine) */
+    /* The same for a poll on a listening TCP socket (a host socket in KazeTerm) */
     int ls = listener(), efd2 = eventfd(0, EFD_NONBLOCK), ep2 = epoll_create1(0);
     epoll_ctl(ep2, EPOLL_CTL_ADD, efd2, &ev);
     struct iocb pt = with_resfd(cb(ls, IOCB_CMD_POLL, (void *)(uintptr_t)POLLIN, 0, 0, 2), efd2);

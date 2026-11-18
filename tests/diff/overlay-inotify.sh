@@ -5,7 +5,7 @@
 # removal, renames with their cookies, a name replaced by a rename, getdents — and fdinfo shows
 # the overlay's inode and device; changes made directly in a layer are not reported to them.
 # Watches on the layers themselves are not compared (Linux reports there what its overlay does to
-# the upper layer, Appine only creations), nor a watched file's last unlink after a hard link to
+# the upper layer, KazeTerm only creations), nor a watched file's last unlink after a hard link to
 # it came and went (Linux's overlay counts the link on the file's inode and its removal on
 # another, so it never reports the deletion). All layers are on one tmpfs
 cd /tmp

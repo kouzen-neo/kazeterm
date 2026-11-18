@@ -489,7 +489,7 @@ int main(void)
     connect(uc, (struct sockaddr *)&un, sizeof un);
     unix_line("client", uc);
     struct sockaddr_un ab = {.sun_family = AF_UNIX};
-    memcpy(ab.sun_path, "\0appine\0test", 12);
+    memcpy(ab.sun_path, "\0kazeterm\0test", 12);
     int ua = socket(AF_UNIX, SOCK_DGRAM, 0);
     bind(ua, (struct sockaddr *)&ab, offsetof(struct sockaddr_un, sun_path) + 12);
     unix_line("abstract", ua);
@@ -509,7 +509,7 @@ grep ' lo$' /proc/net/if_inet6 || echo "if_inet6: no lo"
 # Interface traffic counters: the header of /proc/net/dev and the format of the lo line, the
 # attributes of /sys/class/net/lo and the files under statistics; after sending and receiving on
 # loopback lo's counters grow by at least the payload bytes (Linux also counts protocol headers,
-# Appine counts only the payload), and both places read the same. Other interfaces depend on the
+# KazeTerm counts only the payload), and both places read the same. Other interfaces depend on the
 # container's network
 head -n 2 /proc/net/dev
 grep '^ *lo:' /proc/net/dev | awk '{ print "lo fields:", NF }'
@@ -724,8 +724,8 @@ int main(void)
     request(GENL_ID_CTRL, NLM_F_ACK, CTRL_CMD_GETFAMILY, CTRL_ATTR_FAMILY_ID, &id, 2);
     replies("GETFAMILY id 16, with ACK");
     replies("ACK");
-    request(GENL_ID_CTRL, 0, CTRL_CMD_GETFAMILY, CTRL_ATTR_FAMILY_NAME, "appine-none", 12);
-    replies("GETFAMILY appine-none");
+    request(GENL_ID_CTRL, 0, CTRL_CMD_GETFAMILY, CTRL_ATTR_FAMILY_NAME, "kazeterm-none", 12);
+    replies("GETFAMILY kazeterm-none");
     request(GENL_ID_CTRL, 0, CTRL_CMD_GETFAMILY, 0, NULL, 0);
     replies("GETFAMILY without attributes");
     request(0x7ff0, 0, 1, 0, NULL, 0);
@@ -734,10 +734,10 @@ int main(void)
     replies("unknown nlctrl command");
     request(GENL_ID_CTRL, NLM_F_DUMP, CTRL_CMD_GETFAMILY, 0, NULL, 0);
     replies("dump (only nlctrl shown)");
-    request(GENL_ID_CTRL, 0, 10 /* CTRL_CMD_GETPOLICY */, CTRL_ATTR_FAMILY_NAME, "appine-none", 12);
+    request(GENL_ID_CTRL, 0, 10 /* CTRL_CMD_GETPOLICY */, CTRL_ATTR_FAMILY_NAME, "kazeterm-none", 12);
     replies("GETPOLICY without NLM_F_DUMP");
-    request(GENL_ID_CTRL, NLM_F_DUMP, 10, CTRL_ATTR_FAMILY_NAME, "appine-none", 12);
-    replies("GETPOLICY appine-none");
+    request(GENL_ID_CTRL, NLM_F_DUMP, 10, CTRL_ATTR_FAMILY_NAME, "kazeterm-none", 12);
+    replies("GETPOLICY kazeterm-none");
     request(GENL_ID_CTRL, NLM_F_DUMP, 10, 0, NULL, 0);
     replies("GETPOLICY without attributes");
     struct timeval short_wait = {0, 100000};
@@ -1309,7 +1309,7 @@ PY
 # user ID; the permissions to set, read and remove the extended attribute; writing, truncating
 # and chown removing file capabilities and the setuid and setgid bits; securebits locks. Only the
 # few capabilities used are printed, and a set equal to the bounding set prints as all (docker's
-# default bounding set is smaller than Appine's)
+# default bounding set is smaller than KazeTerm's)
 cat > showcaps.c <<'C'
 #include <stdio.h>
 #include <string.h>
@@ -1512,12 +1512,12 @@ int main(int argc, char **argv)
         result("nobody sets security.capability on its file", setcaps("own", 0x02000001, NET_RAW, 0, 0, 0));
         printf("nobody reads security.capability: %d bytes\n", caps_xattr_size("ep"));
         result("nobody removes security.capability", removexattr("ep", "security.capability"));
-        result("nobody sets security.appine", setxattr("own", "security.appine", "x", 1, 0));
-        result("nobody sets trusted.appine", setxattr("own", "trusted.appine", "x", 1, 0));
+        result("nobody sets security.kazeterm", setxattr("own", "security.kazeterm", "x", 1, 0));
+        result("nobody sets trusted.kazeterm", setxattr("own", "trusted.kazeterm", "x", 1, 0));
         char v[8];
-        result("nobody reads trusted.appine", getxattr("own", "trusted.appine", v, sizeof v));
-        result("nobody sets user.appine on its file", setxattr("own", "user.appine", "x", 1, 0));
-        result("nobody sets user.appine on root's file", setxattr("plain", "user.appine", "x", 1, 0));
+        result("nobody reads trusted.kazeterm", getxattr("own", "trusted.kazeterm", v, sizeof v));
+        result("nobody sets user.kazeterm on its file", setxattr("own", "user.kazeterm", "x", 1, 0));
+        result("nobody sets user.kazeterm on root's file", setxattr("plain", "user.kazeterm", "x", 1, 0));
         _exit(0);
     }
     wait(NULL);
@@ -2148,7 +2148,7 @@ cat > lease.c <<'C'
 #include <time.h>
 #include <unistd.h>
 
-#define FILE "/dev/shm/appine-lease"
+#define FILE "/dev/shm/kazeterm-lease"
 
 static const char *name(int t) { return t == F_RDLCK ? "RDLCK" : t == F_WRLCK ? "WRLCK" : "UNLCK"; }
 
@@ -2236,12 +2236,12 @@ static void on_notify(union sigval v) { notified = v.sival_int; }
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
-    mq_unlink("/appine-mq");
+    mq_unlink("/kazeterm-mq");
     struct mq_attr attr = {.mq_maxmsg = 4, .mq_msgsize = 64};
-    mqd_t q = mq_open("/appine-mq", O_CREAT | O_RDWR | O_EXCL, 0600, &attr);
-    printf("open %d excl again %d %s\n", q >= 0, mq_open("/appine-mq", O_CREAT | O_EXCL | O_RDWR, 0600, &attr),
+    mqd_t q = mq_open("/kazeterm-mq", O_CREAT | O_RDWR | O_EXCL, 0600, &attr);
+    printf("open %d excl again %d %s\n", q >= 0, mq_open("/kazeterm-mq", O_CREAT | O_EXCL | O_RDWR, 0600, &attr),
            strerror(errno));
-    printf("bad attr %d %s\n", mq_open("/appine-mq2", O_CREAT | O_RDWR, 0600, &(struct mq_attr){.mq_maxmsg = 0}),
+    printf("bad attr %d %s\n", mq_open("/kazeterm-mq2", O_CREAT | O_RDWR, 0600, &(struct mq_attr){.mq_maxmsg = 0}),
            strerror(errno));
     mq_send(q, "low", 3, 1);
     mq_send(q, "high", 4, 9);
@@ -2300,7 +2300,7 @@ int main(void)
         usleep(10000);
     printf("thread notified %d\n", notified);
     mq_close(q);
-    printf("unlink %d reopen %d %s\n", mq_unlink("/appine-mq"), mq_open("/appine-mq", O_RDWR), strerror(errno));
+    printf("unlink %d reopen %d %s\n", mq_unlink("/kazeterm-mq"), mq_open("/kazeterm-mq", O_RDWR), strerror(errno));
     return 0;
 }
 C

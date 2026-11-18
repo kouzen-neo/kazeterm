@@ -1,10 +1,10 @@
 # docker-run-options: --cap-add SYS_NICE --cap-add SYSLOG
 # IO priorities (ioprio_set, ioprio_get, ionice), syslog(2), and the queries of adjtimex and
 # clock_adjtime (block/ioprio.c, kernel/printk/printk.c and kernel/time/ntp.c of Linux 6.1). The
-# native side adds CAP_SYS_NICE (the RT class needs it) and CAP_SYSLOG, like root in Appine; it
-# has no CAP_SYS_TIME, and changing the clock in Appine is also treated as lacking it. The
+# native side adds CAP_SYS_NICE (the RT class needs it) and CAP_SYSLOG, like root in KazeTerm; it
+# has no CAP_SYS_TIME, and changing the clock in KazeTerm is also treated as lacking it. The
 # contents of the kernel log, the buffer size, and NTP's offset, freq and maxerror differ between
-# the two sides (Appine's log is empty, and the NTP state comes from the host but keeps
+# the two sides (KazeTerm's log is empty, and the NTP state comes from the host but keeps
 # changing), so only the error codes, the permissions and the fields that do not change are
 # compared; syslog's read (type 2) would consume the real log on the native side, so it is not
 # called

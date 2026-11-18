@@ -5,7 +5,7 @@
 >
 > Verified: 2026-11-15 (split out of the android/native full mapping of 2026-11-10; the boundary was checked against the source at the split)
 >
-> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: release.yml version trigger, versioned APK name and CHANGELOG-driven release notes)
+> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: KazeTerm rebrand, release.yml version trigger and CHANGELOG-driven release notes)
 
 ## Responsibilities
 
@@ -34,7 +34,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 
 ## Public entry points
 
-- Build: `./gradlew assembleDebug lintDebug` (CI's default), `assembleRelease` (the optimized APK, also built by CI when `workflow_dispatch` selects `build=release`), `release.yml` (manual `version` input or `v*` tag; publishes a signed `Appine-arm64-v8a-vX.Y.Z.apk`), `scripts/release-notes <version>`, `connectedDebugAndroidTest` (with
+- Build: `./gradlew assembleDebug lintDebug` (CI's default), `assembleRelease` (the optimized APK, also built by CI when `workflow_dispatch` selects `build=release`), `release.yml` (manual `version` input or `v*` tag; publishes a signed `KazeTerm-arm64-v8a-vX.Y.Z.apk`), `scripts/release-notes <version>`, `connectedDebugAndroidTest` (with
   `-Pandroid.testInstrumentationRunnerArguments.network=true` for the download of a distribution),
   `scripts/fetch-ghostty [dir]` (default `target/ghostty`), `scripts/release-sources [dir]` (default
   `target/release-sources`).
@@ -44,19 +44,19 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 ### Build
 
 - `CargoNdkTask` runs `cargo ndk -t arm64-v8a --platform 30 -o <build/generated/rust/<variant>/jniLibs>
-  build -p appine-android --profile <profile>`, with `CARGO_TARGET_DIR=target/android` and both
+  build -p kazeterm-android --profile <profile>`, with `CARGO_TARGET_DIR=target/android` and both
   `ANDROID_NDK_HOME` and `ANDROID_NDK_ROOT` set to AGP's NDK, using `~/.cargo/bin/cargo` when it is
   executable; it is never up to date. Debug variants add the `test-hooks` and `borrow-check`
   features and use Cargo's `release` profile. The release APK selects the workspace's
   `android-release` profile, which inherits `release` and enables cross-crate LTO.
-- Gradle defaults are versionCode 1 and versionName 1.0.0; `-PversionName` and `-PversionCode` override them. `release.yml` passes the dispatched version, signs the APK, renames it to `Appine-arm64-v8a-v<version>.apk`, copies the R8 mapping, writes `sha256sums.txt` and publishes a Release whose body `scripts/release-notes` builds from the matching `CHANGELOG.md` section.
+- Gradle defaults are versionCode 1 and versionName 1.0.0; `-PversionName` and `-PversionCode` override them. `release.yml` passes the dispatched version, signs the APK, renames it to `KazeTerm-arm64-v8a-v<version>.apk`, copies the R8 mapping, writes `sha256sums.txt` and publishes a Release whose body `scripts/release-notes` builds from the matching `CHANGELOG.md` section.
 - Gradle resolves Zig from a nonblank, trimmed `zig.path` in `android/local.properties`, then the
   `ZIG` environment variable, then `zig` on `PATH`. `BrowserAssetTask` invokes that executable;
   `CargoNdkTask` passes the same value as `ZIG` to cargo and its build script. The local file is
   ignored by Git, and its contents are read through a Gradle file provider for configuration-cache
   tracking; both tasks declare the selected executable as an input.
 - On an Android target `build.rs` asserts the libghostty-vt source (`build.zig` in
-  `target/ghostty/libghostty-vt-1.0.0`, or `APPINE_GHOSTTY_SRC`) and the release's Zig packages
+  `target/ghostty/libghostty-vt-1.0.0`, or `KAZETERM_GHOSTTY_SRC`) and the release's Zig packages
   beside it (the same path with `-deps`), panics on any architecture but aarch64, and runs `$ZIG`
   (or `zig` on `PATH`) `build -Demit-lib-vt -Dcpu=baseline -Doptimize=ReleaseFast
   -Dtarget=aarch64-linux-android --system <deps>` into `OUT_DIR`, so Zig takes the packages from
@@ -65,7 +65,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
   then compiles `src/vt.c` (C11, extra warnings) with `cc`, against the installed headers and
   Wuffs's single-file header among the packages (`<deps>/<hash>/release/c`, the hash read from the
   source's `pkg/wuffs/build.zig.zon`; vt.c decodes PNG images with the Wuffs in the archive), and
-  links `libghostty-vt.a` statically into `libappine.so` (with uucode, simdutf, Highway, Wuffs, the
+  links `libghostty-vt.a` statically into `libkazeterm.so` (with uucode, simdutf, Highway, Wuffs, the
   translate-c helpers and Zig's compiler_rt); `vt.rs` also links the system's libjnigraphics. The
   build finds the NDK through `ANDROID_NDK_HOME`, and libghostty-vt 1.0.0 requires Zig 0.17.x,
   which its own build checks (`minimum_zig_version`). Every Android build, CI's included,
@@ -107,7 +107,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 ### Notices
 
 - `app/src/main/assets/notices/` holds static HTML, a shared stylesheet and `index.json`, packaged
-  without a Gradle generation task. The catalog lists, in order: Appine (its notice and the
+  without a Gradle generation task. The catalog lists, in order: KazeTerm (its notice and the
   repository's `LICENSE`); Fuchsia's
   BSD-style licence for the line-discipline parts adapted from Starnix (`kernel/tty`); the
   terminal's components with their texts from `android/licenses/` (libghostty-vt 1.0.0, uucode
@@ -146,8 +146,8 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
   granting only generated archives from `cache/diagnostic-exports`; no new permission or
   dependency is required. Retained diagnostic files use the app's no-backup directory.
 - Launcher, settings, licenses list and license reader activities (the application theme
-  `Theme.Appine`, Material 3; the
-  launcher overrides it with `Theme.Appine.Terminal`; settings and licenses leave `uiMode` out of
+  `Theme.KazeTerm`, Material 3; the
+  launcher overrides it with `Theme.KazeTerm.Terminal`; settings and licenses leave `uiMode` out of
   their configuration changes; the non-exported reader handles no configuration changes itself),
   the `specialUse` foreground service with its subtype property, the
   documents provider, backup turned off (`allowBackup`, `fullBackupContent`, data extraction
@@ -159,7 +159,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 ### Released sources
 
 - `scripts/release-sources` refuses to run with tracked changes in the work tree and writes, under
-  the short `HEAD` revision: `appine-<rev>.tar.gz` (`git archive HEAD`), `appine-<rev>-vendor.tar.gz`
+  the short `HEAD` revision: `kazeterm-<rev>.tar.gz` (`git archive HEAD`), `kazeterm-<rev>-vendor.tar.gz`
   (`cargo vendor --locked` of the whole workspace), `libghostty-vt-<version>.tar.gz` and
   `libghostty-vt-<version>-deps.tar.gz` (the release and its Zig packages, copied as
   `fetch-ghostty` checked them; together about 10 MB), and
@@ -177,7 +177,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 ### Guest browser asset
 
 - `BrowserAssetTask` builds `hosts/android/open-url.c` with Zig as static aarch64-linux-musl,
-  packaging `appine-open-url` as a generated asset for either distro; no guest package is needed.
+  packaging `kazeterm-open-url` as a generated asset for either distro; no guest package is needed.
   The bundled musl copyright is in `android/licenses/` and the offline notices.
 
 ## Dependencies (inbound / outbound)
@@ -203,7 +203,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
   `~/.cache/zig` usually has, and Zig 0.17 then panics ("reached unreachable code"), so `build.rs`
   gives the source a cache of its own, which nothing fetches into.
 - `build.rs` reruns only when `vt.c`, the source's `LIB_VERSION` or `build.zig.zon`,
-  `APPINE_GHOSTTY_SRC` or `ZIG` change, not for other libghostty-vt files or `ANDROID_NDK_HOME`.
+  `KAZETERM_GHOSTTY_SRC` or `ZIG` change, not for other libghostty-vt files or `ANDROID_NDK_HOME`.
 - vt.c's Wuffs header is found through the release's layout: the dependency named `wuffs` in
   `pkg/wuffs/build.zig.zon`, the dependency tarball's `<hash>` directories and the file
   `wuffs-v0.4.c`. An upgrade that changes any of them fails the build ("no Wuffs …" or no hash)

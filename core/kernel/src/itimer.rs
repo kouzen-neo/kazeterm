@@ -124,7 +124,7 @@ impl Expiry {
 
 /// The current time of host clock `clock`.
 fn clock_now(clock: i32) -> Option<Duration> {
-    let (sec, nsec) = appine_hal::clock_gettime(clock).ok()?;
+    let (sec, nsec) = kazeterm_hal::clock_gettime(clock).ok()?;
     Some(Duration::new(sec.max(0) as u64, nsec as u32))
 }
 
@@ -148,7 +148,7 @@ pub(crate) fn clock_epoch() -> u64 {
 }
 
 /// The host's wall clock was set, or the device resumed from sleep (the timer thread's
-/// [`appine_hal::ClockWatch`] saw it): the realtime and boottime clocks have jumped against the
+/// [`kazeterm_hal::ClockWatch`] saw it): the realtime and boottime clocks have jumped against the
 /// monotonic one. Every waiting thread is woken so that it turns its deadline into an instant
 /// again ([`Expiry::instant`]), including futex waiters and sleepers without the BKL, which wait
 /// on nothing but their own event; `TFD_TIMER_CANCEL_ON_SET` timerfds now read `ECANCELED`.

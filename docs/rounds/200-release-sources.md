@@ -1,6 +1,6 @@
 # M9：发布时放出的源码（2026-11-03）
 
-[许可证](192-license.md)那一轮记下的发布前义务里，能先做的是把要随 APK 放出的源码整理出来。App 按 GPLv3/AGPLv3 要提供整个 App 的对应源码（包括静态链接进 `libappine.so` 的 crate），APK 里 Alpine minirootfs 的 GPL 包要提供它们的源码；开源许可页已经写了"GPL 包的源码与 appine 的源码一起放在 https://github.com/mthli/appine"。这一轮写了生成这些文件的脚本。
+[许可证](192-license.md)那一轮记下的发布前义务里，能先做的是把要随 APK 放出的源码整理出来。App 按 GPLv3/AGPLv3 要提供整个 App 的对应源码（包括静态链接进 `libappine.so` 的 crate），APK 里 Alpine minirootfs 的 GPL 包要提供它们的源码；开源许可页已经写了"GPL 包的源码与 appine 的源码一起放在 https://github.com/kazeterm/appine"。这一轮写了生成这些文件的脚本。
 
 ## 做法
 

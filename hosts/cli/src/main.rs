@@ -1,4 +1,4 @@
-//! appine-run: runs a guest program directly in the host terminal (the development front end,
+//! kazeterm-run: runs a guest program directly in the host terminal (the development front end,
 //! design doc §13.3).
 //!
 //! Without `--rootfs`, `<program>` is a host path and the guest sees no filesystem at all; with
@@ -7,7 +7,7 @@
 //! environment holds only the variables given by `--env`. Exit codes follow the shell's
 //! convention: the guest's exit code on a normal exit, 128 + the signal number when killed by a
 //! signal, 127 when the program is not found and 126 when it cannot start for another reason.
-//! appine-run's own failures exit with 1 (the inode store cannot be opened, or `--import` failed)
+//! kazeterm-run's own failures exit with 1 (the inode store cannot be opened, or `--import` failed)
 //! and usage errors with 2.
 //!
 //! When stdin and stdout are both terminals, the guest runs on an in-process PTY (the kernel/tty
@@ -20,8 +20,8 @@
 //! by it when the program ends or the guest requests a shutdown (busybox's reboot, halt, poweroff)
 //! (the kernel/boot map).
 //!
-//! SIGINT, SIGTERM and SIGHUP to appine-run (`timeout`, ^C with `--no-pty`, a closed terminal) are
-//! passed on to the program, and another a second or more later ends every guest process; either way appine-run
+//! SIGINT, SIGTERM and SIGHUP to kazeterm-run (`timeout`, ^C with `--no-pty`, a closed terminal) are
+//! passed on to the program, and another a second or more later ends every guest process; either way kazeterm-run
 //! still shuts down, syncs the store and restores the host terminal before it exits.
 
 use std::env;
@@ -31,8 +31,8 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use appine_kernel::errno::Errno;
-use appine_kernel::{DbtStats, ExitStatus, RunError, RunOptions, Terminal, Tier};
+use kazeterm_kernel::errno::Errno;
+use kazeterm_kernel::{DbtStats, ExitStatus, RunError, RunOptions, Terminal, Tier};
 
 /// The legal notice `--version` prints (AGPL section 5: an interactive interface must display the
 /// copyright, the absence of warranty and the license).
@@ -41,8 +41,8 @@ License AGPLv3+: GNU AGPL version 3 or later <https://gnu.org/licenses/agpl.html
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.";
 
-const USAGE: &str = "usage: appine-run [options] [--] <program> [args...]
-       appine-run --rootfs <dir> --import <rootfs.tar.gz>
+const USAGE: &str = "usage: kazeterm-run [options] [--] <program> [args...]
+       kazeterm-run --rootfs <dir> --import <rootfs.tar.gz>
 
   --tier 0             run in the interpreter (default)
   --tier 1             run in the dynamic binary translator (aarch64 Linux hosts only)
@@ -51,14 +51,14 @@ const USAGE: &str = "usage: appine-run [options] [--] <program> [args...]
   --env NAME=VALUE     add a guest environment variable (repeatable)
   --pty                run on an in-process terminal even if stdin is not a tty
   --no-pty             give the guest the host stdin/stdout/stderr directly
-  --memory-limit <n>   kill a guest process when Appine's anonymous memory exceeds n
+  --memory-limit <n>   kill a guest process when KazeTerm's anonymous memory exceeds n
                        bytes (K, M, G suffixes; \"none\" for no limit; default: half the RAM)
   --low-port-offset <n>
                        bind guest ports below 1024 to port + n on the host (then + 2n,
                        + 3n, or any free port) when the host refuses the port itself;
                        0 binds them as they are (default: 10000)
   --always-map-low-ports
-                       move guest ports below 1024 even when the host lets Appine bind them
+                       move guest ports below 1024 even when the host lets KazeTerm bind them
   --init               boot by /etc/inittab first (sysinit, wait, once entries; output in
                        /var/log/boot.log) and shut down by it when the program exits or
                        the guest asks to (reboot, halt, poweroff)
@@ -108,7 +108,7 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--version" => {
-                println!("appine-run {}\n{NOTICE}", env!("CARGO_PKG_VERSION"));
+                println!("kazeterm-run {}\n{NOTICE}", env!("CARGO_PKG_VERSION"));
                 return ExitCode::SUCCESS;
             }
             "--stats" => stats = true,
@@ -151,12 +151,12 @@ fn main() -> ExitCode {
         let Some(store) = &options.rootfs else {
             return usage_error();
         };
-        let imported = appine_kernel::import_rootfs(store, &tarball)
-            .and_then(|r| appine_kernel::sync_store(store).map(|()| r));
+        let imported = kazeterm_kernel::import_rootfs(store, &tarball)
+            .and_then(|r| kazeterm_kernel::sync_store(store).map(|()| r));
         return match imported {
             Ok(r) => {
                 eprintln!(
-                    "appine-run: imported {} files, {} directories, {} symlinks, {} hard links, {} device nodes",
+                    "kazeterm-run: imported {} files, {} directories, {} symlinks, {} hard links, {} device nodes",
                     r.files, r.dirs, r.symlinks, r.hardlinks, r.nodes
                 );
                 ExitCode::SUCCESS
@@ -167,7 +167,7 @@ fn main() -> ExitCode {
                 } else {
                     err.to_string()
                 };
-                eprintln!("appine-run: cannot import {}: {reason}", tarball.display());
+                eprintln!("kazeterm-run: cannot import {}: {reason}", tarball.display());
                 ExitCode::from(1)
             }
         };
@@ -177,14 +177,14 @@ fn main() -> ExitCode {
     };
 
     let argv: Vec<Vec<u8>> = args.iter().map(|a| a.as_bytes().to_vec()).collect();
-    let on_tty = appine_hal::isatty(0) && appine_hal::isatty(1);
+    let on_tty = kazeterm_hal::isatty(0) && kazeterm_hal::isatty(1);
     let mut raw = None;
     if pty.unwrap_or(on_tty) {
         if on_tty {
-            match appine_hal::RawMode::enter(0) {
+            match kazeterm_hal::RawMode::enter(0) {
                 Ok(r) => raw = Some(r),
                 Err(e) => {
-                    eprintln!("appine-run: cannot switch the terminal to raw mode: errno {e}")
+                    eprintln!("kazeterm-run: cannot switch the terminal to raw mode: errno {e}")
                 }
             }
         }
@@ -193,19 +193,19 @@ fn main() -> ExitCode {
             output: 1,
             size: on_tty.then_some(1),
             resize: on_tty
-                .then(appine_hal::sigwinch_notifier)
+                .then(kazeterm_hal::sigwinch_notifier)
                 .and_then(Result::ok),
         });
     }
     // Without the pipe the signals keep their default action
-    options.stop = appine_hal::stop_notifier().ok();
-    let result = appine_kernel::run(&program, &argv, &envp, &options);
+    options.stop = kazeterm_hal::stop_notifier().ok();
+    let result = kazeterm_kernel::run(&program, &argv, &envp, &options);
     // Restore the host terminal first, then print the message
     drop(raw);
     let report = match result {
         Ok(report) => report,
         Err(err) => {
-            eprintln!("appine-run: {}: {err}", program.to_string_lossy());
+            eprintln!("kazeterm-run: {}: {err}", program.to_string_lossy());
             return match err {
                 RunError::Io(io) if io.kind() == ErrorKind::NotFound => ExitCode::from(127),
                 RunError::Exec(errno) if errno == Errno::ENOENT => ExitCode::from(127),
@@ -227,10 +227,10 @@ fn main() -> ExitCode {
         } => {
             match (pc, fault_addr) {
                 (Some(pc), Some(addr)) => {
-                    eprintln!("appine-run: guest killed by {signal} (pc={pc:#x}, addr={addr:#x})")
+                    eprintln!("kazeterm-run: guest killed by {signal} (pc={pc:#x}, addr={addr:#x})")
                 }
-                (Some(pc), None) => eprintln!("appine-run: guest killed by {signal} (pc={pc:#x})"),
-                _ => eprintln!("appine-run: guest killed by {signal}"),
+                (Some(pc), None) => eprintln!("kazeterm-run: guest killed by {signal} (pc={pc:#x})"),
+                _ => eprintln!("kazeterm-run: guest killed by {signal}"),
             }
             ExitCode::from((128 + signal.number()) as u8)
         }
@@ -259,7 +259,7 @@ fn usage_error() -> ExitCode {
 
 fn print_stats(s: &DbtStats) {
     let pct = |n: u64| 100.0 * n as f64 / s.insns.max(1) as f64;
-    eprintln!("appine-run: tier 1 statistics");
+    eprintln!("kazeterm-run: tier 1 statistics");
     eprintln!("  blocks translated   {:>12}", s.blocks);
     eprintln!("    from templates    {:>12}", s.blocks_shared);
     eprintln!("  guest instructions  {:>12}", s.insns);

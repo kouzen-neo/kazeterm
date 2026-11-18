@@ -21,7 +21,7 @@ user-visible ABI contract:
 - the kernel-version contract, Linux's errno numbers, the `ENOSYS` policy for unimplemented
   syscalls, counting the paths the kernel layer does not implement, and refusing guest clock
   changes;
-- the local debug log and syscall trace on the host's stderr (`APPINE_LOG`, `APPINE_STRACE`).
+- the local debug log and syscall trace on the host's stderr (`KAZETERM_LOG`, `KAZETERM_STRACE`).
 
 Root: `core/kernel/src/signal.rs`, `syscall/sig.rs`,
 `coredump.rs`, `klog.rs`, `errno.rs`, `debug.rs`, signalfd (in `fd.rs`/`syscall/sig.rs`), and in
@@ -174,7 +174,7 @@ construction and clock-stub detection (`kernel/vdso`).
   kernel log while `debug.exception-trace` is non-zero (0 at start as on arm64, 1 when the host
   starts the kernel with `MachineOptions::exception_trace`, as the app does) and the signal will
   go unhandled: the handler is the default or ignored and the thread is not traced (Linux's
-  always-report for the initial init has no counterpart: Appine's pid 1 is not guest code). One
+  always-report for the initial init has no counterpart: KazeTerm's pid 1 is not guest code). One
   INFO line `comm[tid]: unhandled exception: `, the exception class and ESR unless the ESR is 0,
   the exception's name (the abort's fault status name, or `undefined instruction`, `User debug
   trap`, `Hardware breakpoint trap (ptrace)`, `SP/PC alignment exception`), and ` in
@@ -251,7 +251,7 @@ construction and clock-stub detection (`kernel/vdso`).
 
 ### ABI contract
 
-- `uname -r` reports `6.1.0-appine` (version `#1 SMP PREEMPT appine`, machine `aarch64`, nodename
+- `uname -r` reports `6.1.0-kazeterm` (version `#1 SMP PREEMPT kazeterm`, machine `aarch64`, nodename
   from the UTS namespace); `/proc/version` and `/proc/sys/kernel/{osrelease,version,ostype}`
   match. Unspecified behaviour follows Linux 6.1. Deliberate exceptions taken from newer kernels:
   `cachestat` (6.5), `/proc/<pid>/fd` entries not usable as mount points (6.12), the time-namespace
@@ -285,7 +285,7 @@ construction and clock-stub detection (`kernel/vdso`).
   Linux defines are counted like the others.
 - Each path keeps its call count and the comm of its first caller; the table holds 128 paths, and
   hits of new paths after that are only counted as dropped.
-- With `APPINE_LOG=1` the first hit of each path writes `appine: unimplemented <path>, first by
+- With `KAZETERM_LOG=1` the first hit of each path writes `kazeterm: unimplemented <path>, first by
   <comm> (pid <pid>)` to the host's stderr (`syscall <nr>` for syscalls).
 - A kernel-bug kill report (`KillReason::Bug::stubs`) carries the 10 most-called paths, ties in
   first-hit order (`prctl option 0x59616d61: 2 calls, first by gdb`; option tags of 0x10000 and
@@ -294,11 +294,11 @@ construction and clock-stub detection (`kernel/vdso`).
 
 ### Debug log and syscall trace
 
-- `APPINE_LOG` and `APPINE_STRACE` are on when set, not empty and not `0`, each read once per
+- `KAZETERM_LOG` and `KAZETERM_STRACE` are on when set, not empty and not `0`, each read once per
   host process at its first use.
-- `debug::log` writes `appine: <line>` to the host's stderr (logcat on Android); nothing reaches
+- `debug::log` writes `kazeterm: <line>` to the host's stderr (logcat on Android); nothing reaches
   the guest.
-- With `APPINE_STRACE`, the dispatcher prints each syscall it handled as it returns: the seconds
+- With `KAZETERM_STRACE`, the dispatcher prints each syscall it handled as it returns: the seconds
   since the first traced syscall, `[tid]`, the number, the six arguments in hex (pid arguments
   already translated to global pids), `=` the result in hex or `-errno`, and the milliseconds it
   took in angle brackets. The fast path is off while tracing (`syscall::fast`), so every syscall
@@ -326,7 +326,7 @@ construction and clock-stub detection (`kernel/vdso`).
   `regions` (the mapping named in unhandled-exception reports).
 - `engine`: CPU state (registers, FP, DIT) and the `Kicker`.
 - vfs (core files, `/dev/kmsg`), credentials (`may_signal`, `CAP_SYSLOG`),
-  `appine_hal` (clocks, `adjtimex` query, `timezone`), procfs (`debug.exception-trace` through
+  `kazeterm_hal` (clocks, `adjtimex` query, `timezone`), procfs (`debug.exception-trace` through
   `recorded_value`, ` (deleted)` names through `mark_deleted`, `comm_str` for a path's first
   caller).
 - `kernel/ptrace`: group/signal stops, fatal-exit hooks and shared register helpers; delivery

@@ -234,7 +234,7 @@ count (`itimer`, `kernel/time`); signal delivery (`kernel/signal`).
 - `itimer` (`Expiry`, `clock_epoch`) and the time-namespace offsets for timerfd; `CAP_WAKE_ALARM`
   (`kernel/cred`).
 - The kernel's waits (`wait_objects`, `block_for`, `interrupted`), wake objects and channels,
-  `edge_waiters`; `appine_hal::poll` and `appine_hal::Edges` (host epoll); per-kind readiness
+  `edge_waiters`; `kazeterm_hal::poll` and `kazeterm_hal::Edges` (host epoll); per-kind readiness
   functions in `net`, `unix`, `tty`, `kernel/inotify`, signalfd, message queues, seccomp; signals
   (`send_to_task`, `send_to_group`, `send_to_pgrp`).
 

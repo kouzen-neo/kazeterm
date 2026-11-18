@@ -66,13 +66,13 @@ val alpineBranch: String = rootfsTarball
     ?: "edge"
 
 android {
-    namespace = "io.github.mthli.appine"
+    namespace = "com.kazeterm"
 
     compileSdk = 37
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "io.github.mthli.appine"
+        applicationId = "com.kazeterm"
         minSdk = 30
         targetSdk = 37
         versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()
@@ -91,14 +91,14 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // CI can supply a PKCS#12 keystore; local builds keep using the debug key
-            val ciStore = System.getenv("APPINE_RELEASE_STORE_FILE")
+            val ciStore = System.getenv("KAZETERM_RELEASE_STORE_FILE")
             if (ciStore != null) {
                 signingConfig = signingConfigs.create("releaseCi") {
                     storeType = "PKCS12"
                     storeFile = file(ciStore)
-                    storePassword = System.getenv("APPINE_RELEASE_STORE_PASSWORD")
-                    keyAlias = System.getenv("APPINE_RELEASE_KEY_ALIAS")
-                    keyPassword = System.getenv("APPINE_RELEASE_KEY_PASSWORD")
+                    storePassword = System.getenv("KAZETERM_RELEASE_STORE_PASSWORD")
+                    keyAlias = System.getenv("KAZETERM_RELEASE_KEY_ALIAS")
+                    keyPassword = System.getenv("KAZETERM_RELEASE_KEY_PASSWORD")
                 }
             } else {
                 // Installed locally only: signed with the debug key
@@ -213,13 +213,13 @@ abstract class BrowserAssetTask : DefaultTask() {
         exec.exec {
             commandLine(zig.get(), "cc", "-target", "aarch64-linux-musl", "-static", "-O2", "-s",
                 "-std=c11", "-Wall", "-Wextra", "-Werror", source.get().asFile.path,
-                "-o", File(out, "appine-open-url").path)
+                "-o", File(out, "kazeterm-open-url").path)
         }
     }
 }
 
 /**
- * Builds libappine.so with cargo-ndk. Both APKs need an optimized interpreter.
+ * Builds libkazeterm.so with cargo-ndk. Both APKs need an optimized interpreter.
  * The debug APK enables kernel test hooks and borrow checks for instrumentation.
  */
 abstract class CargoNdkTask : DefaultTask() {
@@ -255,7 +255,7 @@ abstract class CargoNdkTask : DefaultTask() {
             args(
                 "ndk", "-t", "arm64-v8a", "--platform", "30",
                 "-o", outputDir.get().asFile.path,
-                "build", "-p", "appine-android",
+                "build", "-p", "kazeterm-android",
             )
             args(cargoArgs.get())
             // Set both: with only one set, when the other one in the environment points at another

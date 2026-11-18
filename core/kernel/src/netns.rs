@@ -19,7 +19,7 @@ use std::rc::Rc;
 use crate::cred::{Cred, cap};
 use crate::errno::Errno;
 use crate::nsproxy::{Loopback, NetNs};
-use appine_hal::net::Interface;
+use kazeterm_hal::net::Interface;
 
 const AF_INET: i32 = 2;
 const AF_INET6: i32 = 10;
@@ -1095,7 +1095,7 @@ fn hook_eval(
     // Index and name of the output interface: by name when one is given (on FORWARD), lo for
     // local addresses, otherwise by route
     let oif = || -> (u32, Vec<u8>) {
-        let found = |f: &dyn Fn(&appine_hal::net::Interface) -> bool| {
+        let found = |f: &dyn Fn(&kazeterm_hal::net::Interface) -> bool| {
             crate::netdev::interfaces(ns)
                 .into_iter()
                 .find(|i| f(i))

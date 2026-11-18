@@ -17,7 +17,7 @@ SKIP="$SKIP:FileCapTest.FileCapabilityCoercionInsideUserNamespace"
 # Fail on the native side at times: docker's own messages keep the VM's kernel log wrapping, so a
 # read from its start can find the record gone
 SKIP="$SKIP:SyslogTest.Read:SyslogTest.ReadDevKmsg:SyslogTest.DevKmsgSeekSet:SyslogTest.DevKmsgSeekEnd"
-# Cannot be compared on CI: 6.9 dropped syslog's CAP_SYS_ADMIN fallback, which 6.1 (Appine) and
+# Cannot be compared on CI: 6.9 dropped syslog's CAP_SYS_ADMIN fallback, which 6.1 (KazeTerm) and
 # 6.8 still have (the tests expect CAP_SYSLOG alone to count); reading /proc/kmsg hangs natively
 # on CI until the 60 s timeout
 S=SyslogAccessTestAll/SyslogAccessTest

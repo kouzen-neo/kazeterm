@@ -1,4 +1,4 @@
-# docker with containerd's default overlayfs snapshotter on Appine's overlayfs: no storage-driver
+# docker with containerd's default overlayfs snapshotter on KazeTerm's overlayfs: no storage-driver
 # in daemon.json, otherwise as docker.sh (no bridge, no iptables, host networking). dockerd runs
 # with a data root, exec root and socket of its own, so docker.sh's images stay:
 #   scripts/survey -s target/survey/docker docker-overlay

@@ -1,12 +1,12 @@
-# <img src="website/dist/favicon.svg" width="36" height="36" align="absmiddle" alt=""> Appine
+# <img src="website/dist/favicon.svg" width="36" height="36" align="absmiddle" alt=""> KazeTerm
 
-Appine is a high-performance Linux terminal for Android.
+KazeTerm is a high-performance Linux terminal for Android.
 
 Install packages, edit code, and build projects on your phone or tablet without rooting it.
 
 Alpine Linux comes bundled with the app. Debian is available from **Settings**.
 
-**[Get Appine on Google Play](https://play.google.com/store/apps/details?id=io.github.mthli.appine)** · **[Download the APK from GitHub Releases](https://github.com/mthli/appine/releases)**
+**[Get KazeTerm on Google Play](https://play.google.com/store/apps/details?id=com.kazeterm)** · **[Download the APK from GitHub Releases](https://github.com/kazeterm/kazeterm/releases)**
 
 Requires Android 11 or later on a 64-bit ARM device.
 
@@ -16,7 +16,7 @@ Requires Android 11 or later on a 64-bit ARM device.
 <table>
   <tr>
     <td width="20%" align="center" valign="top">
-      <a href="docs/screenshots/codex-cli.png"><img src="docs/screenshots/codex-cli.png" width="160" alt="Codex CLI open in the Appine project directory"></a>
+      <a href="docs/screenshots/codex-cli.png"><img src="docs/screenshots/codex-cli.png" width="160" alt="Codex CLI open in the KazeTerm project directory"></a>
       <hr width="128">
       <p>Use <strong>Codex CLI</strong> to work on a local project from your Android terminal.</p>
     </td>
@@ -63,7 +63,7 @@ npm install -g @openai/codex
 
 ## How it works
 
-Appine runs unmodified ARM64 Linux binaries inside the Android app process.
+KazeTerm runs unmodified ARM64 Linux binaries inside the Android app process.
 Its CPU engine translates ARM64 instructions into ARM64 code and uses an
 interpreter for instructions it does not translate. A user-space kernel handles
 Linux system calls, and the Android terminal uses Ghostty's libghostty-vt.
@@ -111,7 +111,7 @@ Build and run the assembly example in `tests/guest/hello.S`.
 
 ```sh
 scripts/dev sh -c 'cc -nostdlib -static -no-pie -o /tmp/hello tests/guest/hello.S &&
-                   cargo run -q -p appine-run -- --tier 1 /tmp/hello'
+                   cargo run -q -p kazeterm-run -- --tier 1 /tmp/hello'
 ```
 
 The C guest programs in `tests/guest` use `musl-gcc` from the `musl-tools` package.
@@ -123,18 +123,18 @@ To run BusyBox, import the Alpine minirootfs tarball. Without the tarball,
 
 ```sh
 scripts/fetch-rootfs # downloads and verifies target/rootfs/alpine-minirootfs-*.tar.gz
-scripts/dev sh -c 'cargo build -q -p appine-run && run=target/linux-arm64/debug/appine-run &&
+scripts/dev sh -c 'cargo build -q -p kazeterm-run && run=target/linux-arm64/debug/kazeterm-run &&
                    $run --rootfs target/store --import target/rootfs/alpine-minirootfs-*.tar.gz &&
                    $run --rootfs target/store /bin/busybox ls -l / &&
                    $run --rootfs target/store --env PATH=/bin:/usr/bin /bin/sh -c "ls / | wc -l"'
 ```
 
-When stdin and stdout are connected to a terminal, `appine-run` gives the guest
+When stdin and stdout are connected to a terminal, `kazeterm-run` gives the guest
 an in-process terminal. The interactive login shell below supports job control
 (`Ctrl-C`, `Ctrl-Z`, and `fg`) and full-screen programs such as `vi` and `top`.
 
 ```sh
-scripts/dev target/linux-arm64/debug/appine-run --rootfs target/store \
+scripts/dev target/linux-arm64/debug/kazeterm-run --rootfs target/store \
     --env TERM=xterm-256color --env HOME=/root /bin/sh -l
 ```
 
@@ -143,30 +143,30 @@ environment variables passed with `--env`. If the host needs a proxy, pass its
 settings to the guest.
 
 ```sh
-scripts/dev sh -c 'target/linux-arm64/debug/appine-run --rootfs target/store \
+scripts/dev sh -c 'target/linux-arm64/debug/kazeterm-run --rootfs target/store \
     --env PATH=/usr/sbin:/usr/bin:/sbin:/bin --env HOME=/root \
     --env http_proxy=$http_proxy --env https_proxy=$https_proxy \
     /bin/sh -c "apk update && apk add git python3"'
 ```
 
-The tests that need the internet run only with `APPINE_NETWORK_TESTS=1`.
+The tests that need the internet run only with `KAZETERM_NETWORK_TESTS=1`.
 
 #### Run Linux Test Project syscall tests
 
 Build the [Linux Test Project](https://github.com/linux-test-project/ltp) syscall
-tests in an ARM64 Alpine container. The test runner starts a fresh `appine-run`
+tests in an ARM64 Alpine container. The test runner starts a fresh `kazeterm-run`
 process for each test.
 
 ```sh
-scripts/dev cargo build --release -p appine-run
+scripts/dev cargo build --release -p kazeterm-run
 scripts/build-ltp                        # builds target/ltp/ltp-<version>.tar (needs Docker)
 scripts/dev scripts/ltp -j 8             # all syscall tests; results in target/ltp/results.txt
 scripts/dev scripts/ltp 'fcntl.*|mmap.*' # only the tests whose name matches
 ```
 
-#### Compare Appine with native Linux
+#### Compare KazeTerm with native Linux
 
-`scripts/difftest` runs each script in `tests/diff` in both Appine and a native
+`scripts/difftest` runs each script in `tests/diff` in both KazeTerm and a native
 ARM64 Docker container, then compares the output and exit status. The container
 runs without Docker's seccomp profile because the profile changes what some
 syscalls return, including `clone3` and `pidfd_getfd`.
@@ -176,7 +176,7 @@ itself.
 
 ```sh
 scripts/fetch-rootfs
-scripts/dev cargo build --release -p appine-run
+scripts/dev cargo build --release -p kazeterm-run
 scripts/difftest              # all cases on tier 1
 scripts/difftest -t 0 signals # one case on the interpreter
 ```
@@ -184,7 +184,7 @@ scripts/difftest -t 0 signals # one case on the interpreter
 The first run needs internet access. It creates a store in `target/difftest/store`
 from the minirootfs and installs Python 3, GCC, Lua, SQLite, Go, Node.js,
 OpenJDK 21, strace, and GDB with `apk`. It exports the root filesystem from
-Appine and imports it as a Docker image so both sides use the same files.
+KazeTerm and imports it as a Docker image so both sides use the same files.
 
 If an older store lacks a package, install it in the store with `apk add` or
 delete the store to rebuild it. In either case, pass `-r` to `scripts/difftest`
@@ -192,20 +192,20 @@ to export the filesystem again.
 
 #### Benchmark, trace, and profile the runtime
 
-For a longer lockstep comparison, run `appine-lockstep`. To compare
-the interpreter and binary translator against native execution, run `appine-bench`.
+For a longer lockstep comparison, run `kazeterm-lockstep`. To compare
+the interpreter and binary translator against native execution, run `kazeterm-bench`.
 
 ```sh
-scripts/dev cargo run --release -p appine-lockstep -- --iterations 1000000
-scripts/dev sh -c 'cargo build --release -p appine-run -p appine-bench &&
-                   target/linux-arm64/release/appine-bench'
+scripts/dev cargo run --release -p kazeterm-lockstep -- --iterations 1000000
+scripts/dev sh -c 'cargo build --release -p kazeterm-run -p kazeterm-bench &&
+                   target/linux-arm64/release/kazeterm-bench'
 ```
 
-To debug a failing test, rerun it with `APPINE_STRACE=1`. `appine-run` prints each syscall
+To debug a failing test, rerun it with `KAZETERM_STRACE=1`. `kazeterm-run` prints each syscall
 with its arguments and result, so you can check which calls failed or returned unexpected
 values.
 
-To profile the runtime, run `appine-run` under `perf record` with `APPINE_PERF_MAP=1`.
+To profile the runtime, run `kazeterm-run` under `perf record` with `KAZETERM_PERF_MAP=1`.
 Tier 1 writes `/tmp/perf-<pid>.map` so `perf report` can attribute samples in
 translated code to guest addresses (`g_<pc>`).
 
@@ -217,14 +217,14 @@ including exits caused by failed grouped memory checks.
 #### Runtime failures and memory limits
 
 In release builds, if the kernel or engine panics or the engine faults on host
-memory, Appine kills only the affected guest process and reports the bug on
+memory, KazeTerm kills only the affected guest process and reports the bug on
 stderr. A panic in a `Machine` method called by the host fails only that call.
 
-Debug builds abort `appine-run` so you can inspect the bug where it happened.
-Set `APPINE_ON_BUG=kill` or `APPINE_ON_BUG=abort` to override the default.
+Debug builds abort `kazeterm-run` so you can inspect the bug where it happened.
+Set `KAZETERM_ON_BUG=kill` or `KAZETERM_ON_BUG=abort` to override the default.
 
-If Appine's anonymous memory exceeds `--memory-limit` (half the RAM by default),
-Appine sends `SIGKILL` to the guest process using the most memory, like the Linux
+If KazeTerm's anonymous memory exceeds `--memory-limit` (half the RAM by default),
+KazeTerm sends `SIGKILL` to the guest process using the most memory, like the Linux
 OOM killer.
 
 ## Project documentation
@@ -238,9 +238,10 @@ OOM killer.
 
 ## License
 
-Copyright (C) 2026 Matthew Lee.
+KazeTerm is a modified version of Appine.
+Original Appine: Copyright (C) 2026 Matthew Lee. Modified 2026-11-18.
 
-Appine is licensed under the [GNU Affero General Public License, version 3 or later](LICENSE).
+KazeTerm is licensed under the [GNU Affero General Public License, version 3 or later](LICENSE).
 
 Parts of the terminal line discipline in `core/kernel/src/tty.rs` are adapted
 from Fuchsia's Starnix and retain [The Fuchsia Authors' BSD-style license](android/licenses/fuchsia-LICENSE).

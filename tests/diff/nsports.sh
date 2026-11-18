@@ -177,7 +177,7 @@ a = try_bind("first 7006")
 b = try_bind("second 7006")
 c = try_bind("first 7007 reuseport", socket.SO_REUSEPORT)
 d = try_bind("second 7007 reuseport", socket.SO_REUSEPORT)
-# Row order is not compared (Linux orders by hash bucket, Appine by the order of the fds)
+# Row order is not compared (Linux orders by hash bucket, KazeTerm by the order of the fds)
 rows = []
 for l in open("/proc/net/tcp").read().splitlines()[1:]:
     f = l.split()

@@ -275,7 +275,7 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   counts every new task, threads included (Linux's `total_forks`); btime is recomputed per read.
   `uptime` includes the reader's boottime offset. `loadavg` comes from the guest's own load
   average. `filesystems` is a fixed list (`nodev fuse` included, no `fuseblk` or `fusectl`);
-  `cmdline` is `appine`; `cgroups` reports the v1 controller names with hierarchy 0 and the total
+  `cmdline` is `kazeterm`; `cgroups` reports the v1 controller names with hierarchy 0 and the total
   cgroup count. `mounts` and `net` link into `self`. `swaps` is the host's file when the app may
   read it (as meminfo's swap lines are the host's), otherwise Linux's header line alone; `locks`
   lists every lock and lease (`kernel/locks`'s `proc_locks`) with pids in the instance's pid
@@ -303,7 +303,7 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   shown in the reader's user namespace (65534 when unmapped) and written from the writer's (an
   unmapped one is `EINVAL`); `kernel/pid_max` accepts writes and ignores them. The `RECORDED`
   table adds 40 more with Linux 6.1's modes, defaults and accepted ranges (`overflowuid`/`gid`,
-  `vm.dirty_*`, `drop_caches`, `swappiness`, `overcommit_ratio`, `page-cluster`,
+  `vm.dirty_*`, `drop_caches`, `swkazetermss`, `overcommit_ratio`, `page-cluster`,
   `watermark_scale_factor`, `mmap_rnd_*bits`, `kernel.sysrq`, `randomize_va_space` (default 0:
   nothing is randomized), `kptr_restrict`, `perf_*`, `hung_task_*`, `sched_rt_*`,
   `sched_schedstats`, `panic_on_oops`, `core_pipe_limit`, `modules_disabled` (only 1 can be
@@ -316,7 +316,7 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   `drop_caches` is write-only (reads `EINVAL`). `kernel.modprobe` keeps a string, `kernel.tainted`
   only gains flags (of the 19 defined), and `vm.overcommit_memory` (0 to 2) is used: 1 turns off
   fork's commit check (`kernel/mm`). Constants: `file-max`, `cap_last_cap` 40, `ngroups_max`,
-  `pid_max` 4194304, `osrelease` `6.1.0-appine`; `random/uuid` is fresh per read, `boot_id` fixed
+  `pid_max` 4194304, `osrelease` `6.1.0-kazeterm`; `random/uuid` is fresh per read, `boot_id` fixed
   per boot, the entropy values 256.
 - `/proc/<pid>/net/*` (`arp`, `dev`, `icmp`, `icmp6`, `if_inet6`, `ipv6_route`, `netstat`, `raw`,
   `raw6`, `route`, `snmp`, `sockstat`, `sockstat6`, `tcp`, `tcp6`, `udp`, `udp6`, `unix`) uses the
@@ -400,7 +400,7 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   `content` delegates to `file`, `proc_cgroup` and `proc_cgroups`; `write` supplies a `Writer`
   with the writer's namespaces and the opener's credentials. Device filtering and change
   observation are called by the file syscalls, not owned by this adapter.
-- Host: `appine_hal` (`host_meminfo`, `host_vmstat`, `host_swaps`, `host_cpus`, `cpu_sysfs`,
+- Host: `kazeterm_hal` (`host_meminfo`, `host_vmstat`, `host_swaps`, `host_cpus`, `cpu_sysfs`,
   `clock_gettime`, `fill_random`, `thread_ctxt_switches`, routes, `tx_queue_len`); the engine
   (`guest_hwcap*`, `guest_midr`).
 
@@ -456,7 +456,7 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   while owners and the open-time check of `mem` and `maps` use the thread's; with per-thread
   credentials (a thread that changed its ids) the two can disagree.
 - **Per-thread values that are the process's:** `task/<tid>/stat`'s start time is the process's
-  (Appine keeps none per thread); `/proc/<pid>/net/*` of a process whose main thread has gone (a
+  (KazeTerm keeps none per thread); `/proc/<pid>/net/*` of a process whose main thread has gone (a
   zombie, or one whose other threads live) shows the initial network namespace rather than the
   process's.
 - **pagemap follows the tid, not the address space opened:** it looks the thread up at each read,
@@ -464,7 +464,7 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   and a reused tid would show another process's mappings without a new ptrace check.
 - **Writes never advance a synthetic file's position** (except `mem`): repeated writes on one
   descriptor keep taking effect, where Linux ignores a strict-mode sysctl write at a non-zero
-  position and refuses a second id-map write (`EINVAL`; Appine's is `EPERM`, the map being set).
+  position and refuses a second id-map write (`EINVAL`; KazeTerm's is `EPERM`, the map being set).
 - **`/sys/class/net/<if>/statistics` leaks the initial namespace's counters:** host-interface and
   `lo` counters are read by name from the kernel-wide traffic table without a namespace check, so
   a new namespace's `lo` shows the initial loopback's counts, while `/proc/net/dev` and netlink
@@ -494,5 +494,5 @@ network semantics behind `/proc/net` and `net.*` (`kernel/net`, `kernel/netns`);
   files, `proc_sys_permission`, write opens of read-only proc files)
   was observed on a native 6.8 kernel and attributed to 6.1 from knowledge of the kernel; so was
   which write each kind of read-only file fails with.
-- The bounds Linux puts on the mqueue, `aio-max-nr` and `lease-break-time` sysctls (Appine accepts
+- The bounds Linux puts on the mqueue, `aio-max-nr` and `lease-break-time` sysctls (KazeTerm accepts
   any positive value, or any number).

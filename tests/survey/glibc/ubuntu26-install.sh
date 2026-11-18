@@ -4,7 +4,7 @@
 #
 #   cid=$(docker create --platform linux/arm64 ubuntu:26.04)
 #   docker export $cid | gzip > target/glibc/ubuntu-26-04.tar.gz; docker rm $cid
-#   appine-run --rootfs target/glibc/ubuntu26-store --import target/glibc/ubuntu-26-04.tar.gz
+#   kazeterm-run --rootfs target/glibc/ubuntu26-store --import target/glibc/ubuntu-26-04.tar.gz
 export DEBIAN_FRONTEND=noninteractive
 # In a rootfs from docker export, resolv.conf and hosts are empty (docs/rounds/69-glibc-probe.md)
 [ -s /etc/resolv.conf ] || echo 'nameserver 127.0.0.53' > /etc/resolv.conf

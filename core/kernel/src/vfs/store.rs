@@ -33,7 +33,7 @@
 //! a few milliseconds are committed together; each operation is a savepoint in the transaction
 //! and on error rolls back only itself. When the app is killed, at most the last few milliseconds
 //! of changes are lost, and the store is still the complete state of some moment (Linux loses
-//! more on power loss). While other Appine processes are also using the store, every operation
+//! more on power loss). While other KazeTerm processes are also using the store, every operation
 //! commits immediately. Checkpoints (writing the WAL back into the database file, which needs
 //! fsync) are done by a background thread ([`wal_hook`]), not in commits, which mostly hold the
 //! BKL.
@@ -50,7 +50,7 @@
 //!
 //! Path resolution and stat go through an in-memory metadata cache (dentries, including names that
 //! do not exist; inode rows; symlink targets) instead of querying the database level by level.
-//! Our own writes only remove the affected entries. Several Appine processes can share one store,
+//! Our own writes only remove the affected entries. Several KazeTerm processes can share one store,
 //! so the first 8 bytes of the `lock` file are a counter that all processes map shared: it is
 //! bumped after every commit, and when the cache finds that it changed other than by its own
 //! commit, the whole cache is invalidated.
@@ -139,7 +139,7 @@ impl FileTime {
     /// (seconds, nanoseconds) to hand to the host.
     fn host(self) -> (i64, i64) {
         match self {
-            FileTime::Now => appine_hal::TIME_NOW,
+            FileTime::Now => kazeterm_hal::TIME_NOW,
             FileTime::At(ns) => split_ns(ns),
         }
     }
@@ -370,7 +370,7 @@ impl Store {
         }
         let store = Self::connect(dir)?;
         let fd = store.lock.as_raw_fd();
-        if appine_hal::flock(fd, true, false).is_ok() {
+        if kazeterm_hal::flock(fd, true, false).is_ok() {
             store.meta.commits.users().store(0, Ordering::SeqCst);
             store.remove_lost_objects()?;
             for path in volatile {
@@ -385,7 +385,7 @@ impl Store {
             store.transaction(|s| s.remove_orphans())?;
             store.commit()?;
         }
-        appine_hal::flock(fd, false, true).map_err(Errno)?;
+        kazeterm_hal::flock(fd, false, true).map_err(Errno)?;
         // Another process is also using the store: wait for it to commit its deferred write
         // transaction (after seeing this count it no longer defers); only then are its changes
         // visible
@@ -404,7 +404,7 @@ impl Store {
             .map_err(db_err)?;
         db.pragma_update(None, "journal_size_limit", WAL_SIZE_LIMIT)
             .map_err(db_err)?;
-        // Several Appine processes can use the same store at once: wait for others' write
+        // Several KazeTerm processes can use the same store at once: wait for others' write
         // transactions to end instead of failing at once
         db.busy_timeout(Duration::from_secs(10)).map_err(db_err)?;
         // Metadata operations are very frequent: every statement is compiled only once
@@ -417,9 +417,9 @@ impl Store {
             .truncate(false)
             .open(dir.join("lock"))
             .map_err(io_err)?;
-        appine_hal::flock(lock.as_raw_fd(), false, true).map_err(Errno)?;
+        kazeterm_hal::flock(lock.as_raw_fd(), false, true).map_err(Errno)?;
         let commits = Commits::open(&lock)?;
-        let objects_dir = appine_hal::open_dir(&dir.join("objects")).map_err(Errno)?;
+        let objects_dir = kazeterm_hal::open_dir(&dir.join("objects")).map_err(Errno)?;
         let meta = Arc::new(Meta {
             lock: RwLock::new(()),
             cache: UnsafeCell::new(Cache {
@@ -764,7 +764,7 @@ impl Store {
 
     /// The store's identity across connections: the device and inode of its `objects` directory.
     fn id(&self) -> Result<(u64, u64), Errno> {
-        let st = appine_hal::fstat(self.meta.objects_dir.as_raw_fd()).map_err(Errno)?;
+        let st = kazeterm_hal::fstat(self.meta.objects_dir.as_raw_fd()).map_err(Errno)?;
         Ok((st.st_dev, st.st_ino))
     }
 
@@ -939,8 +939,8 @@ impl Store {
     }
 
     /// The capacity of the host filesystem the store is on (reported to the guest by statfs).
-    pub fn fs_stats(&self) -> Result<appine_hal::FsStats, Errno> {
-        appine_hal::statvfs(&self.objects).map_err(Errno)
+    pub fn fs_stats(&self) -> Result<kazeterm_hal::FsStats, Errno> {
+        kazeterm_hal::statvfs(&self.objects).map_err(Errno)
     }
 
     // ---- Changes ----
@@ -1643,7 +1643,7 @@ impl Store {
         }
         if st.kind() == mode::S_IFREG {
             let mut name = [0u8; 21];
-            return appine_hal::set_times_at(
+            return kazeterm_hal::set_times_at(
                 self.meta.objects_dir.as_raw_fd(),
                 object_name(data.object, &mut name),
                 atime.map(FileTime::host),
@@ -1679,7 +1679,7 @@ impl Store {
         if self.held(ino)? {
             return self.set_held_times(ino, atime, mtime);
         }
-        appine_hal::set_times_fd(
+        kazeterm_hal::set_times_fd(
             file.as_raw_fd(),
             atime.map(FileTime::host),
             mtime.map(FileTime::host),
@@ -1874,7 +1874,7 @@ impl Store {
     /// the WAL back to disk at any time, and by then the new file's content must already be on
     /// disk, so that after power loss the name does not hold an empty or truncated file. Native
     /// ext4 does the same on a replacing rename (auto_da_alloc), and apk installing files and
-    /// editors saving rely on it without calling fsync; Appine's renames are only in the
+    /// editors saving rely on it without calling fsync; KazeTerm's renames are only in the
     /// database, invisible to the host. A few files are fdatasynced one by one (writeback is
     /// started for all of them first, which ext4 merges into one journal commit); for more, the
     /// whole filesystem is syncfsed once. This holds the BKL, so other processes wait during the
@@ -1887,7 +1887,7 @@ impl Store {
         inos.sort_unstable();
         inos.dedup();
         let r = if inos.len() > FLUSH_EACH {
-            appine_hal::syncfs(self.meta.fs.as_raw_fd())
+            kazeterm_hal::syncfs(self.meta.fs.as_raw_fd())
         } else {
             // Files deleted after the rename cannot be opened and need no attention
             let files: Vec<File> = inos
@@ -1895,16 +1895,16 @@ impl Store {
                 .filter_map(|&ino| self.open_object(ino, false).ok())
                 .collect();
             for f in &files {
-                let _ = appine_hal::sync_file_range(
+                let _ = kazeterm_hal::sync_file_range(
                     f.as_raw_fd(),
                     0,
                     0,
-                    appine_hal::SYNC_FILE_RANGE_WRITE,
+                    kazeterm_hal::SYNC_FILE_RANGE_WRITE,
                 );
             }
             files
                 .iter()
-                .try_for_each(|f| appine_hal::fsync(f.as_raw_fd(), true))
+                .try_for_each(|f| kazeterm_hal::fsync(f.as_raw_fd(), true))
         };
         if let Err(e) = r {
             crate::debug::log(format_args!("inode store: flushing replaced files: {e}"));
@@ -2083,7 +2083,7 @@ impl Store {
     fn open_number(&self, object: Ino, flags: i32) -> Result<File, Errno> {
         let mut name = [0u8; 21];
         let dir = self.meta.objects_dir.as_raw_fd();
-        appine_hal::open_at(dir, object_name(object, &mut name), flags, OBJECT_MODE)
+        kazeterm_hal::open_at(dir, object_name(object, &mut name), flags, OBJECT_MODE)
             .map_err(|e| object_err(object, e))
     }
 
@@ -2098,7 +2098,7 @@ impl Store {
         {
             let mut name = [0u8; 21];
             let dir = self.meta.objects_dir.as_raw_fd();
-            let _ = appine_hal::chmod_at(dir, object_name(data.object, &mut name), OBJECT_MODE);
+            let _ = kazeterm_hal::chmod_at(dir, object_name(data.object, &mut name), OBJECT_MODE);
         }
     }
 
@@ -2250,7 +2250,7 @@ impl Store {
     /// `shared` goes when the object is the file's own.
     fn settle(&self, ino: Ino, object: Ino, (atime, mtime): (i64, i64)) -> Result<(), Errno> {
         let mut name = [0u8; 21];
-        appine_hal::set_times_at(
+        kazeterm_hal::set_times_at(
             self.meta.objects_dir.as_raw_fd(),
             object_name(object, &mut name),
             Some(FileTime::At(atime).host()),
@@ -2495,7 +2495,7 @@ impl Meta {
     /// data, the WAL and the database file together. May be called with the BKL released.
     pub(crate) fn sync_all(&self) -> Result<(), Errno> {
         let seen = self.commits.get();
-        appine_hal::syncfs(self.fs.as_raw_fd()).map_err(Errno)?;
+        kazeterm_hal::syncfs(self.fs.as_raw_fd()).map_err(Errno)?;
         self.durable.fetch_max(seen + 1, Ordering::AcqRel);
         Ok(())
     }
@@ -2566,7 +2566,7 @@ impl Reader<'_> {
 /// docs), except that a held file keeps the times of its row.
 fn fill_from_host(st: &mut Stat, objects_dir: &OwnedFd, data: Data) -> Result<(), Errno> {
     let mut name = [0u8; 21];
-    let o = appine_hal::stat_at(objects_dir.as_raw_fd(), object_name(data.object, &mut name))
+    let o = kazeterm_hal::stat_at(objects_dir.as_raw_fd(), object_name(data.object, &mut name))
         .map_err(Errno)?;
     st.size = o.st_size as u64;
     st.blocks = Some(o.st_blocks as u64);
@@ -2689,7 +2689,7 @@ impl Cache {
 /// commits, the number of connections open on the store, and the range of inode numbers newly
 /// allocated by write transactions not yet committed.
 struct Commits {
-    map: appine_hal::FileMapping,
+    map: kazeterm_hal::FileMapping,
 }
 
 impl Commits {
@@ -2697,7 +2697,7 @@ impl Commits {
         if lock.metadata().map_err(io_err)?.len() < 32 {
             lock.set_len(32).map_err(io_err)?;
         }
-        let map = appine_hal::map_file(lock.as_raw_fd(), 0, 32, true, true).map_err(Errno)?;
+        let map = kazeterm_hal::map_file(lock.as_raw_fd(), 0, 32, true, true).map_err(Errno)?;
         Ok(Commits { map })
     }
 
@@ -2738,7 +2738,7 @@ impl Commits {
 impl Drop for Commits {
     fn drop(&mut self) {
         // SAFETY: the mapping came from map_file and is not accessed afterwards
-        unsafe { appine_hal::unmap(self.map.base, self.map.len) }
+        unsafe { kazeterm_hal::unmap(self.map.base, self.map.len) }
     }
 }
 
@@ -2879,7 +2879,7 @@ fn reap(meta: Arc<Meta>, db: PathBuf) {
 /// Deletes an object in the `objects` directory; not an error if it is already gone.
 fn remove_object(objects_dir: &OwnedFd, ino: Ino) -> Result<(), Errno> {
     let mut name = [0u8; 21];
-    match appine_hal::unlink_at(objects_dir.as_raw_fd(), object_name(ino, &mut name)) {
+    match kazeterm_hal::unlink_at(objects_dir.as_raw_fd(), object_name(ino, &mut name)) {
         Err(e) if e != libc::ENOENT => Err(object_err(ino, e)),
         _ => Ok(()),
     }
@@ -2972,19 +2972,19 @@ pub(crate) fn copy_object(from: &File, to: &File, len: u64) -> Result<(), Errno>
     let (i, o) = (from.as_raw_fd(), to.as_raw_fd());
     let mut pos = 0;
     while pos < len {
-        let data = match appine_hal::lseek(i, pos as i64, SEEK_DATA) {
+        let data = match kazeterm_hal::lseek(i, pos as i64, SEEK_DATA) {
             Ok(data) => data.min(len),
             Err(e) if e == Errno::ENXIO.0 => break,
             // A host that cannot tell has data everywhere
             Err(_) => pos,
         };
-        let hole = appine_hal::lseek(i, data as i64, SEEK_HOLE)
+        let hole = kazeterm_hal::lseek(i, data as i64, SEEK_HOLE)
             .unwrap_or(len)
             .min(len);
         let mut at = data;
         while at < hole {
             let chunk = (hole - at).min(1 << 30) as usize;
-            match appine_hal::copy_file(i, at, o, at, chunk).map_err(Errno)? {
+            match kazeterm_hal::copy_file(i, at, o, at, chunk).map_err(Errno)? {
                 0 => break,
                 n => at += n as u64,
             }
@@ -3053,7 +3053,7 @@ mod tests {
     }
 
     fn temp_store(name: &str) -> (Store, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("appine-store-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kazeterm-store-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         let mut s = Store::create(&dir).unwrap();
         // Deferred write transactions are committed only when the test commits them itself,
@@ -3100,7 +3100,7 @@ mod tests {
     #[test]
     fn cache_follows_own_and_other_processes_writes() {
         let (a, dir) = temp_store("cache");
-        // A second connection stands in for another Appine process
+        // A second connection stands in for another KazeTerm process
         let b = Store::open(&dir, &[]).unwrap();
         let names = |s: &Store| -> Vec<Vec<u8>> {
             s.readdir(ROOT)
@@ -3473,7 +3473,7 @@ mod tests {
 
     #[test]
     fn concurrent_connections_wait_for_each_other() {
-        // Several Appine processes using one store at once: writes wait for others' transactions
+        // Several KazeTerm processes using one store at once: writes wait for others' transactions
         // to end and do not fail
         let (s, dir) = temp_store("concurrent");
         let dirs: Vec<Ino> = (0..4)

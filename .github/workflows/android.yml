@@ -125,7 +125,7 @@ jobs:
       - name: Clippy for Android
         env:
           CARGO_TARGET_DIR: target/android
-        run: cargo ndk -t arm64-v8a --platform 30 clippy --release -p appine-android -p appine-kernel -- -D warnings
+        run: cargo ndk -t arm64-v8a --platform 30 clippy --release -p kazeterm-android -p kazeterm-kernel -- -D warnings
 
       - name: Prepare release signing key
         if: inputs.build == 'release'
@@ -133,18 +133,18 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
           set -eu
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/appine-release.p12"
-          chmod 600 "$RUNNER_TEMP/appine-release.p12"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kazeterm-release.p12"
+          chmod 600 "$RUNNER_TEMP/kazeterm-release.p12"
 
       # The instrumentation tests that run on an emulator (app/src/androidTest) need KVM, so they
       # run locally
       - name: Build and lint
         working-directory: android
         env:
-          APPINE_RELEASE_STORE_FILE: ${{ runner.temp }}/appine-release.p12
-          APPINE_RELEASE_STORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          APPINE_RELEASE_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          APPINE_RELEASE_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          KAZETERM_RELEASE_STORE_FILE: ${{ runner.temp }}/kazeterm-release.p12
+          KAZETERM_RELEASE_STORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          KAZETERM_RELEASE_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KAZETERM_RELEASE_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           if [ "${{ inputs.build }}" = "release" ]; then
             ./gradlew assembleRelease lintDebug --console=plain
@@ -155,17 +155,17 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: inputs.build != 'release'
         with:
-          name: appine-debug-apk
+          name: kazeterm-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
       - uses: actions/upload-artifact@v7
         if: inputs.build == 'release'
         with:
-          name: appine-release-apk
+          name: kazeterm-release-apk
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/mapping/release/mapping.txt
 
       - name: Remove signing key
         if: always() && inputs.build == 'release'
-        run: rm -f "$RUNNER_TEMP/appine-release.p12"
+        run: rm -f "$RUNNER_TEMP/kazeterm-release.p12"

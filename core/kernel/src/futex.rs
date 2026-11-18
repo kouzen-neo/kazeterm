@@ -16,8 +16,8 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use appine_engine::prot;
-use appine_hal::Event;
+use kazeterm_engine::prot;
+use kazeterm_hal::Event;
 
 use crate::kernel::{Shared, Tid};
 use crate::mm::Mm;
@@ -384,7 +384,7 @@ mod tests {
     fn signaled(e: &Event) -> bool {
         crate::kernel::flush_signals();
         let mut p = [(e.fd(), 1, 0)];
-        appine_hal::poll(&mut p, Some(std::time::Duration::ZERO)).unwrap();
+        kazeterm_hal::poll(&mut p, Some(std::time::Duration::ZERO)).unwrap();
         p[0].2 & 1 != 0
     }
 

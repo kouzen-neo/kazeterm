@@ -2,13 +2,13 @@
 //! outputs must be identical byte for byte.
 //!
 //! Only very small round counts are used here, to check correctness; for timing comparisons see
-//! `appine-bench`. Needs a Linux aarch64 host.
+//! `kazeterm-bench`. Needs a Linux aarch64 host.
 #![cfg(all(target_os = "linux", target_arch = "aarch64"))]
 
 use std::path::Path;
 use std::process::{Command, Output};
 
-use appine_bench::{PROGRAMS, build};
+use kazeterm_bench::{PROGRAMS, build};
 
 #[test]
 fn benchmarks_agree_across_tiers() {
@@ -22,7 +22,7 @@ fn benchmarks_agree_across_tiers() {
             &format!("{} (native)", program.name),
         );
         for tier in ["0", "1"] {
-            let output = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+            let output = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
                 .args(["--tier", tier])
                 .arg(&exe)
                 .arg(&rounds)

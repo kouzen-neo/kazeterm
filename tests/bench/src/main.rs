@@ -2,8 +2,8 @@
 //! compares the times (design doc §14).
 //!
 //! ```text
-//! cargo build --release -p appine-run -p appine-bench
-//! target/release/appine-bench [--runs N] [--quick] [--skip-tier0] [--only NAME] [--stats]
+//! cargo build --release -p kazeterm-run -p kazeterm-bench
+//! target/release/kazeterm-bench [--runs N] [--quick] [--skip-tier0] [--only NAME] [--stats]
 //! ```
 //!
 //! Needs a Linux aarch64 host: the benchmark programs must run natively. Each way takes the
@@ -14,10 +14,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant};
 
-use appine_bench::{PROGRAMS, Program, build, host_cpu};
+use kazeterm_bench::{PROGRAMS, Program, build, host_cpu};
 
 const USAGE: &str =
-    "usage: appine-bench [--runs N] [--quick] [--skip-tier0] [--only NAME] [--stats]";
+    "usage: kazeterm-bench [--runs N] [--quick] [--skip-tier0] [--only NAME] [--stats]";
 
 struct Options {
     runs: usize,
@@ -36,24 +36,24 @@ fn main() -> ExitCode {
         }
     };
     if !cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-        eprintln!("appine-bench: needs a Linux aarch64 host");
+        eprintln!("kazeterm-bench: needs a Linux aarch64 host");
         return ExitCode::from(2);
     }
     let exe_dir: PathBuf = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(Path::to_path_buf))
         .unwrap_or_default();
-    let appine_run = exe_dir.join("appine-run");
-    if !appine_run.exists() {
+    let kazeterm_run = exe_dir.join("kazeterm-run");
+    if !kazeterm_run.exists() {
         eprintln!(
-            "appine-bench: {} not found; build it first:\n  cargo build --release -p appine-run -p appine-bench",
-            appine_run.display()
+            "kazeterm-bench: {} not found; build it first:\n  cargo build --release -p kazeterm-run -p kazeterm-bench",
+            kazeterm_run.display()
         );
         return ExitCode::from(2);
     }
     let out_dir = exe_dir.join("bench-programs");
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
-        eprintln!("appine-bench: {}: {e}", out_dir.display());
+        eprintln!("kazeterm-bench: {}: {e}", out_dir.display());
         return ExitCode::FAILURE;
     }
 
@@ -68,11 +68,11 @@ fn main() -> ExitCode {
             continue;
         }
         let result =
-            build(program, &out_dir).and_then(|exe| run_program(program, &exe, &appine_run, &o));
+            build(program, &out_dir).and_then(|exe| run_program(program, &exe, &kazeterm_run, &o));
         let (native, tier0, tier1) = match result {
             Ok(r) => r,
             Err(msg) => {
-                eprintln!("appine-bench: {msg}");
+                eprintln!("kazeterm-bench: {msg}");
                 return ExitCode::FAILURE;
             }
         };
@@ -151,7 +151,7 @@ fn parse_options() -> Result<Options, String> {
 fn run_program(
     program: &Program,
     exe: &Path,
-    appine_run: &Path,
+    kazeterm_run: &Path,
     o: &Options,
 ) -> Result<(Duration, Option<Duration>, Duration), String> {
     let rounds = if o.quick {
@@ -164,7 +164,7 @@ fn run_program(
     let tier0 = if o.skip_tier0 {
         None
     } else {
-        let (t, out) = measure(&os(&[&appine_run, &"--tier", &"0", &exe, &rounds]), 1)?;
+        let (t, out) = measure(&os(&[&kazeterm_run, &"--tier", &"0", &exe, &rounds]), 1)?;
         if out != expected {
             return Err(format!(
                 "{}: tier 0 output differs from native",
@@ -173,7 +173,7 @@ fn run_program(
         }
         Some(t)
     };
-    let (tier1, out) = measure(&os(&[&appine_run, &"--tier", &"1", &exe, &rounds]), o.runs)?;
+    let (tier1, out) = measure(&os(&[&kazeterm_run, &"--tier", &"1", &exe, &rounds]), o.runs)?;
     if out != expected {
         return Err(format!(
             "{}: tier 1 output differs from native",
@@ -181,7 +181,7 @@ fn run_program(
         ));
     }
     if o.stats {
-        let out = Command::new(appine_run)
+        let out = Command::new(kazeterm_run)
             .args(["--tier", "1", "--stats"])
             .arg(exe)
             .arg(&rounds)

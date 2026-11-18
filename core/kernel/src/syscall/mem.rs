@@ -2,7 +2,7 @@
 
 use std::os::fd::AsRawFd;
 
-use appine_engine::{PAGE_SIZE, prot};
+use kazeterm_engine::{PAGE_SIZE, prot};
 
 use super::SysResult;
 use crate::cred::cap;
@@ -363,7 +363,7 @@ fn reread(cx: &mut Cx<'_>, rereads: Vec<crate::mm::Reread>) -> Result<(), Errno>
         {
             let mut at = 0;
             while at < buf.len() {
-                match appine_hal::pread(f.as_raw_fd(), &mut buf[at..], r.offset + at as u64) {
+                match kazeterm_hal::pread(f.as_raw_fd(), &mut buf[at..], r.offset + at as u64) {
                     Ok(0) | Err(_) => break,
                     Ok(n) => at += n,
                 }
@@ -593,7 +593,7 @@ pub(super) fn msync(cx: &mut Cx<'_>, addr: u64, len: u64, flags: u32) -> SysResu
             cx.unlocked(move || {
                 ranges
                     .into_iter()
-                    .try_for_each(|(a, n)| match appine_hal::msync(a, n) {
+                    .try_for_each(|(a, n)| match kazeterm_hal::msync(a, n) {
                         Err(libc::ENOMEM) => Ok(()),
                         r => r,
                     })

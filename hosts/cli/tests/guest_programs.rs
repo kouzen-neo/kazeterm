@@ -1,10 +1,10 @@
 //! End-to-end tests: tests/guest/*.S are assembled into static ELFs with the host `cc`, and
 //! tests/guest/*.c are compiled into programs statically linked with musl by `musl-gcc`, then they
-//! are run by appine-run. Each test case runs under Tier 0 and under Tier 1 separately, and the
+//! are run by kazeterm-run. Each test case runs under Tier 0 and under Tier 1 separately, and the
 //! results must be the same.
 //!
 //! Without musl-gcc (Debian/Ubuntu's musl-tools) the C programs are skipped; with
-//! `APPINE_REQUIRE_MUSL=1` (as CI sets) that becomes a failure.
+//! `KAZETERM_REQUIRE_MUSL=1` (as CI sets) that becomes a failure.
 //!
 //! Producing Linux aarch64 ELFs needs a Linux arm64 host (design doc §13.3); on other hosts the
 //! whole file is not compiled.
@@ -18,7 +18,7 @@ const TIERS: [&str; 2] = ["0", "1"];
 #[test]
 fn hello_world() {
     for (tier, out) in run("hello", &[]) {
-        assert_eq!(stdout(&out), "Hello from appine!\n", "tier {tier}");
+        assert_eq!(stdout(&out), "Hello from kazeterm!\n", "tier {tier}");
         assert_eq!(out.status.code(), Some(0), "tier {tier}: {}", stderr(&out));
     }
 }
@@ -27,8 +27,8 @@ fn hello_world() {
 fn options_without_a_value_refuse_one() {
     // `--pty=0` used to turn the PTY on: an inline value on a flag is a usage error (2), while an
     // option with a value still takes it inline (a missing program is 127)
-    let appine_run = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_appine-run"))
+    let kazeterm_run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(args)
             .output()
             .unwrap()
@@ -44,10 +44,10 @@ fn options_without_a_value_refuse_one() {
         "--help=1",
         "--version=1",
     ] {
-        assert_eq!(appine_run(&[flag, "/nonexistent"]), Some(2), "{flag}");
+        assert_eq!(kazeterm_run(&[flag, "/nonexistent"]), Some(2), "{flag}");
     }
-    assert_eq!(appine_run(&["--tier=7", "/nonexistent"]), Some(2));
-    assert_eq!(appine_run(&["--tier=0", "/nonexistent"]), Some(127));
+    assert_eq!(kazeterm_run(&["--tier=7", "/nonexistent"]), Some(2));
+    assert_eq!(kazeterm_run(&["--tier=0", "/nonexistent"]), Some(127));
 }
 
 #[test]
@@ -67,8 +67,8 @@ fn fib_uses_stack_and_calls() {
 
 #[test]
 fn argv_reaches_guest() {
-    for (tier, out) in run("echo", &["hello", "appine", "world"]) {
-        assert_eq!(stdout(&out), "hello appine world\n", "tier {tier}");
+    for (tier, out) in run("echo", &["hello", "kazeterm", "world"]) {
+        assert_eq!(stdout(&out), "hello kazeterm world\n", "tier {tier}");
         assert_eq!(out.status.code(), Some(0), "tier {tier}: {}", stderr(&out));
     }
 }
@@ -118,11 +118,11 @@ fn threads_signals_and_fork() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -142,17 +142,17 @@ fn threads_signals_and_fork() {
 fn thread_churn_keeps_the_host_heap_intact() {
     // 4 processes, each with 4 threads that keep creating and joining short-lived threads for 5
     // seconds: an exiting thread dropping an Rc weak reference outside the BKL corrupts the host
-    // heap, and Appine exits with SIGABRT (tests/guest/churn.c)
+    // heap, and KazeTerm exits with SIGABRT (tests/guest/churn.c)
     let Some(program) = build_c_guest("churn") else {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .arg("5")
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert!(
             out.status.success() && stdout(&out).ends_with("all ok\n"),
             "tier {tier}: {:?} {}{}",
@@ -171,11 +171,11 @@ fn sockets_polling_and_timers() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -204,13 +204,13 @@ fn bugs_kill_only_the_guest_process() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
-            .env("APPINE_TEST_HOOKS", "1")
-            .env("APPINE_ON_BUG", "kill")
+            .env("KAZETERM_TEST_HOOKS", "1")
+            .env("KAZETERM_ON_BUG", "kill")
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -254,12 +254,12 @@ fn tcp_filters_refused_by_the_host_are_kept() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
-            .env("APPINE_TEST_HOOKS", "1")
+            .env("KAZETERM_TEST_HOOKS", "1")
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -287,12 +287,12 @@ fn clock_jumps_wake_wall_clock_waiters() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
-            .env("APPINE_TEST_HOOKS", "1")
+            .env("KAZETERM_TEST_HOOKS", "1")
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -314,8 +314,8 @@ fn host_calls_survive_kernel_bugs() {
     // that call fails, a call on a console also hangs up that console, and the Machine stays usable
     // afterwards. A spawn whose thread cannot start fails without leaving its process or the
     // console's session behind
-    use appine_kernel::errno::Errno;
-    use appine_kernel::{ExitStatus, KillReason, Machine, MachineOptions, RunError, Stdio, Tier};
+    use kazeterm_kernel::errno::Errno;
+    use kazeterm_kernel::{ExitStatus, KillReason, Machine, MachineOptions, RunError, Stdio, Tier};
     use std::os::unix::ffi::OsStrExt;
     if !cfg!(debug_assertions) {
         return;
@@ -323,13 +323,13 @@ fn host_calls_survive_kernel_bugs() {
     let Some(program) = build_c_guest("bugs") else {
         return;
     };
-    // The kernel layer reads APPINE_ON_BUG only when it first hits a bug: rerun this test case in
-    // a child process that has it and APPINE_TEST_HOOKS set
-    if std::env::var_os("APPINE_TEST_HOOKS").is_none() {
+    // The kernel layer reads KAZETERM_ON_BUG only when it first hits a bug: rerun this test case in
+    // a child process that has it and KAZETERM_TEST_HOOKS set
+    if std::env::var_os("KAZETERM_TEST_HOOKS").is_none() {
         let out = Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "host_calls_survive_kernel_bugs", "--nocapture"])
-            .env("APPINE_TEST_HOOKS", "1")
-            .env("APPINE_ON_BUG", "kill")
+            .env("KAZETERM_TEST_HOOKS", "1")
+            .env("KAZETERM_ON_BUG", "kill")
             .output()
             .expect("failed to rerun the test");
         assert!(
@@ -402,7 +402,7 @@ fn host_calls_survive_kernel_bugs() {
         let (out, end) = read_all(&machine, id);
         assert_eq!(
             (out.as_str(), end),
-            ("Hello from appine!\r\n", Ok(())),
+            ("Hello from kazeterm!\r\n", Ok(())),
             "{tier:?}"
         );
         assert_eq!(machine.wait(pid), ExitStatus::Exited(0), "{tier:?}");
@@ -429,7 +429,7 @@ fn host_calls_survive_kernel_bugs() {
         let (out, end) = read_all(&machine, id);
         assert_eq!(
             (out.as_str(), end),
-            ("Hello from appine!\r\n", Ok(())),
+            ("Hello from kazeterm!\r\n", Ok(())),
             "{tier:?}"
         );
         assert_eq!(machine.wait(pid), ExitStatus::Exited(0), "{tier:?}");
@@ -521,12 +521,12 @@ fn bkl_watchdog_reports_long_holds() {
     let Some(program) = build_c_guest("stall") else {
         return;
     };
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
-        .env("APPINE_TEST_HOOKS", "1")
-        .env("APPINE_BKL_WATCHDOG", "1")
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
+        .env("KAZETERM_TEST_HOOKS", "1")
+        .env("KAZETERM_BKL_WATCHDOG", "1")
         .arg(&program)
         .output()
-        .expect("failed to run appine-run");
+        .expect("failed to run kazeterm-run");
     let (out, err) = (stdout(&out), stderr(&out));
     assert!(out.ends_with("all ok\n"), "{out}{err}");
     let report = err
@@ -534,18 +534,18 @@ fn bkl_watchdog_reports_long_holds() {
         .find(|l| l.contains(" has held the BKL for "))
         .unwrap_or_else(|| panic!("no report on stderr: {err}"));
     assert!(
-        report.starts_with("appine: pid ")
+        report.starts_with("kazeterm: pid ")
             && report.contains(" (guest-stall), thread ")
             && report.contains(" in syscall 43409 at guest pc 0x")
             && report.contains("(host thread guest-"),
         "{report}"
     );
-    // As dmesg would show it: "<3>[    1.234567] appine: pid 2 (guest-stall), thread 2 held the
+    // As dmesg would show it: "<3>[    1.234567] kazeterm: pid 2 (guest-stall), thread 2 held the
     // BKL for 2 s in syscall 43409 at guest pc 0x..."
     let record = out.lines().next().unwrap();
     assert!(
         record.starts_with("<3>[")
-            && record.contains("] appine: pid ")
+            && record.contains("] kazeterm: pid ")
             && record.contains(" (guest-stall), thread ")
             && record.contains(" s in syscall 43409 at guest pc 0x"),
         "{record}"
@@ -566,13 +566,13 @@ fn bkl_watchdog_reports_a_hold_right_after_another() {
     let Some(program) = build_c_guest("stall") else {
         return;
     };
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
-        .env("APPINE_TEST_HOOKS", "1")
-        .env("APPINE_BKL_WATCHDOG", "1")
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
+        .env("KAZETERM_TEST_HOOKS", "1")
+        .env("KAZETERM_BKL_WATCHDOG", "1")
         .arg(&program)
         .arg("twice")
         .output()
-        .expect("failed to run appine-run");
+        .expect("failed to run kazeterm-run");
     let (out, err) = (stdout(&out), stderr(&out));
     assert!(out.ends_with("all ok\n"), "{out}{err}");
     let reports: Vec<&str> = err
@@ -602,7 +602,7 @@ fn bkl_watchdog_reports_a_hold_right_after_another() {
 fn bkl_stall_reaches_the_host() {
     // Machine::stall answers without the BKL while a hold goes on, then carries its kernel log
     // record once it ended
-    use appine_kernel::{ExitStatus, Machine, MachineOptions, Stdio};
+    use kazeterm_kernel::{ExitStatus, Machine, MachineOptions, Stdio};
     use std::os::unix::ffi::OsStrExt;
     use std::time::{Duration, Instant};
     if !cfg!(debug_assertions) {
@@ -611,13 +611,13 @@ fn bkl_stall_reaches_the_host() {
     let Some(program) = build_c_guest("stall") else {
         return;
     };
-    // The kernel reads APPINE_BKL_WATCHDOG when it starts: rerun this test case in a child process
-    // that has it and APPINE_TEST_HOOKS set
-    if std::env::var_os("APPINE_TEST_HOOKS").is_none() {
+    // The kernel reads KAZETERM_BKL_WATCHDOG when it starts: rerun this test case in a child process
+    // that has it and KAZETERM_TEST_HOOKS set
+    if std::env::var_os("KAZETERM_TEST_HOOKS").is_none() {
         let out = Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "bkl_stall_reaches_the_host", "--nocapture"])
-            .env("APPINE_TEST_HOOKS", "1")
-            .env("APPINE_BKL_WATCHDOG", "1")
+            .env("KAZETERM_TEST_HOOKS", "1")
+            .env("KAZETERM_BKL_WATCHDOG", "1")
             .output()
             .expect("failed to rerun the test");
         assert!(
@@ -638,7 +638,7 @@ fn bkl_stall_reaches_the_host() {
             Stdio::Host,
         )
         .unwrap();
-    let wait_for = |what: &str, done: &dyn Fn(&appine_kernel::Stall) -> bool| {
+    let wait_for = |what: &str, done: &dyn Fn(&kazeterm_kernel::Stall) -> bool| {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             if let Some(s) = machine.stall().filter(|s| done(s)) {
@@ -683,11 +683,11 @@ fn memory_limit_and_thread_limits() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier, "--memory-limit", "256M"])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -717,11 +717,11 @@ fn main_stack_grows_up_to_rlimit_stack() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -748,13 +748,13 @@ fn shootdowns_wait_only_for_threads_they_kicked() {
         return;
     };
     for tier in TIERS {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         let deadline = Instant::now() + Duration::from_secs(60);
         while child.try_wait().unwrap().is_none() {
             if Instant::now() >= deadline {
@@ -778,11 +778,11 @@ fn mprotect_never_makes_copy_on_write_pages_writable() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(stdout(&out), "done\n", "tier {tier}: {}", stderr(&out));
     }
 }
@@ -797,11 +797,11 @@ fn ipc_timers_credentials_and_scheduling() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -826,11 +826,11 @@ fn self_modifying_code() {
         return;
     };
     for tier in TIERS {
-        let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier])
             .arg(&program)
             .output()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -861,14 +861,14 @@ fn readv_on_host_stdin_returns_what_has_arrived() {
         return;
     };
     for tier in TIERS {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
             .args(["--tier", tier, "--no-pty"])
             .arg(&program)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("failed to run appine-run");
+            .expect("failed to run kazeterm-run");
         let (lines, answers) = mpsc::channel();
         let stdout = child.stdout.take().unwrap();
         std::thread::spawn(move || {
@@ -897,7 +897,7 @@ fn readv_on_host_stdin_returns_what_has_arrived() {
 
 #[test]
 fn missing_program_exits_127() {
-    let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+    let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
         .arg("/nonexistent/program")
         .output()
         .unwrap();
@@ -910,12 +910,12 @@ fn run(name: &str, args: &[&str]) -> Vec<(&'static str, Output)> {
     TIERS
         .iter()
         .map(|&tier| {
-            let out = Command::new(env!("CARGO_BIN_EXE_appine-run"))
+            let out = Command::new(env!("CARGO_BIN_EXE_kazeterm-run"))
                 .args(["--tier", tier])
                 .arg(&program)
                 .args(args)
                 .output()
-                .expect("failed to run appine-run");
+                .expect("failed to run kazeterm-run");
             (tier, out)
         })
         .collect()
@@ -959,7 +959,7 @@ fn build_c_guest(name: &str) -> Option<PathBuf> {
         .status();
     let Ok(status) = status else {
         assert!(
-            std::env::var_os("APPINE_REQUIRE_MUSL").is_none_or(|v| v != "1"),
+            std::env::var_os("KAZETERM_REQUIRE_MUSL").is_none_or(|v| v != "1"),
             "musl-gcc not found; install musl-tools"
         );
         eprintln!("skipping {name}: musl-gcc not found");

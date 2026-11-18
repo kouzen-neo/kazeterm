@@ -52,7 +52,7 @@ M9 计划里的许可证审计（风险 R3）。做之前用户提出想把 appi
 ## 推迟项
 
 - 发布之前要做的（都是 GPLv3/AGPLv3、GPLv2 的义务，记在这里免得漏掉）：
-  - 仓库现在是私有的。随 APK 要提供整个 App 的完整源码（包括静态链接的 crate：可以在发布时附上 `cargo vendor` 的结果），所以发布之前要公开仓库，或者附上提供源码的书面承诺。开源许可页里写的源码地址是 `https://github.com/mthli/appine`。→ `scripts/release-sources` 生成源码和 `cargo vendor` 的包（[发布时放出的源码](200-release-sources.md)）；仓库仍是私有的，公开还是附书面承诺由用户定
+  - 仓库现在是私有的。随 APK 要提供整个 App 的完整源码（包括静态链接的 crate：可以在发布时附上 `cargo vendor` 的结果），所以发布之前要公开仓库，或者附上提供源码的书面承诺。开源许可页里写的源码地址是 `https://github.com/kazeterm/appine`。→ `scripts/release-sources` 生成源码和 `cargo vendor` 的包（[发布时放出的源码](200-release-sources.md)）；仓库仍是私有的，公开还是附书面承诺由用户定
   - APK 里 Alpine minirootfs 的 GPL 包（busybox、apk-tools、alpine-baselayout、scanelf、musl-utils）：要把它们在各自 aports 提交下的目录和上游源码打包，随 appine 的源码一起放出（开源许可页里已经这样写了）。下载、打包的脚本还没写：APKBUILD 的 `source=` 里有变量，直接执行 APKBUILD 又等于运行下载来的代码，要另想办法（比如用 Alpine 自己的 `abuild fetch` 在容器里做）。→ `scripts/release-sources` 做了（[发布时放出的源码](200-release-sources.md)）：不执行 APKBUILD，上游源码按 sha512sums 里的文件名从 Alpine 的 distfiles 镜像下载、校验
 - 源文件没有加 SPDX 的许可证标识，只靠 `LICENSE` 和 `Cargo.toml`。
 - 设置里下载的 Debian 由用户从 Docker 官方镜像的来源下载，不经过 appine 分发，没有列进开源许可页。

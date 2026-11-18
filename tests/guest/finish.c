@@ -1,8 +1,8 @@
 /*
  * Each step of process finish (finish_group) catches kernel-layer bugs on its own (design doc §12
  * item 5): when step n goes wrong, only what that step does is lost, and the later steps are done
- * all the same. Bugs are simulated with the test hooks of debug builds; appine-run must set
- * APPINE_TEST_HOOKS=1 and APPINE_ON_BUG=kill; a controlling terminal is needed, so run it copied
+ * all the same. Bugs are simulated with the test hooks of debug builds; kazeterm-run must set
+ * KAZETERM_TEST_HOOKS=1 and KAZETERM_ON_BUG=kill; a controlling terminal is needed, so run it copied
  * into the store.
  *
  * The finishing process v is a session leader with a controlling terminal, and before exiting it

@@ -463,7 +463,7 @@ const NS_GET_OWNER_UID: u32 = 0xb704;
 /// owner and the parent namespace, giving a new fd (with `FD_CLOEXEC`); `NS_GET_NSTYPE` is its
 /// `CLONE_NEW*`; `NS_GET_OWNER_UID` is the user ID of the user namespace's creator in the caller's
 /// user namespace. Anything else is ENOTTY (so are `NS_GET_MNTNS_ID` and the others added in 6.9:
-/// Appine reports kernel 6.1). `mnt` is the mount the file was reached through, and `kind` is its
+/// KazeTerm reports kernel 6.1). `mnt` is the mount the file was reached through, and `kind` is its
 /// kind.
 pub(super) fn ioctl(
     cx: &mut Cx<'_>,

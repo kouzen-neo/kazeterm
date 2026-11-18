@@ -162,7 +162,7 @@ print("size", os.fstat(fd).st_size)
 usage("full")
 af = os.open(D + "/b", os.O_WRONLY | os.O_APPEND)
 print("pwrite inside", err(os.pwrite, fd, b"z" * 100, 0), "append to other", err(os.write, af, b"q" * 5000))
-# A deleted file that is still open is freed on Linux only when it is closed, in Appine as soon
+# A deleted file that is still open is freed on Linux only when it is closed, in KazeTerm as soon
 # as its last name is removed, so this is not compared
 os.close(af)
 print("fallocate", err(os.posix_fallocate, fd, 0, 200000))

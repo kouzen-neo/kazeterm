@@ -400,7 +400,7 @@ C
 gcc -O2 -o diff4 diff4.c
 ./diff4
 
-# Newly mapped anonymous memory must be zero: Appine keeps torn-down host memory after discarding
+# Newly mapped anonymous memory must be zero: KazeTerm keeps torn-down host memory after discarding
 # its contents, and reuses it directly for the next request of the same size
 # (docs/rounds/109-spawn-mmap-bkl.md). Several threads and child processes repeatedly map, check,
 # fill and tear down blocks of a few fixed sizes
@@ -456,7 +456,7 @@ gcc -O2 -o diff5 diff5.c -pthread
 # Dot product instructions (ASIMDDP): the host sometimes advertises them, and HWCAP, the DP field
 # of ID_AA64ISAR0_EL1 and asimddp in /proc/cpuinfo agree; the vector and by-element forms of SDOT
 # and UDOT, and at -O3 the compiler vectorizing an int8 dot product loop into SDOT. The whole file
-# adds only +dotprod; Appine does not advertise the other v8.2 instructions (RDM and so on)
+# adds only +dotprod; KazeTerm does not advertise the other v8.2 instructions (RDM and so on)
 cat > dotprod.c <<'C'
 #include <arm_neon.h>
 #include <stdint.h>
@@ -642,7 +642,7 @@ int main(void)
     unsigned long hw = getauxval(AT_HWCAP);
     uint64_t isar1;
     __asm__ volatile("mrs %0, id_aa64isar1_el1" : "=r"(isar1));
-    /* When the host also has LRCPC2 (LDAPUR and so on) Linux reports 2; Appine implements only
+    /* When the host also has LRCPC2 (LDAPUR and so on) Linux reports 2; KazeTerm implements only
      * LRCPC and reports 1 */
     printf("lrcpc %d, LRCPC field at least 1: %d\n", !!(hw & HWCAP_LRCPC), (int)(isar1 >> 20 & 15) >= 1);
     if (!(hw & HWCAP_LRCPC))
@@ -712,7 +712,7 @@ int main(void)
     unsigned long hw = getauxval(AT_HWCAP);
     uint64_t isar1;
     __asm__ volatile("mrs %0, id_aa64isar1_el1" : "=r"(isar1));
-    /* When the host also has LRCPC3 Linux reports 3, Appine 2 */
+    /* When the host also has LRCPC3 Linux reports 3, KazeTerm 2 */
     printf("ilrcpc %d, LRCPC field at least 2: %d\n", !!(hw & HWCAP_ILRCPC), (int)(isar1 >> 20 & 15) >= 2);
     if (!(hw & HWCAP_ILRCPC))
         return 0;

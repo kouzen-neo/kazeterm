@@ -1,7 +1,7 @@
 // M0 exit criterion: a hand-written static aarch64 program that uses only write + exit.
     .section .rodata
 msg:
-    .ascii  "Hello from appine!\n"
+    .ascii  "Hello from kazeterm!\n"
     .equ    msg_len, . - msg
 
     .text

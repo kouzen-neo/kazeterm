@@ -395,7 +395,7 @@ pub(crate) struct Epoll {
     edge_watched: Cell<bool>,
     /// Threads waiting in epoll_wait: epoll_ctl wakes them directly when it changes the interests
     /// (threads waiting only on exclusive interests are not on the FILE channel).
-    waiters: Vec<Arc<appine_hal::Event>>,
+    waiters: Vec<Arc<kazeterm_hal::Event>>,
 }
 
 /// Level-triggered host fds in cursor order and the events already known inside the guest kernel.
@@ -415,11 +415,11 @@ impl HostPollBatch {
         if self.fds.is_empty() {
             return;
         }
-        if appine_hal::poll(&mut self.fds, Some(Duration::ZERO)).is_err() {
+        if kazeterm_hal::poll(&mut self.fds, Some(Duration::ZERO)).is_err() {
             // Interests can share a host fd. If the batch exceeds the host's RLIMIT_NOFILE
             // (or the poll was interrupted), one failed call must not hide other ready fds.
             for fd in &mut self.fds {
-                let _ = appine_hal::poll(std::slice::from_mut(fd), Some(Duration::ZERO));
+                let _ = kazeterm_hal::poll(std::slice::from_mut(fd), Some(Duration::ZERO));
             }
         }
         for ((index, known), (_, wanted, revents)) in
@@ -1085,7 +1085,7 @@ fn claimed(int: &Interest, f: &OpenFile, owner: usize) -> bool {
 pub(crate) struct ExGate {
     file: Weak<RefCell<OpenFile>>,
     /// Waiting threads, earliest first.
-    sleepers: Vec<Arc<appine_hal::Event>>,
+    sleepers: Vec<Arc<kazeterm_hal::Event>>,
     /// The file's data generation at the last check ([`edge`]).
     last: [u64; 4],
 }
@@ -1093,7 +1093,7 @@ pub(crate) struct ExGate {
 impl ExGate {
     /// Looks at file `f`: when the data generation has changed, the file is ready and this edge
     /// has not been reported by any epoll, takes out the first waiter in the queue (to be woken).
-    fn next_waiter(&mut self, f: &OpenFile) -> Option<Arc<appine_hal::Event>> {
+    fn next_waiter(&mut self, f: &OpenFile) -> Option<Arc<kazeterm_hal::Event>> {
         let now = edge(f);
         if now == self.last || self.sleepers.is_empty() {
             return None;
@@ -1114,7 +1114,7 @@ impl ExGate {
 
 /// Before waiting: registers `event` on the exclusive gate of each of `files`. When a gate is
 /// new, wakes the timer thread so that it starts watching that file.
-fn gate_enter(cx: &mut Cx<'_>, files: &[FileRef], event: &Arc<appine_hal::Event>) {
+fn gate_enter(cx: &mut Cx<'_>, files: &[FileRef], event: &Arc<kazeterm_hal::Event>) {
     let mut created = false;
     for file in files {
         let k = cx.k();
@@ -1173,7 +1173,7 @@ pub(crate) fn check_exclusive(
 
 /// After waiting: removes `event` from the exclusive gates of `files` (a woken one has already
 /// been removed).
-fn gate_leave(cx: &mut Cx<'_>, files: &[FileRef], event: &Arc<appine_hal::Event>) {
+fn gate_leave(cx: &mut Cx<'_>, files: &[FileRef], event: &Arc<kazeterm_hal::Event>) {
     for g in cx.k().ex_gates.iter_mut() {
         if files.iter().any(|f| g.file.as_ptr() == Rc::as_ptr(f)) {
             g.sleepers.retain(|e| !Arc::ptr_eq(e, event));
@@ -1387,7 +1387,7 @@ fn poll_now(f: &OpenFile, wanted: i16, depth: u32) -> i16 {
             (edges.map_or(-1, HostEdges::fd), POLLIN, 0),
         ];
         let n = if edges.is_some() { 2 } else { 1 };
-        if appine_hal::poll(&mut p[..n], Some(Duration::ZERO)).is_ok() {
+        if kazeterm_hal::poll(&mut p[..n], Some(Duration::ZERO)).is_ok() {
             ev |= p[0].2;
             if let Some(e) = edges {
                 e.polled(p[1].2);
@@ -2077,7 +2077,7 @@ mod tests {
         }));
         let file = OpenFile::new(FileKind::EventFd(efd.clone()), oflags::O_RDWR);
         let sleepers: Vec<_> = (0..3)
-            .map(|_| Arc::new(appine_hal::Event::new().unwrap()))
+            .map(|_| Arc::new(kazeterm_hal::Event::new().unwrap()))
             .collect();
         let mut gate = ExGate {
             file: Rc::downgrade(&file),

@@ -196,7 +196,7 @@ procfs views of credentials (`kernel/procfs`); the cgroup device eBPF (`kernel/c
   with syscall/arch/address), TRACE (`PTRACE_EVENT_SECCOMP` stop and re-check, or `ENOSYS` without
   a tracer), USER_NOTIF, LOG, ALLOW, KILL_THREAD (or KILL_PROCESS when it is the last live
   thread), KILL_PROCESS and unknown actions (fatal `SIGSYS` with core dump). Logged actions go to
-  Appine's debug log only (stderr with `APPINE_LOG`); USER_NOTIF is never logged.
+  KazeTerm's debug log only (stderr with `KAZETERM_LOG`); USER_NOTIF is never logged.
 - User notifications: the waiting thread is woken by replies, ends on fatal signals, and returns
   `ERESTARTSYS` on other signals (unless `WAIT_KILLABLE_RECV` and already received, where a signal
   costs one spurious wakeup before blocking again). RECV (zeroed struct, blocks even when
@@ -224,7 +224,7 @@ procfs views of credentials (`kernel/procfs`); the cgroup device eBPF (`kernel/c
 
 - User namespaces and id maps (`kernel/ns`); `Stat` and modes (`kernel/store`); ptrace stops (`kernel/ptrace`),
   `signal::force`/`force_fatal` (`kernel/signal`); the vDSO stub check (`kernel/vdso`); fd tables; the kernel's
-  waits and wake objects; `appine_hal::fill_random` (notification ids); the debug log.
+  waits and wake objects; `kazeterm_hal::fill_random` (notification ids); the debug log.
 
 ## Invariants and gotchas
 
@@ -241,7 +241,7 @@ procfs views of credentials (`kernel/procfs`); the cgroup device eBPF (`kernel/c
 
 ## Confirmed bugs / technical debt
 
-- **seccomp logging is incomplete.** Logged actions reach only Appine's debug stderr (not the guest
+- **seccomp logging is incomplete.** Logged actions reach only KazeTerm's debug stderr (not the guest
   kernel log, where Linux's audit records appear without auditd), and USER_NOTIF is never logged
   although `SECCOMP_FILTER_FLAG_LOG` asks for it.
 - **`for_access` ignores `SECBIT_NO_SETUID_FIXUP`**, so access(2) answers differ for

@@ -947,10 +947,10 @@ fn memory<'a>(ctx: &'a [u8], stack: &'a [u8], addr: u64, size: usize) -> Option<
 fn helper(id: i32, env: &Env) -> u64 {
     match id {
         // CLOCK_MONOTONIC
-        5 => appine_hal::clock_gettime(1).map_or(0, |(s, ns)| s as u64 * 1_000_000_000 + ns as u64),
+        5 => kazeterm_hal::clock_gettime(1).map_or(0, |(s, ns)| s as u64 * 1_000_000_000 + ns as u64),
         7 => {
             let mut b = [0u8; 4];
-            let _ = appine_hal::fill_random(&mut b);
+            let _ = kazeterm_hal::fill_random(&mut b);
             u32::from_le_bytes(b) as u64
         }
         15 => (env.gid as u64) << 32 | env.uid as u64,

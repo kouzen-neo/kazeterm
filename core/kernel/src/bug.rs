@@ -18,7 +18,7 @@
 //!     ([`host_call`]): the call returns an error, and when the failing call is on a console, that
 //!     console is hung up.
 //! - The engine makes the host receive SIGSEGV, SIGBUS or SIGILL: the engine returns
-//!   [`Exit::HostFault`](appine_engine::Exit).
+//!   [`Exit::HostFault`](kazeterm_engine::Exit).
 //!
 //! In both cases the process (here the whole thread group) is ended with SIGSEGV, as Linux's oops
 //! ends the current task, and a report is written to the host's stderr (logcat on Android); the
@@ -28,7 +28,7 @@
 //!
 //! Debug builds still terminate the host process directly by default (abort on panic; host
 //! faults produce a core dump by the default action), for debugging on the spot during
-//! development; the environment variable `APPINE_ON_BUG=kill` or `abort` overrides the default.
+//! development; the environment variable `KAZETERM_ON_BUG=kill` or `abort` overrides the default.
 
 use std::fmt;
 use std::panic::AssertUnwindSafe;
@@ -38,7 +38,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 
 #[cfg(any(debug_assertions, feature = "test-hooks"))]
-use appine_engine::Cpu;
+use kazeterm_engine::Cpu;
 
 #[cfg(any(debug_assertions, feature = "test-hooks"))]
 use crate::errno::Errno;
@@ -119,7 +119,7 @@ pub(crate) fn catch<R>(f: impl FnOnce() -> R) -> Option<R> {
         Ok(r) => Some(r),
         Err(_) if contain() => None,
         Err(_) => {
-            eprintln!("appine: internal error, aborting");
+            eprintln!("kazeterm: internal error, aborting");
             std::process::abort()
         }
     }
@@ -128,7 +128,7 @@ pub(crate) fn catch<R>(f: impl FnOnce() -> R) -> Option<R> {
 /// Hitting a bug ends only the guest process, instead of terminating the host process.
 pub(crate) fn contain() -> bool {
     static CONTAIN: OnceLock<bool> = OnceLock::new();
-    *CONTAIN.get_or_init(|| match std::env::var("APPINE_ON_BUG").as_deref() {
+    *CONTAIN.get_or_init(|| match std::env::var("KAZETERM_ON_BUG").as_deref() {
         Ok("kill") => true,
         Ok("abort") => false,
         _ => !cfg!(debug_assertions),
@@ -185,7 +185,7 @@ const LOG_BEFORE: u64 = 10;
 pub(crate) fn kill(k: &Kernel, task: &Task, pc: u64, what: fmt::Arguments<'_>) {
     let comm = crate::pseudo::comm_str(Some(task), task.tgid);
     let report = format!(
-        "appine: internal error in pid {} ({comm}), thread {}, last guest pc {pc:#x}: {}; \
+        "kazeterm: internal error in pid {} ({comm}), thread {}, last guest pc {pc:#x}: {}; \
          killed the process with SIGSEGV",
         task.tgid,
         task.tid.get(),
@@ -207,7 +207,7 @@ pub(crate) fn kill_process(k: &Kernel, tgid: Tid, what: fmt::Arguments<'_>) {
     });
     let comm = crate::pseudo::comm_str(task.as_deref(), tgid);
     let report = format!(
-        "appine: internal error in pid {tgid} ({comm}): {}; killed the process with SIGSEGV",
+        "kazeterm: internal error in pid {tgid} ({comm}): {}; killed the process with SIGSEGV",
         with_panic(what),
     );
     eprintln!("{report}");
@@ -219,7 +219,7 @@ pub(crate) fn kill_process(k: &Kernel, tgid: Tid, what: fmt::Arguments<'_>) {
 
 /// Reports a bug that cannot be attributed to a guest process.
 pub(crate) fn report(what: fmt::Arguments<'_>) {
-    eprintln!("appine: internal error: {}", with_panic(what));
+    eprintln!("kazeterm: internal error: {}", with_panic(what));
 }
 
 /// `what` followed by the message and location of the panic this thread just had (if any).
@@ -396,7 +396,7 @@ pub(crate) fn host_refuses_tcp_filters() -> bool {
 }
 
 /// The test hook's syscall number, far outside Linux's numbers. Exists only in debug builds and in
-/// builds with the `test-hooks` feature (the Android debug app), and requires `APPINE_TEST_HOOKS=1`
+/// builds with the `test-hooks` feature (the Android debug app), and requires `KAZETERM_TEST_HOOKS=1`
 /// to be set. End-to-end tests use it to simulate kernel-layer and engine bugs.
 #[cfg(any(debug_assertions, feature = "test-hooks"))]
 pub(crate) const TEST_SYSCALL: u64 = 0xa991;
@@ -435,7 +435,7 @@ pub(crate) fn test_hook(
     what: u64,
     addr: u64,
 ) -> Result<u64, Errno> {
-    if std::env::var_os("APPINE_TEST_HOOKS").is_none_or(|v| v != "1") {
+    if std::env::var_os("KAZETERM_TEST_HOOKS").is_none_or(|v| v != "1") {
         return Err(Errno::ENOSYS);
     }
     let arm = |at: Trap, id: Tid| ARMED[at as usize].store(id, Ordering::SeqCst);
@@ -465,7 +465,7 @@ pub(crate) fn test_hook(
             impl Drop for MustHoldBkl {
                 fn drop(&mut self) {
                     if !crate::kernel::bkl_held() {
-                        eprintln!("appine: unwound out of Cx::unlocked without the BKL");
+                        eprintln!("kazeterm: unwound out of Cx::unlocked without the BKL");
                         std::process::abort();
                     }
                 }

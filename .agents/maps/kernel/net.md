@@ -162,7 +162,7 @@ virtual devices, nftables, namespace port registration and the inbound forwarder
   timeout; a signal `ERESTARTSYS`, or `EINTR` when there is a timeout, as AF_UNIX); the new socket
   inherits protocol, local port map (not the lease), namespace and its address, mark, the claimed
   original destination, the listener's `SO_RCVTIMEO`/`SO_SNDTIMEO`, recorded `IPV6_V6ONLY` and a
-  filter kept in Appine (the host's own filter is inherited on the host); the peer address is
+  filter kept in KazeTerm (the host's own filter is inherited on the host); the peer address is
   unmapped, translated and written back before the fd is filled (a non-NULL address with a NULL
   length `EFAULT`, as recvfrom's), so a fault drops the connection and gives the fd back.
 - shutdown: inet goes to the host, and `SHUT_RD`/`SHUT_RDWR` set `rd_shut`, also when the host
@@ -420,7 +420,7 @@ virtual devices, nftables, namespace port registration and the inbound forwarder
 
 ### Outbound
 
-- `appine_hal::net` (host sockets, `dns_query`, `interfaces`, `routes`, `source_for`, epoll
+- `kazeterm_hal::net` (host sockets, `dns_query`, `interfaces`, `routes`, `source_for`, epoll
   `Watch`); `kernel/netns` (`to_host`, `from_host`, `implicit_bind`, nat, filter, listener
   registration), `nft`, `netdev`, `forward`; `kernel/netlink` (netlink sockets dispatched there,
   `rtnl_watched`/`rtnl_notify` around changing ioctls, `message` and `attr` for route messages);
@@ -462,7 +462,7 @@ virtual devices, nftables, namespace port registration and the inbound forwarder
   `SO_BINDTODEVICE` names are resolved against host interfaces; `SO_ATTACH_BPF` passes a guest fd
   number to the host.
 - **A TCP filter the host refused filters nothing:** on a host with Linux 5d39580f68e6 the program
-  is only kept in Appine, so a drop-everything filter (dockerd's on each port it publishes, until
+  is only kept in KazeTerm, so a drop-everything filter (dockerd's on each port it publishes, until
   its DNAT rules are in place) still lets connections through and other programs see unfiltered
   data; a guest filter that the host accepts on an older kernel does filter.
 - **`ip route get` with `iif` is `EOPNOTSUPP`:** Linux 6.1 answers input-route lookups

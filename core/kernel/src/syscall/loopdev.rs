@@ -9,7 +9,7 @@
 //! size fixed when it is bound (`LOOP_SET_CAPACITY` takes the file's new length). There is no page
 //! cache in between, so the file and the device always agree, and no block layer above it: no
 //! partitions, discard or direct I/O are offered, and nothing can be mounted from a device, since
-//! Appine has no disk filesystems. What it is for: LTP acquires its test device this way (and runs
+//! KazeTerm has no disk filesystems. What it is for: LTP acquires its test device this way (and runs
 //! on tmpfs over it), `losetup` works, and tools such as mkfs can write images through it.
 
 use std::collections::BTreeMap;

@@ -7,7 +7,7 @@
 //! address. Hints such as PAC/BTI are deliberately implemented as NOPs (the engine map), unlike
 //! hardware, so they are not tested here either.
 
-use appine_engine::{hwcap, hwcap2};
+use kazeterm_engine::{hwcap, hwcap2};
 
 use crate::rng::Rng;
 
@@ -26,7 +26,7 @@ pub const HWCAP2_DCPODP: u64 = hwcap2::DCPODP << 32;
 /// The guest's `AT_HWCAP` and its `AT_HWCAP2` shifted left by 32, compared with
 /// [`Class::requires`].
 pub fn guest_caps() -> u64 {
-    appine_engine::guest_hwcap() | appine_engine::guest_hwcap2() << 32
+    kazeterm_engine::guest_hwcap() | kazeterm_engine::guest_hwcap2() << 32
 }
 
 /// Size of the data area (two pages), the same as on the native side.

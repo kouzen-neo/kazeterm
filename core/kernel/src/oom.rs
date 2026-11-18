@@ -32,7 +32,7 @@ use std::rc::{Rc, Weak};
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-use appine_engine::PAGE_SIZE;
+use kazeterm_engine::PAGE_SIZE;
 
 use crate::cell::RefCell;
 use crate::cgroup::ROOT;
@@ -120,7 +120,7 @@ pub(crate) struct Events {
 
 /// The default limit: half of the host's physical memory.
 pub(crate) fn default_limit() -> u64 {
-    match appine_hal::memory_info().0 {
+    match kazeterm_hal::memory_info().0 {
         0 => u64::MAX,
         total => total / 2,
     }
@@ -157,7 +157,7 @@ pub(crate) fn check(k: &mut Kernel, shared: &Shared) -> Option<Instant> {
                 }
             }
             None => {
-                eprintln!("appine: cannot measure the memory use, the memory limit is off");
+                eprintln!("kazeterm: cannot measure the memory use, the memory limit is off");
                 k.oom.limit = u64::MAX;
             }
         }
@@ -198,12 +198,12 @@ fn footprint() -> Option<u64> {
     app_memory().map(|u| u.anon + u.shmem + u.swap)
 }
 
-/// The app's memory usage, item by item ([`appine_hal::memory_usage`]). Pages Tier 1's code cache
+/// The app's memory usage, item by item ([`kazeterm_hal::memory_usage`]). Pages Tier 1's code cache
 /// has written in the writable view and that are not torn down yet ([`unmap_code_views`]) count
 /// twice in the host's RssShmem, so one count is subtracted.
-pub(crate) fn app_memory() -> Option<appine_hal::MemoryUsage> {
-    let mut u = appine_hal::memory_usage()?;
-    u.shmem = u.shmem.saturating_sub(appine_engine::written_code_bytes());
+pub(crate) fn app_memory() -> Option<kazeterm_hal::MemoryUsage> {
+    let mut u = kazeterm_hal::memory_usage()?;
+    u.shmem = u.shmem.saturating_sub(kazeterm_engine::written_code_bytes());
     Some(u)
 }
 
@@ -242,7 +242,7 @@ pub(crate) fn out_of_memory(k: &mut Kernel, (domain, used, limit): (u64, u64, u6
         let g = victim.borrow();
         let task = g.threads.first().and_then(|t| k.tasks.get(t));
         eprintln!(
-            "appine: out of memory: killed process {} ({}) rss:{}kB oom_score_adj:{}; \
+            "kazeterm: out of memory: killed process {} ({}) rss:{}kB oom_score_adj:{}; \
              {} memory {}kB, limit {}kB",
             g.tgid,
             crate::pseudo::comm_str(task.map(|t| &**t), g.tgid),
@@ -309,7 +309,7 @@ fn select(
     (domain, limit): (u64, u64),
 ) -> Option<(Rc<RefCell<ThreadGroup>>, u64)> {
     let total = if domain == ROOT {
-        appine_hal::memory_info().0.max(limit)
+        kazeterm_hal::memory_info().0.max(limit)
     } else {
         limit
     };
@@ -357,7 +357,7 @@ fn badness(k: &Kernel, g: &ThreadGroup, total: i64) -> Option<(i64, u64)> {
 /// scaled into 0 to 2000 (1000 + badness × 1000 / total, times 2/3), and 0 for a process never
 /// picked.
 pub(crate) fn proc_score(k: &Kernel, g: &ThreadGroup) -> u64 {
-    let total = (appine_hal::ram_and_swap() / PAGE_SIZE).max(1) as i64;
+    let total = (kazeterm_hal::ram_and_swap() / PAGE_SIZE).max(1) as i64;
     badness(k, g, total).map_or(0, |(b, _)| {
         ((1000 + b * 1000 / total) * 2 / 3).max(0) as u64
     })
@@ -469,7 +469,7 @@ fn waiting_for_victim(k: &Kernel, now: Instant) -> bool {
 
 /// Called each time the timer thread wakes up: while some guest thread is running, tears down the
 /// pages Tier 1's code cache has written in the writable view once a second, and once more after
-/// all threads are waiting, then stops ([`appine_engine::unmap_written_code`]). The code cache is
+/// all threads are waiting, then stops ([`kazeterm_engine::unmap_written_code`]). The code cache is
 /// mapped twice for W^X, and the host's RSS counts pages per mapping, so a page touched in both
 /// views counts twice: translations count double in the app usage measured above ([`app_memory`]
 /// subtracts the ones not torn down yet) and in the RSS the LMK looks at. Tearing down by time
@@ -487,7 +487,7 @@ pub(crate) fn unmap_code_views(k: &mut Kernel, shared: &Shared) -> Option<Instan
     // Woken by something else after stopping: no thread ran meanwhile, so there are no newly
     // written pages
     if !idle || k.oom.code_views.is_some() {
-        appine_engine::unmap_written_code();
+        kazeterm_engine::unmap_written_code();
     }
     if idle && shared.stop_checks(|| all_sleeping(k)) {
         k.oom.code_views = None;

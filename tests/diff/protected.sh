@@ -2,7 +2,7 @@
 # fs.protected_symlinks and fs.protected_hardlinks (Linux's may_follow_link and may_linkat) and
 # the ioctls of the random devices (round 185). On the native VM both sysctls are 1; in the
 # container /proc/sys is read-only, so writes are not compared (the sysctl test case of
-# rootfs_programs tests them in Appine). The random ioctls need CAP_SYS_ADMIN: adding to the
+# rootfs_programs tests them in KazeTerm). The random ioctls need CAP_SYS_ADMIN: adding to the
 # entropy pool and reseeding do the VM no harm
 cd /tmp
 rm -rf prot && mkdir prot && chmod 755 prot

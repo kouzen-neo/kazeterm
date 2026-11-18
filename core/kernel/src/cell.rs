@@ -9,7 +9,7 @@
 //! `Rc` in hand (`file.borrow()`), and the temporary borrows of `if let`, `match` and `let … else`
 //! are easy to miss. The places that release the BKL call [`assert_none_held`], so every wait
 //! checks, and the problem shows up without needing a concurrent collision. Debug builds (cargo
-//! test) always check; release builds check when the `borrow-check` feature is on (`appine-run`
+//! test) always check; release builds check when the `borrow-check` feature is on (`kazeterm-run`
 //! turns it on by default, and it is what the differential tests, LTP and surveys use; the debug
 //! app turns it on too). In the app's release build the count does not exist, just like the
 //! standard library's `RefCell`.

@@ -4,7 +4,7 @@
 //! A [`Machine`] holds one kernel instance: it can start several processes one after another
 //! ([`Machine::spawn`]), and each process can have its own console (an in-process PTY whose master
 //! the host holds, [`Machine::open_console`]). The Android foreground service opens one console
-//! and one login shell per terminal tab; `appine-run` starts only one process ([`run`]). Methods
+//! and one login shell per terminal tab; `kazeterm-run` starts only one process ([`run`]). Methods
 //! may be called on any host thread, and blocking methods use the same unified wait mechanism as
 //! guest threads. Interval timers are handled by one host thread ([`crate::itimer`]).
 //!
@@ -22,8 +22,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use appine_engine::{Cpu, Dbt, DbtStats};
-use appine_hal::Event;
+use kazeterm_engine::{Cpu, Dbt, DbtStats};
+use kazeterm_hal::Event;
 
 use crate::cell::RefCell;
 use crate::cred::Cred;
@@ -119,10 +119,10 @@ impl Machine {
             Some(dir) => Some(Rc::new(Vfs::open(dir).map_err(RunError::Rootfs)?)),
             None => None,
         };
-        appine_hal::raise_fd_limit();
+        kazeterm_hal::raise_fd_limit();
         // An engine bug ends only the guest process that hits it (crate::bug)
         if crate::bug::contain() {
-            appine_engine::install_fault_guard();
+            kazeterm_engine::install_fault_guard();
         }
         let shared = Arc::new(Shared::new(Kernel::new(options.tier)));
         if let Some(vfs) = &vfs {
@@ -545,7 +545,7 @@ impl Machine {
     /// at any time, so deferred write transactions are committed too.
     pub fn trim_memory(&self) {
         crate::debug::log(format_args!("trimming memory"));
-        appine_engine::trim_dbt_pool();
+        kazeterm_engine::trim_dbt_pool();
         crate::bug::host_call("Machine::trim_memory", || {
             let k = self.shared.lock();
             k.file_maps.clear();
@@ -902,10 +902,10 @@ fn timers(shared: Arc<Shared>) {
     let event = shared.timers.clone();
     // Jumps of the host's wall clock (set, or the device resuming): wall-clock deadlines on the
     // realtime and boottime bases move, so every waiter must look again
-    let watch = appine_hal::ClockWatch::new();
+    let watch = kazeterm_hal::ClockWatch::new();
     let mut k = shared.lock();
     while !k.shutting_down {
-        if watch.as_ref().is_some_and(appine_hal::ClockWatch::take) {
+        if watch.as_ref().is_some_and(kazeterm_hal::ClockWatch::take) {
             crate::itimer::clock_jumped(&k);
         }
         let mut next = crate::itimer::expire(&k);
@@ -1031,7 +1031,7 @@ fn on_console<T>(
 }
 
 /// Loads a guest program and runs it until it ends, then ends the other processes
-/// (`appine-run`).
+/// (`kazeterm-run`).
 ///
 /// With [`RunOptions::rootfs`] set, `program` is a path in the guest filesystem;
 /// otherwise it is a host path.
@@ -1071,7 +1071,7 @@ pub fn run(
             .expect("cannot start the terminal thread")
     });
     let done =
-        appine_hal::Event::new().map_err(|e| RunError::Io(io::Error::from_raw_os_error(e)))?;
+        kazeterm_hal::Event::new().map_err(|e| RunError::Io(io::Error::from_raw_os_error(e)))?;
     let status = std::thread::scope(|scope| {
         // Stop requests from the host (RunOptions::stop): the first signal goes to the program,
         // a later one ends everything; either way the program's end comes back below
@@ -1086,14 +1086,14 @@ pub fn run(
                 loop {
                     const POLLIN: i16 = 1;
                     let mut fds = [(stop, POLLIN, 0), (done.fd(), POLLIN, 0)];
-                    if appine_hal::poll(&mut fds, None).is_err() {
+                    if kazeterm_hal::poll(&mut fds, None).is_err() {
                         continue;
                     }
                     if fds[1].2 != 0 {
                         return;
                     }
                     let mut sig = [0u8; 1];
-                    if appine_hal::read(stop, &mut sig) != Ok(1) {
+                    if kazeterm_hal::read(stop, &mut sig) != Ok(1) {
                         continue;
                     }
                     match asked {
@@ -1109,7 +1109,7 @@ pub fn run(
         }
         let status = if options.init {
             // The program ending means shutdown; a guest request to reboot is also only a
-            // shutdown, ending appine-run
+            // shutdown, ending kazeterm-run
             let power = machine.wait_or_power(pid).err();
             machine.shutdown(power.unwrap_or(crate::Power::PowerOff), SHUTDOWN_TIMEOUT);
             machine.wait(pid)

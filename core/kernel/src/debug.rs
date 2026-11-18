@@ -1,5 +1,5 @@
 //! Local debug log (the kernel/signal map, design doc §12.4): written to the host's stderr when
-//! the environment variable `APPINE_LOG=1` is set. With `APPINE_STRACE=1` it also prints every
+//! the environment variable `KAZETERM_LOG=1` is set. With `KAZETERM_STRACE=1` it also prints every
 //! returning syscall (number, arguments and result), like strace; each line starts with the
 //! seconds since start at the time of return and ends with the milliseconds the syscall itself
 //! took.
@@ -19,11 +19,11 @@ pub(crate) fn trace_start() -> Option<Instant> {
 pub(crate) fn tracing() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
     *ENABLED.get_or_init(|| {
-        std::env::var_os("APPINE_STRACE").is_some_and(|v| !v.is_empty() && v != "0")
+        std::env::var_os("KAZETERM_STRACE").is_some_and(|v| !v.is_empty() && v != "0")
     })
 }
 
-/// `APPINE_STRACE`: prints one syscall and its result.
+/// `KAZETERM_STRACE`: prints one syscall and its result.
 pub(crate) fn trace_syscall(
     start: Option<Instant>,
     tid: i32,
@@ -51,12 +51,12 @@ fn epoch() -> Instant {
 /// [`crate::stub`]).
 pub(crate) fn log(args: fmt::Arguments<'_>) {
     if enabled() {
-        eprintln!("appine: {args}");
+        eprintln!("kazeterm: {args}");
     }
 }
 
 fn enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
     *ENABLED
-        .get_or_init(|| std::env::var_os("APPINE_LOG").is_some_and(|v| !v.is_empty() && v != "0"))
+        .get_or_init(|| std::env::var_os("KAZETERM_LOG").is_some_and(|v| !v.is_empty() && v != "0"))
 }

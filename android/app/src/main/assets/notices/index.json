@@ -1,10 +1,10 @@
 [
   {
-    "id": "appine",
-    "name": "Appine",
+    "id": "kazeterm",
+    "name": "KazeTerm",
     "version": "",
     "license": "AGPL-3.0-or-later",
-    "file": "appine.html"
+    "file": "kazeterm.html"
   },
   {
     "id": "fuchsia",

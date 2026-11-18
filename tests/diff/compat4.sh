@@ -455,7 +455,7 @@ int main(void) {
 C
 rm -rf /tmp/sgid /tmp/plain
 gcc -O1 -o newmodes newmodes.c && ./newmodes
-# Other groups run later in the same Appine store (compat's file-capability case copies a program
+# Other groups run later in the same KazeTerm store (compat's file-capability case copies a program
 # to /tmp/plain)
 rm -rf /tmp/sgid /tmp/plain
 # accept4: no free fd is EMFILE with the connection still queued; a bad address drops the

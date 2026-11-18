@@ -19,7 +19,7 @@ while :; do
     if [ $((v % 5)) -eq 0 ]; then
         yes "s $v" | head -n 500 > s$v
         fsync s$v . && echo "synced $v"
-        # Pause: Appine's background thread finishes the checkpoint once writes stop, and the WAL is
+        # Pause: KazeTerm's background thread finishes the checkpoint once writes stop, and the WAL is
         # reused from the start afterwards
         sleep 0.3
     fi

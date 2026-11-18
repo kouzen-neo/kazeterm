@@ -1,4 +1,4 @@
-# podman: runs containers inside Appine. The vfs storage driver (no overlayfs), host networking (no
+# podman: runs containers inside KazeTerm. The vfs storage driver (no overlayfs), host networking (no
 # veth, iptables), no cgroups (read-only). The store must be created separately: scripts/survey -s
 # target/survey/podman podman
 # Native comparison: scripts/survey -n <an alpine:3.24 image with podman installed> podman,

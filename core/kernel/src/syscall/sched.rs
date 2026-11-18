@@ -4,7 +4,7 @@
 //! belongs to the thread; it is applied to the host thread together with the CPU affinity
 //! ([`apply_host`]), and the host allocates CPUs accordingly; `SCHED_IDLE` becomes the host's
 //! lowest priority. Guest CPU `i` is the `i`th CPU the host allows this process to use
-//! ([`appine_hal::host_cpus`]). Real-time policies and real-time priorities are only recorded
+//! ([`kazeterm_hal::host_cpus`]). Real-time policies and real-time priorities are only recorded
 //! (visible in procfs and through the matching get calls). Permissions are checked by Linux's
 //! rules: changing another's settings needs the same effective user ID, raising priority needs
 //! `RLIMIT_NICE` to allow it or `CAP_SYS_NICE`, and real-time policies need `CAP_SYS_NICE`.
@@ -670,7 +670,7 @@ pub(super) fn sched_setaffinity(cx: &mut Cx<'_>, pid: i32, len: usize, mask: u64
     if let Some(t) = task {
         t.affinity.set(new);
         if t.host_tid.get() != 0 {
-            appine_hal::set_thread_affinity(t.host_tid.get(), new);
+            kazeterm_hal::set_thread_affinity(t.host_tid.get(), new);
         }
     }
     Ok(0)
@@ -764,7 +764,7 @@ pub(crate) fn host_started(t: &Task, reused: bool) {
     let mask = t.affinity.get() & online_cpus();
     // A host thread reused from the pool still has the previous guest thread's affinity
     if mask != online_cpus() || reused {
-        appine_hal::set_thread_affinity(t.host_tid.get(), mask);
+        kazeterm_hal::set_thread_affinity(t.host_tid.get(), mask);
     }
 }
 
@@ -781,7 +781,7 @@ fn apply_host(t: &Task) {
     } else {
         t.nice.get().max(HOST_NICE_FLOOR)
     };
-    appine_hal::set_thread_nice(tid, nice);
+    kazeterm_hal::set_thread_nice(tid, nice);
 }
 
 /// Sets a guest thread's host thread I/O priority from the guest thread's: RT becomes BE at the
@@ -799,7 +799,7 @@ fn apply_host_ioprio(t: &Task, reset: bool) {
     } else {
         raw
     };
-    appine_hal::set_thread_ioprio(tid, host);
+    kazeterm_hal::set_thread_ioprio(tid, host);
 }
 
 // ---- Shared helpers ----
@@ -842,7 +842,7 @@ fn owner_or_nice_over(cred: &Cred, target: &Cred) -> bool {
 
 /// The mask for the host's CPU count (at most 64).
 fn online_cpus() -> u64 {
-    let cpus = appine_hal::host_cpus().len();
+    let cpus = kazeterm_hal::host_cpus().len();
     if cpus == 64 {
         u64::MAX
     } else {

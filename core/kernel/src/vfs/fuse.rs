@@ -2404,7 +2404,7 @@ pub(crate) fn snapshot(
 ) -> Result<std::fs::File, Errno> {
     use std::os::unix::fs::FileExt;
     let data = read(cx, h, offset, len as usize)?;
-    let file = appine_hal::memfd(c"appine-fuse").map_err(Errno)?;
+    let file = kazeterm_hal::memfd(c"kazeterm-fuse").map_err(Errno)?;
     file.set_len(offset + data.len() as u64)
         .map_err(|e| Errno(e.raw_os_error().unwrap_or(Errno::EIO.0)))?;
     file.write_all_at(&data, offset)

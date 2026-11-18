@@ -66,7 +66,7 @@ namespace creation (`kernel/ns`); console and terminal bridge behaviour (`kernel
   zombies. `Machine::spawn` registers such a process (in the group table, init's children and the
   watched table) only once its host thread has started; when its task or thread cannot be
   created, it gives the console it attached back (`kernel/tty`) and leaves nothing registered.
-- On request (the app always; `appine-run --init`) it boots from a subset of `/etc/inittab` (a
+- On request (the app always; `kazeterm-run --init`) it boots from a subset of `/etc/inittab` (a
   store file; anything else is an empty table): `sysinit` (waited), then `boot` and `bootwait`
   together in file order (only `bootwait` waited), then `wait` (waited) and `once` (not waited) for
   the default runlevel (`initdefault`, else 2). Commands run through `/bin/sh -c` with stdin from

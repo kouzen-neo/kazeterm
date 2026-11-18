@@ -1,12 +1,12 @@
 //! lockstep within `cargo test`: 20000 instructions per class by default, with a random seed
 //! each time.
 //!
-//! The environment variables `APPINE_LOCKSTEP_ITERS` and `APPINE_LOCKSTEP_SEED` override the
+//! The environment variables `KAZETERM_LOCKSTEP_ITERS` and `KAZETERM_LOCKSTEP_SEED` override the
 //! defaults; failure messages include a command to reproduce.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use appine_lockstep::{AVAILABLE, Config, run};
+use kazeterm_lockstep::{AVAILABLE, Config, run};
 
 #[test]
 fn interpreter_matches_hardware() {
@@ -14,21 +14,21 @@ fn interpreter_matches_hardware() {
         eprintln!("skipped: lockstep needs a Linux aarch64 host");
         return;
     }
-    let seed = env_u64("APPINE_LOCKSTEP_SEED").unwrap_or_else(|| {
+    let seed = env_u64("KAZETERM_LOCKSTEP_SEED").unwrap_or_else(|| {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64
     });
     let config = Config {
-        iterations: env_u64("APPINE_LOCKSTEP_ITERS").unwrap_or(20_000),
+        iterations: env_u64("KAZETERM_LOCKSTEP_ITERS").unwrap_or(20_000),
         seed,
         class: None,
     };
     eprintln!("lockstep seed = {seed}");
     match run(&config) {
         Ok(reports) => {
-            let tier1 = appine_engine::Dbt::new().is_some();
+            let tier1 = kazeterm_engine::Dbt::new().is_some();
             for r in reports.iter().filter(|r| !r.skipped) {
                 assert!(
                     r.executed > 0,

@@ -15,7 +15,7 @@ fn main() {
     for path in sources.iter().chain(&[
         "src/c/emit.h",
         "src/c/internal.h",
-        "include/appine/engine.h",
+        "include/kazeterm/engine.h",
     ]) {
         println!("cargo::rerun-if-changed={path}");
     }
@@ -27,10 +27,10 @@ fn main() {
         .warnings(true)
         .extra_warnings(true)
         .warnings_into_errors(true)
-        .compile("appine_engine");
+        .compile("kazeterm_engine");
 
     // Lets dependents' C code include the headers: the environment variable
-    // DEP_APPINE_ENGINE_INCLUDE
+    // DEP_KAZETERM_ENGINE_INCLUDE
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let include = std::path::Path::new(&manifest_dir).join("include");
     println!("cargo::metadata=include={}", include.display());

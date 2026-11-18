@@ -1,5 +1,5 @@
 #!/bin/sh
-# Differential tests (design doc §13.3 layer 4): the same script runs on Appine and on real arm64
+# Differential tests (design doc §13.3 layer 4): the same script runs on KazeTerm and on real arm64
 # Linux, and the outputs and exit codes are compared. Run on a host with docker:
 #
 #   scripts/difftest [-t tier] [-r] [-s store directory] [-j jobs] [-R] [case name…]
@@ -7,21 +7,21 @@
 # -R runs each group that failed once more, alone, after all the others: one that passes then is
 # reported as flaky and does not fail the run (its first outputs stay in target/difftest/failed).
 # -j runs several groups at once (4 by default on macOS, 1 on other hosts): on the native side each
-# runs in its own container; on the Appine side each concurrent slot uses a clone of the store
+# runs in its own container; on the KazeTerm side each concurrent slot uses a clone of the store
 # (<store>-w<n>; the groups all write files of the same names into the guest's /tmp, so sharing one
 # store would make them overwrite each other), which on macOS is an APFS clonefile (`cp -c`,
 # copy-on-write, taking almost no space) and elsewhere `cp --reflink=auto` (a real copy where
 # unsupported). Clones are remade when missing or with -r (after new packages are installed into the
 # main store, -r is needed anyway to re-export the image). Groups that took long last time start
 # first (recorded in target/difftest/durations-t<tier>.txt). Each group's result is printed as a
-# whole, and the `ok` line carries the times (seconds each for native and Appine). -j 1 runs the
+# whole, and the `ok` line carries the times (seconds each for native and KazeTerm). -j 1 runs the
 # groups one by one as before.
 # Test cases are tests/diff/<name>.sh, run by the guest's /bin/sh with stderr merged into stdout.
 # The real Linux side is a docker container: the store's root filesystem is first packed inside
-# Appine and imported as an image, so both sides run exactly the same files. The image is generated
+# KazeTerm and imported as an image, so both sides run exactly the same files. The image is generated
 # only the first time or with -r; after changing the store, pass -r. The options on a test case's
 # `# docker-run-options: …` line are added to its container (such as CAP_SYS_ADMIN for mount), and
-# those on the `# appine-options: …` line to appine-run (such as --always-map-low-ports for
+# those on the `# kazeterm-options: …` line to kazeterm-run (such as --always-map-low-ports for
 # lowports: the container can bind low ports, so without it the mapping is not exercised). A case
 # with a `# difftest-files: <dir>` line gets the files of tests/diff/<dir> on both sides, unpacked
 # into /tmp/difftest-files/<dir> before the script runs: they travel inside the script itself as a
@@ -35,22 +35,22 @@
 #
 # Only one run goes at a time (a lock under target/difftest): a second run waits for the first.
 #
-# Both sides' outputs are written to target/difftest/<name>.native and .appine and overwritten on
+# Both sides' outputs are written to target/difftest/<name>.native and .kazeterm and overwritten on
 # the next run; on a mismatch a copy is also saved as
 # target/difftest/failed/<time>-t<tier>-<name>.*, which can still be inspected after a rerun.
-# appine-run's own stderr goes to <name>.appine.err: when it contains internal errors reported by
+# kazeterm-run's own stderr goes to <name>.kazeterm.err: when it contains internal errors reported by
 # the kernel layer (a kernel bug, a kernel object borrowed while the BKL is released), the case
 # fails even if the outputs match.
 #
 # The store is target/difftest/store by default; when it does not exist the minirootfs is imported
 # (run scripts/fetch-rootfs first) and then the packages the test cases need are installed with apk
-# inside Appine, which needs the network (using the host's or docker's proxy). The store must be
-# inside the work tree. appine-run also runs in a container and sees the same kind of network as the
+# inside KazeTerm, which needs the network (using the host's or docker's proxy). The store must be
+# inside the work tree. kazeterm-run also runs in a container and sees the same kind of network as the
 # native side (the container's eth0, routes, addresses), so that network test cases are comparable:
-# on a Linux arm64 host it runs in APPINE_IMAGE (debian:trixie-slim by default; its glibc must not
-# be older than the one on the host that built appine-run), and the environment variable APPINE_RUN
-# can name the appine-run to use; on other hosts it goes through scripts/dev. The environment
-# variable APPINE_DBT_REGS is passed on to appine-run as well (with APPINE_DBT_REGS=go every program
+# on a Linux arm64 host it runs in KAZETERM_IMAGE (debian:trixie-slim by default; its glibc must not
+# be older than the one on the host that built kazeterm-run), and the environment variable KAZETERM_RUN
+# can name the kazeterm-run to use; on other hosts it goes through scripts/dev. The environment
+# variable KAZETERM_DBT_REGS is passed on to kazeterm-run as well (with KAZETERM_DBT_REGS=go every program
 # uses the register set Tier 1 has for Go).
 set -eu
 
@@ -68,7 +68,7 @@ retry=0
 # When running concurrently, the script calls itself to run one group (-G case name), and then does
 # not prepare the store or the image
 group=
-image=appine-difftest
+image=kazeterm-difftest
 packages="python3 gcc musl-dev lua5.4 sqlite go nodejs openjdk21-jdk strace gdb uv bubblewrap iproute2 util-linux-misc dmesg iptables nftables fuse3 fuse-overlayfs sshfs openssh-sftp-server rclone"
 env_path=PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -125,8 +125,8 @@ fi
 # linux <shell command>: runs in the Linux arm64 environment, where variables like $http_proxy are
 # expanded
 if [ "$(uname -sm)" = "Linux aarch64" ]; then
-    run=${APPINE_RUN:-target/linux-arm64/release/appine-run}
-    [ -x "$run" ] || run=target/release/appine-run
+    run=${KAZETERM_RUN:-target/linux-arm64/release/kazeterm-run}
+    [ -x "$run" ] || run=target/release/kazeterm-run
     case $run in
     /*) ;;
     *) run=$root/$run ;;
@@ -135,16 +135,16 @@ if [ "$(uname -sm)" = "Linux aarch64" ]; then
     # Run as the caller, so a newly created store belongs to the caller and linux on the host can
     # open it too; as in scripts/dev, lift the nice limit (the nice values of guest threads are set
     # on host threads)
-    appine() {
+    kazeterm() {
         docker run --rm --platform linux/arm64 --security-opt seccomp=unconfined \
-            ${APPINE_DBT_REGS:+-e APPINE_DBT_REGS} \
+            ${KAZETERM_DBT_REGS:+-e KAZETERM_DBT_REGS} \
             --user "$(id -u):$(id -g)" --ulimit nice=40:40 -v "$root:$root" -w "$root" \
-            "${APPINE_IMAGE:-debian:trixie-slim}" "$run" "$@"
+            "${KAZETERM_IMAGE:-debian:trixie-slim}" "$run" "$@"
     }
 else
-    run=target/linux-arm64/release/appine-run
+    run=target/linux-arm64/release/kazeterm-run
     linux() { scripts/dev sh -c "$1"; }
-    appine() { scripts/dev "$run" "$@"; }
+    kazeterm() { scripts/dev "$run" "$@"; }
 fi
 
 if [ -z "$group" ]; then
@@ -155,7 +155,7 @@ if [ ! -d "$store" ]; then
         exit 1
     }
     echo "creating $store"
-    appine --rootfs "$store" --import "$tarball" >/dev/null
+    kazeterm --rootfs "$store" --import "$tarball" >/dev/null
     linux "$run --tier 1 --rootfs $store --env $env_path"' \
         ${http_proxy:+--env http_proxy=$http_proxy} ${https_proxy:+--env https_proxy=$https_proxy} \
         -- /bin/sh -c "apk add -q '"$packages"'"'
@@ -163,7 +163,7 @@ if [ ! -d "$store" ]; then
 fi
 # Checking only that the directory exists is not enough: a store whose install failed midway, or
 # whose cache was only partly restored, makes every test case fail
-if ! appine --tier 1 --rootfs "$store" --env "$env_path" -- \
+if ! kazeterm --tier 1 --rootfs "$store" --env "$env_path" -- \
     /bin/sh -c "for tool in python3 gcc lua5.4 sqlite3 go node java strace gdb uv bwrap iptables nft fusermount3 fuse-overlayfs sshfs rclone; do
             command -v \"\$tool\" || exit 1
         done && nsenter --version | grep -q util-linux && dmesg --version | grep -q util-linux" >/dev/null 2>&1; then
@@ -182,7 +182,7 @@ for suite in starnix gvisor; do
         continue
     fi
     want=$(tar xOf "$tests" ./VERSION)
-    have=$(appine --rootfs "$store" -- /bin/cat /usr/lib/$suite-tests/VERSION 2>/dev/null || true)
+    have=$(kazeterm --rootfs "$store" -- /bin/cat /usr/lib/$suite-tests/VERSION 2>/dev/null || true)
     if [ "$want" != "$have" ]; then
         echo "installing $tests into $store"
         linux "$run --rootfs $store -- /bin/sh -c 'rm -rf /usr/lib/$suite-tests &&
@@ -202,7 +202,7 @@ done
 # image is labelled with the list and exported again when it changes
 exported="bin etc home lib media mnt opt run sbin srv tmp usr var"
 label=$(echo "$exported" | tr ' ' ,)
-if [ "$(docker image inspect --format '{{index .Config.Labels "appine.export"}}' "$image" \
+if [ "$(docker image inspect --format '{{index .Config.Labels "kazeterm.export"}}' "$image" \
     2>/dev/null)" != "$label" ]; then
     rebuild=1
 fi
@@ -211,9 +211,9 @@ if [ "$rebuild" = 1 ] || ! docker image inspect "$image" >/dev/null 2>&1; then
     # /tmp and /var/tmp need only the directories themselves: what earlier runs left there
     # (possibly gigabytes) need not go into the image
     old=$(docker image inspect --format '{{.Id}}' "$image" 2>/dev/null || true)
-    appine --tier 1 --rootfs "$store" -- /bin/sh -c "cd / && exec tar -c -f - \
+    kazeterm --tier 1 --rootfs "$store" -- /bin/sh -c "cd / && exec tar -c -f - \
         --exclude='tmp/*' --exclude='var/tmp/*' \$(ls -d $exported 2>/dev/null)" 2>/dev/null |
-        docker import --platform linux/arm64 --change "LABEL appine.export=$label" - \
+        docker import --platform linux/arm64 --change "LABEL kazeterm.export=$label" - \
             "$image" >/dev/null
     # The replaced image is left untagged and would keep its gigabytes in the VM until the disk
     # fills; a container still using it keeps it (rmi refuses)
@@ -271,7 +271,7 @@ run_group() {
         dir=/tmp/difftest-files/$files
         unpack="rm -rf $dir && mkdir -p $dir && echo $blob | base64 -d | tar -xzof - -C $dir && "
     fi
-    # Both sides start from an empty $HOME and /tmp: the Appine store kept what earlier runs left
+    # Both sides start from an empty $HOME and /tmp: the KazeTerm store kept what earlier runs left
     # there (Go's and uv's caches under /root/.cache, files cases made in /tmp)
     fresh="rm -rf /root /tmp && mkdir -m 700 /root && mkdir -m 1777 /tmp && "
     script="exec 2>&1; $fresh$unpack$(cat "tests/diff/$name.sh")"
@@ -283,7 +283,7 @@ run_group() {
         return 1
     fi
     options=$(sed -n 's/^# docker-run-options: //p' "tests/diff/$name.sh")
-    appine_options=$(sed -n 's/^# appine-options: //p' "tests/diff/$name.sh")
+    kazeterm_options=$(sed -n 's/^# kazeterm-options: //p' "tests/diff/$name.sh")
     set +e
     # Docker's default seccomp rules change the results of some syscalls (clone3 returns ENOSYS,
     # pidfd_getfd returns EPERM); what should be compared is the kernel's own behaviour
@@ -295,24 +295,24 @@ run_group() {
     echo "exit $?" >>"$out/$name.native"
     t1=$(date +%s)
     # shellcheck disable=SC2086 # the options must be split on whitespace
-    appine --tier "$tier" --rootfs "$store" --env "$env_path" --env HOME=/root $appine_options -- \
-        /bin/sh -c "cd / && $script" >"$out/$name.appine" 2>"$out/$name.appine.err"
-    echo "exit $?" >>"$out/$name.appine"
+    kazeterm --tier "$tier" --rootfs "$store" --env "$env_path" --env HOME=/root $kazeterm_options -- \
+        /bin/sh -c "cd / && $script" >"$out/$name.kazeterm" 2>"$out/$name.kazeterm.err"
+    echo "exit $?" >>"$out/$name.kazeterm"
     t2=$(date +%s)
     set -e
-    bugs=$(grep '^appine: internal error' "$out/$name.appine.err" || true)
-    if cmp -s "$out/$name.native" "$out/$name.appine" && [ -z "$bugs" ]; then
-        echo "ok   $name ($((t1 - t0))s native, $((t2 - t1))s appine)"
+    bugs=$(grep '^kazeterm: internal error' "$out/$name.kazeterm.err" || true)
+    if cmp -s "$out/$name.native" "$out/$name.kazeterm" && [ -z "$bugs" ]; then
+        echo "ok   $name ($((t1 - t0))s native, $((t2 - t1))s kazeterm)"
     else
         echo "FAIL $name"
-        diff -u "$out/$name.native" "$out/$name.appine" | sed 's/^/    /' || true
+        diff -u "$out/$name.native" "$out/$name.kazeterm" | sed 's/^/    /' || true
         [ -z "$bugs" ] || printf '%s\n' "$bugs" | sed 's/^/    /'
         kept=$out/failed/$(date +%Y%m%d-%H%M%S)-t$tier-$name
         mkdir -p "$out/failed"
         cp "$out/$name.native" "$kept.native"
-        cp "$out/$name.appine" "$kept.appine"
-        cp "$out/$name.appine.err" "$kept.appine.err"
-        echo "    saved as $kept.native, .appine, .appine.err"
+        cp "$out/$name.kazeterm" "$kept.kazeterm"
+        cp "$out/$name.kazeterm.err" "$kept.kazeterm.err"
+        echo "    saved as $kept.native, .kazeterm, .kazeterm.err"
         return 1
     fi
 }
@@ -367,7 +367,7 @@ else
             touch "$clone/.cloned"
         fi
     done
-    # Groups that took long last time (native plus Appine) start first, so no long group is left to
+    # Groups that took long last time (native plus KazeTerm) start first, so no long group is left to
     # run alone at the end; groups that never ran go last
     durations=$out/durations-t$tier.txt
     touch "$durations"
@@ -392,7 +392,7 @@ else
     done
     failures="$(sed -n 's/^FAIL \([^ :]*\).*/\1/p' "$reports") $missing"
     # Record the times of the groups that passed this time; those that did not pass keep last time's
-    sed -n 's/^ok   \([^ ]*\) (\([0-9]*\)s native, \([0-9]*\)s appine)$/\1 \2 \3/p' "$reports" \
+    sed -n 's/^ok   \([^ ]*\) (\([0-9]*\)s native, \([0-9]*\)s kazeterm)$/\1 \2 \3/p' "$reports" \
         >"$out/.times"
     awk 'FILENAME == ARGV[1] { d[$1] = $2 + $3; next } !($1 in d) { print } END { for (n in d) print n, d[n] }' \
         "$out/.times" "$durations" | sort >"$durations.new"

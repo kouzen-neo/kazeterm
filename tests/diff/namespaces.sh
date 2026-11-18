@@ -755,12 +755,12 @@ child(entered)
 def peercred():
     os.unshare(CLONE_NEWPID)
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind("\0appine-pidns")
+    srv.bind("\0kazeterm-pidns")
     srv.listen()
 
     def init():
         c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        c.connect("\0appine-pidns")
+        c.connect("\0kazeterm-pidns")
         cred = c.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12)
         print("inside sees peer pid", struct.unpack("3i", cred)[0])
         c.send(b"y")
@@ -1008,7 +1008,7 @@ child(joined)
 shm = libc.shmget(KEY, 4096, IPC_CREAT | 0o600)
 sem = libc.semget(KEY, 1, IPC_CREAT | 0o600)
 msq = libc.msgget(KEY, IPC_CREAT | 0o600)
-mq = libc.mq_open(b"/appine-ns", os.O_CREAT | os.O_RDONLY, 0o600, None)
+mq = libc.mq_open(b"/kazeterm-ns", os.O_CREAT | os.O_RDONLY, 0o600, None)
 print("outside objects", shm >= 0, sem >= 0, msq >= 0, mq >= 0)
 
 
@@ -1024,7 +1024,7 @@ def ipc():
     os.read(go[0], 1)
     print("new ns", link("ipc") != me)
     print("shmget", c(libc.shmget(KEY, 4096, 0)), "semget", c(libc.semget(KEY, 1, 0)),
-          "msgget", c(libc.msgget(KEY, 0)), "mq_open", c(libc.mq_open(b"/appine-ns", os.O_RDONLY, 0, None)))
+          "msgget", c(libc.msgget(KEY, 0)), "mq_open", c(libc.mq_open(b"/kazeterm-ns", os.O_RDONLY, 0, None)))
     print("sysvipc", sysvipc("shm"), sysvipc("sem"), sysvipc("msg"))
     mine = libc.shmget(0, 4096, IPC_CREAT | 0o600)
     print("first id", mine, "same key again", c(libc.shmget(KEY, 8192, IPC_CREAT | IPC_EXCL | 0o600)) >= 0)
@@ -1072,7 +1072,7 @@ child(joined_ipc)
 libc.shmctl(shm, IPC_RMID, None)
 libc.semctl(sem, 0, IPC_RMID)
 libc.msgctl(msq, IPC_RMID, None)
-libc.mq_unlink(b"/appine-ns")
+libc.mq_unlink(b"/kazeterm-ns")
 PY4
 
 # Network namespaces: inside busybox's unshare -n there is only lo, down; after ip brings it up
@@ -1088,7 +1088,7 @@ busybox unshare -n sh -c '
     ping -c 1 -W 1 10.0.0.1 2>&1 | tail -1
 '
 
-# ICMPv6 in a new network namespace: once lo is up, ::1 can be pinged (Appine's ICMPv6 sockets use
+# ICMPv6 in a new network namespace: once lo is up, ::1 can be pinged (KazeTerm's ICMPv6 sockets use
 # the host's ::1)
 busybox unshare -n sh -c 'ping6 -c 1 -W 1 ::1 2>&1 | tail -1; ip link set lo up; ping6 -c 1 ::1 | sed "s/ time=.*//; /round-trip/d"'
 
@@ -1167,7 +1167,7 @@ outer.bind(("127.0.0.1", 0))
 outer.listen()
 outer_port = outer.getsockname()[1]
 outer_unix = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-outer_unix.bind("\0appine-netns")
+outer_unix.bind("\0kazeterm-netns")
 outer_unix.listen()
 me = os.readlink("/proc/self/ns/net")
 
@@ -1223,8 +1223,8 @@ def netns():
           err(udp().connect, ("192.0.2.1", 9)), "bind", err(tcp().bind, ("10.0.0.1", 0)))
     print("outer port", err(tcp().connect, ("127.0.0.1", outer_port)))
     un = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    print("outer abstract", err(un.connect, "\0appine-netns"),
-          "bind it here", err(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM).bind, "\0appine-netns"))
+    print("outer abstract", err(un.connect, "\0kazeterm-netns"),
+          "bind it here", err(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM).bind, "\0kazeterm-netns"))
     # /proc/net is this namespace's: dev has only lo, tcp has only the sockets here
     with open("/proc/self/net/dev") as f:
         print("dev", [l.split(":")[0].strip() for l in f.readlines()[2:]])

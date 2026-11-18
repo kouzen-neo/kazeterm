@@ -88,7 +88,7 @@ fn prog_load(cx: &mut Cx<'_>, attr: &[u8]) -> SysResult {
     if insn_cnt == 0 || insn_cnt > bpf::MAX_INSNS {
         return Err(Errno::E2BIG);
     }
-    // Without capabilities only socket filter and cgroup skb programs may be loaded (Appine has
+    // Without capabilities only socket filter and cgroup skb programs may be loaded (KazeTerm has
     // neither, so they are EINVAL below)
     if prog_type != PROG_TYPE_SOCKET_FILTER && prog_type != PROG_TYPE_CGROUP_SKB && !bpf_capable(cx)
     {

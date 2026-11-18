@@ -5,7 +5,7 @@
 //!   host ping socket.
 //! - DNS stub: the guest's `/etc/resolv.conf` points at `127.0.0.53`. UDP datagrams sent to
 //!   `127.0.0.53:53` do not go through the host network but to the host's resolver
-//!   ([`appine_hal::net::dns_query`]), and the answer is put into this socket's own queue, as if
+//!   ([`kazeterm_hal::net::dns_query`]), and the answer is put into this socket's own queue, as if
 //!   received from `127.0.0.53:53`.
 //! - `NETLINK_ROUTE`: queries for interfaces, addresses, routes and rules are answered in process
 //!   (getifaddrs, `ip addr`, `ip route`, `ip rule`; routes are in [`crate::route`]); the neighbour
@@ -17,7 +17,7 @@ use std::fmt::Write as _;
 use std::rc::Rc;
 use std::time::Duration;
 
-use appine_hal::net::{Interface, Route};
+use kazeterm_hal::net::{Interface, Route};
 
 use crate::traffic::IfStats;
 
@@ -244,7 +244,7 @@ impl InetSocket {
 
 impl Drop for InetSocket {
     fn drop(&mut self) {
-        appine_hal::net::close(self.fd);
+        kazeterm_hal::net::close(self.fd);
         if let (Some(p), Some(n)) = (self.self_port, &self.net)
             && let Ok(mut lo) = n.lo.try_borrow_mut()
             && let Some(i) = lo.self_udp.iter().position(|&x| x == p)
@@ -287,7 +287,7 @@ pub fn stub_addr(family: i32) -> Vec<u8> {
     } else {
         SocketAddr::new(v4.into(), 53)
     };
-    appine_hal::net::sockaddr(addr)
+    kazeterm_hal::net::sockaddr(addr)
 }
 
 /// The answer given to the guest when resolution fails: the query brought back as is, with the
@@ -928,7 +928,7 @@ pub(crate) fn configure_host_link(
         }
     });
     let Some(dev) = found else {
-        // Appine cannot create one when asked to (Linux also gives EOPNOTSUPP when it has no
+        // KazeTerm cannot create one when asked to (Linux also gives EOPNOTSUPP when it has no
         // driver for that kind of interface)
         return Some(if newlink && flags & NLM_F_CREATE != 0 {
             EOPNOTSUPP
@@ -1576,7 +1576,7 @@ pub(crate) fn proc_listing(
             continue;
         };
         let fd = inet.fd;
-        let proto = int(appine_hal::net::getsockopt(fd, SOL_SOCKET, SO_PROTOCOL, 4));
+        let proto = int(kazeterm_hal::net::getsockopt(fd, SOL_SOCKET, SO_PROTOCOL, 4));
         let listed = inet.family == family
             && match table {
                 // MPTCP sockets are listed here too (the first subflow is a TCP socket; Go 1.24
@@ -1596,8 +1596,8 @@ pub(crate) fn proc_listing(
         let me = inet.net.clone().unwrap_or_else(|| w.all[0].clone());
         let unmap =
             |a: Vec<u8>, local: bool| crate::syscall::unmap_addr(portmap, w, inet, a, local);
-        let host_peer = appine_hal::net::sockname(fd, true).ok();
-        let local = appine_hal::net::sockname(fd, false).ok().map(|a| {
+        let host_peer = kazeterm_hal::net::sockname(fd, true).ok();
+        let local = kazeterm_hal::net::sockname(fd, false).ok().map(|a| {
             let role = crate::netns::Role::Local {
                 any: inet.any,
                 vaddr: inet.vaddr,
@@ -1613,7 +1613,7 @@ pub(crate) fn proc_listing(
             })
             .or_else(|| inet.peer.clone());
         let state = if tcp {
-            appine_hal::net::getsockopt(fd, IPPROTO_TCP, TCP_INFO, 8)
+            kazeterm_hal::net::getsockopt(fd, IPPROTO_TCP, TCP_INFO, 8)
                 .ok()
                 .and_then(|b| b.first().copied())
                 .unwrap_or(TCP_CLOSE)
@@ -1686,7 +1686,7 @@ pub(crate) fn sockstat(sockets: &[(crate::syscall::SocketRef, u32)], v6: bool) -
         let Socket::Inet(inet) = &*b else {
             continue;
         };
-        let proto = int(appine_hal::net::getsockopt(
+        let proto = int(kazeterm_hal::net::getsockopt(
             inet.fd,
             SOL_SOCKET,
             SO_PROTOCOL,
@@ -1694,7 +1694,7 @@ pub(crate) fn sockstat(sockets: &[(crate::syscall::SocketRef, u32)], v6: bool) -
         ));
         if inet.ty == SOCK_STREAM && proto == Some(IPPROTO_TCP) {
             alloc += 1;
-            let state = appine_hal::net::getsockopt(inet.fd, IPPROTO_TCP, TCP_INFO, 8)
+            let state = kazeterm_hal::net::getsockopt(inet.fd, IPPROTO_TCP, TCP_INFO, 8)
                 .ok()
                 .and_then(|b| b.first().copied());
             if inet.family == family && state.is_some_and(|s| s != TCP_CLOSE) {
@@ -1708,7 +1708,7 @@ pub(crate) fn sockstat(sockets: &[(crate::syscall::SocketRef, u32)], v6: bool) -
         if inet.raw {
             raw += 1;
         } else if inet.ty == SOCK_DGRAM && proto == Some(IPPROTO_UDP) {
-            let bound = appine_hal::net::sockname(inet.fd, false)
+            let bound = kazeterm_hal::net::sockname(inet.fd, false)
                 .is_ok_and(|a| a.get(2..4).is_some_and(|p| p != [0, 0]));
             if bound || inet.stub_peer {
                 udp += 1;
@@ -1817,7 +1817,7 @@ pub(crate) fn proc_snmp(
                 return false;
             };
             (inet.ty, inet.proto) == (SOCK_STREAM, IPPROTO_TCP)
-                && appine_hal::net::getsockopt(inet.fd, IPPROTO_TCP, TCP_INFO, 8)
+                && kazeterm_hal::net::getsockopt(inet.fd, IPPROTO_TCP, TCP_INFO, 8)
                     .is_ok_and(|b| b.first() == Some(&TCP_ESTABLISHED))
         })
         .count() as u64;
@@ -2516,7 +2516,7 @@ mod tests {
     fn recognizes_the_dns_stub() {
         assert!(is_stub(&stub_addr(AF_INET)));
         assert!(is_stub(&stub_addr(AF_INET6)));
-        let other = appine_hal::net::sockaddr("127.0.0.53:54".parse().unwrap());
+        let other = kazeterm_hal::net::sockaddr("127.0.0.53:54".parse().unwrap());
         assert!(!is_stub(&other));
         let fail = servfail(&[0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0]);
         assert_eq!(fail[..4], [0x12, 0x34, 0x81, 0x82]);

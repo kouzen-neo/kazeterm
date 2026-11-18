@@ -18,7 +18,7 @@ provides:
 - virtual devices (bridge, veth, dummy) with addresses, routes and sysctls, and the mapping of
   their IPv4 addresses to host loopback addresses;
 - namespace-path construction and socket-boundary integration for `kernel/nft` evaluation;
-- forwarding of connections from outside Appine to published (DNAT) ports.
+- forwarding of connections from outside KazeTerm to published (DNAT) ports.
 
 Root: `core/kernel/src/netns.rs`, `netdev.rs`, `forward.rs`, `netconf.rs`.
 
@@ -223,7 +223,7 @@ file structure (`kernel/procfs`); host sockets (`hal`).
 
 ### Outbound
 
-- `appine_hal::net` (host sockets, host interfaces, poll, dup, events); `kernel/net`'s portmap
+- `kazeterm_hal::net` (host sockets, host interfaces, poll, dup, events); `kernel/net`'s portmap
   and routes (`route::merge`, `attrs`); `kernel/netlink`'s encoding (`message`, `attr`,
   `configure_host_link`); credentials (`ns_capable`); the kernel
   log; `std::thread` for the forwarder.

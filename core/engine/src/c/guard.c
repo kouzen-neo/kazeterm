@@ -3,12 +3,12 @@
  * (wrongly translated code, a broken page-table entry) makes the host receive SIGSEGV, SIGBUS or
  * SIGILL, only the guest process running at the time is ended, instead of crashing the whole app.
  *
- * appine_cpu_run() and appine_dbt_run() run through appine_guard_run(), and during that time the
+ * kazeterm_cpu_run() and kazeterm_dbt_run() run through kazeterm_guard_run(), and during that time the
  * guard is "armed": when a fault happens then, the handler siglongjmps back to
- * appine_guard_run(), which returns APPINE_EXIT_HOST_FAULT. So during that time the engine does
+ * kazeterm_guard_run(), which returns KAZETERM_EXIT_HOST_FAULT. So during that time the engine does
  * not call back into the kernel layer and does not call malloc (except for writing the perf map
- * file when profiling with APPINE_PERF_MAP), and every lock it holds is registered with
- * appine_guard_hold() (or, for a set of locks taken together, appine_guard_hold_fn()) and
+ * file when profiling with KAZETERM_PERF_MAP), and every lock it holds is registered with
+ * kazeterm_guard_hold() (or, for a set of locks taken together, kazeterm_guard_hold_fn()) and
  * released after jumping back.
  *
  * Other faults (the kernel layer's own, other host threads') first write a one-line report to
@@ -43,7 +43,7 @@ struct guard {
         void *lock;
         void (*release)(void *);
     } locks[MAX_LOCKS];
-    struct appine_host_fault fault;
+    struct kazeterm_host_fault fault;
 };
 
 static const int signals[] = {SIGSEGV, SIGBUS, SIGILL};
@@ -117,7 +117,7 @@ static void report(int sig, const siginfo_t *info, void *uc)
     prctl(PR_GET_NAME, name, 0, 0, 0);
     name[16] = 0;
 #endif
-    put_str(&l, "appine: host signal ");
+    put_str(&l, "kazeterm: host signal ");
     put_num(&l, (uint64_t)sig, 10);
     put_str(&l, " (code ");
     if (info->si_code < 0)
@@ -168,7 +168,7 @@ static void handler(int sig, siginfo_t *info, void *uc)
      * someone else */
     if (g && g->armed && info->si_code > 0) {
         g->armed = 0;
-        g->fault = (struct appine_host_fault){
+        g->fault = (struct kazeterm_host_fault){
             .signo = sig,
             .code = info->si_code,
             .addr = (uint64_t)(uintptr_t)info->si_addr,
@@ -192,7 +192,7 @@ static void install(void)
     __atomic_store_n(&installed, true, __ATOMIC_RELEASE);
 }
 
-void appine_fault_guard_install(void)
+void kazeterm_fault_guard_install(void)
 {
     pthread_once(&once, install);
 }
@@ -215,7 +215,7 @@ static void unlock_rwlock(void *lock)
     pthread_rwlock_unlock(lock);
 }
 
-void appine_guard_hold_fn(void *lock, void (*release)(void *))
+void kazeterm_guard_hold_fn(void *lock, void (*release)(void *))
 {
     struct guard *g = current();
     if (g && g->armed) {
@@ -228,12 +228,12 @@ void appine_guard_hold_fn(void *lock, void (*release)(void *))
     }
 }
 
-void appine_guard_hold(void *lock, bool rw)
+void kazeterm_guard_hold(void *lock, bool rw)
 {
-    appine_guard_hold_fn(lock, rw ? unlock_rwlock : unlock_mutex);
+    kazeterm_guard_hold_fn(lock, rw ? unlock_rwlock : unlock_mutex);
 }
 
-void appine_guard_drop(void)
+void kazeterm_guard_drop(void)
 {
     struct guard *g = current();
     if (g && g->armed && g->depth) {
@@ -243,12 +243,12 @@ void appine_guard_drop(void)
     }
 }
 
-_Noreturn void appine_guard_fail(void)
+_Noreturn void kazeterm_guard_fail(void)
 {
     struct guard *g = current();
     if (g && g->armed) {
         g->armed = 0;
-        g->fault = (struct appine_host_fault){
+        g->fault = (struct kazeterm_host_fault){
             .signo = SIGABRT,
             .code = 0,
             .addr = 0,
@@ -260,7 +260,7 @@ _Noreturn void appine_guard_fail(void)
 }
 
 /* For the engine's unit test: a run whose function fails an internal check returns
- * APPINE_EXIT_HOST_FAULT with SIGABRT recorded; returns that signal (-1 when the run returned
+ * KAZETERM_EXIT_HOST_FAULT with SIGABRT recorded; returns that signal (-1 when the run returned
  * otherwise, -2 when the locks held were not released as registered). Only with the guard
  * installed: without it the check aborts the process */
 static pthread_mutex_t test_locks[5] = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
@@ -276,29 +276,29 @@ static void test_release(void *unused)
 
 /* Three locks and a released set are registered; two more locks nested inside them, beyond
  * MAX_LOCKS, are taken and given back before the check fails: the four registered are released */
-static enum appine_exit fail_check(void *ctx, struct appine_cpu *cpu)
+static enum kazeterm_exit fail_check(void *ctx, struct kazeterm_cpu *cpu)
 {
     (void)ctx;
     (void)cpu;
     for (unsigned i = 0; i < 3; i++) {
         pthread_mutex_lock(&test_locks[i]);
-        appine_guard_hold(&test_locks[i], false);
+        kazeterm_guard_hold(&test_locks[i], false);
     }
-    appine_guard_hold_fn(NULL, test_release);
+    kazeterm_guard_hold_fn(NULL, test_release);
     for (unsigned i = 3; i < 5; i++) {
         pthread_mutex_lock(&test_locks[i]);
-        appine_guard_hold(&test_locks[i], false);
+        kazeterm_guard_hold(&test_locks[i], false);
     }
     for (unsigned i = 5; i-- > 3;) {
-        appine_guard_drop();
+        kazeterm_guard_drop();
         pthread_mutex_unlock(&test_locks[i]);
     }
-    appine_guard_fail();
+    kazeterm_guard_fail();
 }
 
-int appine_guard_selftest(void)
+int kazeterm_guard_selftest(void)
 {
-    if (appine_guard_run(fail_check, NULL, NULL) != APPINE_EXIT_HOST_FAULT)
+    if (kazeterm_guard_run(fail_check, NULL, NULL) != KAZETERM_EXIT_HOST_FAULT)
         return -1;
     for (unsigned i = 0; i < 5; i++) {
         if (pthread_mutex_trylock(&test_locks[i]) != 0)
@@ -307,15 +307,15 @@ int appine_guard_selftest(void)
     }
     if (test_released != 1)
         return -2;
-    struct appine_host_fault f;
-    appine_host_fault_last(&f);
+    struct kazeterm_host_fault f;
+    kazeterm_host_fault_last(&f);
     return f.signo;
 }
 
 /* After jumping back from the handler: restore the host's FPCR, release the locks still held,
  * and unblock this signal (it is blocked while the handler runs, and siglongjmp does not restore
  * the signal mask) */
-static enum appine_exit recover(struct guard *g)
+static enum kazeterm_exit recover(struct guard *g)
 {
     write_fpcr(g->fpcr);
     while (g->nlocks) {
@@ -327,7 +327,7 @@ static enum appine_exit recover(struct guard *g)
     sigemptyset(&set);
     sigaddset(&set, g->fault.signo);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
-    return APPINE_EXIT_HOST_FAULT;
+    return KAZETERM_EXIT_HOST_FAULT;
 }
 
 /* The current thread's guard, allocated on first use; NULL when the guard is not installed */
@@ -344,8 +344,8 @@ static struct guard *current_or_new(void)
     return g;
 }
 
-enum appine_exit appine_guard_run(enum appine_exit (*fn)(void *, struct appine_cpu *), void *ctx,
-                                  struct appine_cpu *cpu)
+enum kazeterm_exit kazeterm_guard_run(enum kazeterm_exit (*fn)(void *, struct kazeterm_cpu *), void *ctx,
+                                  struct kazeterm_cpu *cpu)
 {
     /* Still needed after siglongjmp returns: keep it in memory, not only in a register that may be
      * clobbered */
@@ -358,13 +358,13 @@ enum appine_exit appine_guard_run(enum appine_exit (*fn)(void *, struct appine_c
     g->depth = 0;
     g->nlocks = 0;
     g->armed = 1;
-    enum appine_exit r = fn(ctx, cpu);
+    enum kazeterm_exit r = fn(ctx, cpu);
     g->armed = 0;
     return r;
 }
 
-void appine_host_fault_last(struct appine_host_fault *out)
+void kazeterm_host_fault_last(struct kazeterm_host_fault *out)
 {
     struct guard *g = current();
-    *out = g ? g->fault : (struct appine_host_fault){0};
+    *out = g ? g->fault : (struct kazeterm_host_fault){0};
 }

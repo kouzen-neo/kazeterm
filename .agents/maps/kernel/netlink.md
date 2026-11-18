@@ -177,7 +177,7 @@ layer and namespace ids (`kernel/netns`), nftables (`kernel/nft`); mq_notify (`k
   (`forward_all`) after an initial-namespace ruleset change.
 - `kernel/netns`: `netdev::{request, base, views, tables, interfaces, nsid, nsid_alloc}`.
 - `kernel/nft`: `nft::handle`.
-- `appine_hal::net` (`interfaces` through `getifaddrs`, `tx_queue_len`); credentials
+- `kazeterm_hal::net` (`interfaces` through `getifaddrs`, `tx_queue_len`); credentials
   (`ns_capable`); the kernel's waits and wake objects.
 
 ## Invariants and gotchas

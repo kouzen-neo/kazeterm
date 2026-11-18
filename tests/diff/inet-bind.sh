@@ -54,7 +54,7 @@ static void v4(const char *name, int type, int proto, int raw)
     if (getsockname(fd, (struct sockaddr *)&got, &len) == 0)
         printf("bound: family %d, address %s, port %s\n", got.sin_family,
                inet_ntoa(got.sin_addr), got.sin_port ? "set" : "0");
-    /* A raw socket can be bound again on Linux; on Appine it cannot (the kernel/net map) */
+    /* A raw socket can be bound again on Linux; on KazeTerm it cannot (the kernel/net map) */
     if (!raw) {
         r = bind(fd, (const struct sockaddr *)&ss, sizeof *in);
         printf("unspec again: %s\n", r == 0 ? "ok" : strerror(errno));

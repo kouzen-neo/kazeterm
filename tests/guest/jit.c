@@ -1,7 +1,7 @@
 /*
  * Guest test program for self-modifying code (M7): writes instructions into memory and runs them
  * as a JIT does, checking that after rewriting and running ic ivau Tier 1 does not keep running the
- * old translation. Build with musl-gcc -static and run directly in appine-run. Each check that
+ * old translation. Build with musl-gcc -static and run directly in kazeterm-run. Each check that
  * passes prints a line "ok <name>"; a failure prints the reason and exits with 1; when all pass it
  * prints "all ok" at the end.
  */

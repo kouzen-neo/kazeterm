@@ -21,7 +21,7 @@ stat -c '%A %n' /sys/fs/cgroup
 for c in cpuset cpu memory pids; do
     grep -qw $c cgroup.controllers && echo "controller $c"
 done
-# Files whose contents do not depend on the host. Appine reports 6.1, and newer kernels have extra
+# Files whose contents do not depend on the host. KazeTerm reports 6.1, and newer kernels have extra
 # entries in cgroup.stat, memory.events, cpu.stat and pids.events (nr_subsys_*, sock_throttled,
 # nice_usec...), so for these only the entries 6.1 already has are compared
 for f in cgroup.events cgroup.freeze cgroup.max.depth cgroup.max.descendants \
@@ -87,7 +87,7 @@ jvm=$(java /tmp/Mem.java)
 if [ "$limit" = max ]; then want=$total; else want=$limit; fi
 [ "$jvm" = "$want" ] && echo "the JVM sees the limit" || echo "the JVM sees $jvm, not $want"
 # With a writable mount the JVM considers itself in a container only when there is a CPU or memory
-# limit (Appine's memory.max is the OOM killer's limit, which the native side usually lacks), and
+# limit (KazeTerm's memory.max is the OOM killer's limit, which the native side usually lacks), and
 # in a container there is no CPU quota
 s=$(java -XshowSettings:system -version 2>&1)
 echo "$s" | grep Provider

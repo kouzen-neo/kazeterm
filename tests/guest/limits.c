@@ -1,5 +1,5 @@
 /*
- * The app's memory limit and the limits on thread counts (design doc §12 item 4). appine-run must
+ * The app's memory limit and the limits on thread counts (design doc §12 item 4). kazeterm-run must
  * run this with --memory-limit, a limit far below 1 GB.
  */
 #include <errno.h>

@@ -64,7 +64,7 @@ mount -t cgroup2 -o ro cgroup /tmp/mnt/sys/fs/cgroup; echo "cgroup2 again $?"
 mount -t proc proc /tmp/mnt/proc; echo "proc again $?"
 show | tail -n 1
 umount /tmp/mnt/proc; echo "umount the top $?"
-mount -t appinefs nosuchsource /tmp/mnt/dir; echo "unknown type $?"
+mount -t kazetermfs nosuchsource /tmp/mnt/dir; echo "unknown type $?"
 mount -t proc proc /tmp/mnt/f; echo "on a file $?"
 
 # bind: directories and files inside procfs, --rbind brings along the mounts inside

@@ -10,7 +10,7 @@
 # SO_GET_FILTER, whose optlen counts classic BPF instructions of 8 bytes (Linux's sk_get_filter):
 # 0 asks for the count, fewer than the program has is EINVAL, and the program comes back whole
 # with optlen its count, on a UDP socket and on a TCP one (which needs CAP_NET_ADMIN on kernels
-# with 5d39580f68e6, and which such a host refuses to Appine, so Appine keeps the program): an
+# with 5d39580f68e6, and which such a host refuses to KazeTerm, so KazeTerm keeps the program): an
 # optlen other than 16 or no program is EINVAL, accepted sockets inherit the listener's program,
 # and a locked one can be neither replaced nor detached; and
 # /proc/<pid>/syscall (Linux's proc_pid_syscall): the reader's own read, a thread waiting in read,
@@ -365,7 +365,7 @@ int main(void)
     get(s, "detached", 2 * LEN);
     close(s);
 
-    /* TCP, which a host with Linux 5d39580f68e6 refuses to the app (Appine keeps the program) */
+    /* TCP, which a host with Linux 5d39580f68e6 refuses to the app (KazeTerm keeps the program) */
     int t = socket(AF_INET, SOCK_STREAM, 0);
     printf("tcp attach: %d\n", setsockopt(t, SOL_SOCKET, SO_ATTACH_FILTER, &fp, sizeof fp));
     get(t, "tcp count", 0);

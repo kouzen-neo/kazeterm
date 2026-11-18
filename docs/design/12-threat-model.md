@@ -1,6 +1,6 @@
 # 12. Threat model
 
-Like iSH and Termux, Appine is **not a security sandbox**: it promises no security boundary between different uids inside the guest, nor between the guest and the host app. The requirements below are numbered continuously across subsections.
+Like iSH and Termux, KazeTerm is **not a security sandbox**: it promises no security boundary between different uids inside the guest, nor between the guest and the host app. The requirements below are numbered continuously across subsections.
 
 ## 12.1 Hard engineering invariants
 
@@ -10,17 +10,17 @@ Like iSH and Termux, Appine is **not a security sandbox**: it promises no securi
 
 ## 12.2 Robustness
 
-4. **The guest's own OOM killer**: all guest memory has a total limit; when it is exceeded, Appine picks one guest process to kill, instead of letting the system LMK kill the whole app. Implemented in `core/kernel/src/oom.rs`.
+4. **The guest's own OOM killer**: all guest memory has a total limit; when it is exceeded, KazeTerm picks one guest process to kill, instead of letting the system LMK kill the whole app. Implemented in `core/kernel/src/oom.rs`.
    - **Limit**: what is measured is the anonymous memory of the whole app process (RssAnon + RssShmem + VmSwap, which is what LMK looks at), minus one copy of the Tier 1 code-cache pages that are still mapped in the write view (W^X in the [engine map](../../.agents/maps/engine.md)). The default is half of physical memory; `MachineOptions::memory_limit` changes it.
    - **Checking**: new pages the guest touches are handled by the host kernel, so the check is periodic: every 20 ms while any guest thread is running, and every 5 ms once usage passes 3/4 of the limit.
-   - **When exceeded**: one process, picked by Linux's oom_badness, is ended with SIGKILL and recorded in the kernel log ([kernel/signal map](../../.agents/maps/kernel/signal.md)); Appine waits for it to finish exiting (up to 1 second) before looking again.
+   - **When exceeded**: one process, picked by Linux's oom_badness, is ended with SIGKILL and recorded in the kernel log ([kernel/signal map](../../.agents/maps/kernel/signal.md)); KazeTerm waits for it to finish exiting (up to 1 second) before looking again.
    - **cgroup**: the limit and the usage are also shown to the guest as `memory.max` and `memory.current` ([kernel/cgroup map](../../.agents/maps/kernel/cgroup.md)); a `memory.max` the guest sets on a child cgroup is checked too.
    - **Fork bombs**: stopped by the default `threads-max` and `RLIMIT_NPROC` ([kernel/process map](../../.agents/maps/kernel/process.md)).
 5. **A bug in the kernel layer or the engine ends only the guest process that hit it**: the kernel layer is compiled with `panic=unwind`; after catching a panic it ends the current guest process and produces a report. Implemented in `core/kernel/src/bug.rs`.
-   - **Run loop**: every entry into the kernel (including syscalls that do not hold the BKL) catches panics with `catch_unwind`, and acquiring the BKL ignores the poison flag; engine bugs go through `APPINE_EXIT_HOST_FAULT` in the [engine map](../../.agents/maps/engine.md).
+   - **Run loop**: every entry into the kernel (including syscalls that do not hold the BKL) catches panics with `catch_unwind`, and acquiring the BKL ignores the poison flag; engine bugs go through `KAZETERM_EXIT_HOST_FAULT` in the [engine map](../../.agents/maps/engine.md).
    - **Ending and reporting**: in both cases the whole process is ended with SIGSEGV, like a Linux oops, and a report (with the panic message and location) is written to stderr (logcat on Android); the same report goes into the kernel log, and the app explains what happened ([android/service map](../../.agents/maps/android/service.md)).
    - **Outside the run loop**: an error at thread start, in any step of exit, or while the timer thread handles one process's timers ends that process; each of the nine steps of process teardown is caught separately, so an error in one step loses only what that step does; an error in the memory-limit check or in signal-driven I/O turns that feature off; a host call into a `Machine` method (JNI) fails only that call.
-   - **Debug builds**: abort the host process outright by default; `APPINE_ON_BUG=kill`/`abort` overrides this.
+   - **Debug builds**: abort the host process outright by default; `KAZETERM_ON_BUG=kill`/`abort` overrides this.
 
 ## 12.3 Interfaces exposed to Android
 

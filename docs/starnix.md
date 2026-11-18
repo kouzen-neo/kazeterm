@@ -1,7 +1,7 @@
 # Fuchsia Starnix as a reference
 
 Starnix is Fuchsia's Linux syscall layer, written in Rust. It was surveyed twice for code, tests
-and ideas Appine could use: on 2026-11-06 at Fuchsia 86962cb and on 2026-11-07 at 06ce521f.
+and ideas KazeTerm could use: on 2026-11-06 at Fuchsia 86962cb and on 2026-11-07 at 06ce521f.
 Almost none of its code can be moved over, because it is built on Zircon, FIDL and `starnix_core`,
 and its execution model (Zircon restricted mode) has nothing in common with a soft MMU. What pays
 is its test suites and its reading of Linux semantics. The deviations its tests found are recorded
@@ -17,14 +17,14 @@ in the module maps, not here.
   - The runtime lock-order checks of `starnix_sync`.
   - `lib/ebpf`, which has no use yet.
 - **Not usable:**
-  - `starnix_rcu` needs Fuchsia's `fuchsia_rcu`. Appine's no-BKL path resolver already validates
+  - `starnix_rcu` needs Fuchsia's `fuchsia_rcu`. KazeTerm's no-BKL path resolver already validates
     its reads with change counters.
-  - The vendored `rust_netlink` crates would add dependencies. Appine's netlink encoders are small
+  - The vendored `rust_netlink` crates would add dependencies. KazeTerm's netlink encoders are small
     and checked byte for byte by the differential tests.
   - The FUSE, overlayfs, userfaultfd and perf modules are written against its `FsNode`/`FileOps`
     and Zircon.
 - **Locking:** Starnix's per-object locks are no argument for replacing the BKL (kernel/process D2).
-  It has some of the same signal bugs as Appine.
+  It has some of the same signal bugs as KazeTerm.
 
 ## Tests
 
@@ -39,12 +39,12 @@ in the module maps, not here.
   or cannot be compared; `starnix-overlay` puts its layers on a tmpfs, since Linux refuses
   docker's overlay root as an upper layer. The other 16 are listed with their reasons in
   `tests/diff/gtest/run.sh`: they would reboot, suspend or set the clock of the VM, test what
-  Appine does not implement (bpf maps, perf, userfaultfd, tun), need devices, or have nothing to
+  KazeTerm does not implement (bpf maps, perf, userfaultfd, tun), need devices, or have nothing to
   compare.
 - **Full run of the other programs (2026-11-07, at 8dc166b):**
-  - About 70 more programs ran one test per process, as root, on native Linux 6.8 and on Appine.
+  - About 70 more programs ran one test per process, as root, on native Linux 6.8 and on KazeTerm.
     Of 2484 tests, 1186 passed on both sides, 532 passed only natively (203 of them in
-    `bpf_test`) and 138 were skipped only on Appine, mostly for missing sysctls.
+    `bpf_test`) and 138 were skipped only on KazeTerm, mostly for missing sysctls.
   - The failures came down to about 45 unrecorded causes, now in the maps of kernel/process, mm,
     signal, net, tty, cred, poll, procfs and vfs, plus causes the maps had already recorded
     (propagation, PI futexes, absent proc files, the vvar page, the decided `ENOSYS` syscalls).
@@ -59,7 +59,7 @@ in the module maps, not here.
 - **Second full run (2026-11-07, at fcf4c93), which the cases were cut from:**
   - All 77 programs that do not act on the VM, at Tier 1. Leaving out `mmap_test` and the waitpid
     programs, as the first run did: of 2500 tests, 1294 passed on both sides, 560 only natively
-    and 31 were skipped only on Appine. 267 of the native-only passes are in programs now left out
+    and 31 were skipped only on KazeTerm. 267 of the native-only passes are in programs now left out
     of the cases (203 in `bpf_test`); the rest are skipped in the cases by reason.
   - The sysctl fixes turned most skips into runs: `/proc/sys` permission tests that used to skip
     now fail for the recorded DAC deviation.
@@ -75,7 +75,7 @@ in the module maps, not here.
   - `scripts/build-gvisor-tests` builds them without Bazel against the abseil, googletest and
     google benchmark versions gVisor pins; 264 of the 266 programs build for arm64 (the other two
     have x86 sources only). Four `gvisor-*` cases run a first set of the programs, chosen from
-    Appine's weaker areas (processes, signals and ptrace; files, terminals and mounts; inet
+    KazeTerm's weaker areas (processes, signals and ptrace; files, terminals and mounts; inet
     sockets and netlink; AF_UNIX); the harness/diff map has the details.
   - A full run at gVisor 9ee2906 (2026-11-07): of about 14,500 tests, about 11,200 passed on both
     sides and about 2,500 only natively, many of them one cause repeated over parameters (the
@@ -85,7 +85,7 @@ in the module maps, not here.
     ever longer binds and freezes every guest process; mounts inherited by a less privileged
     namespace are not locked; a UDP socket shut down for reading spins in recv; and a bind with
     `AF_UNSPEC` passed to the host oopses the development VM's Ubuntu kernel in AppArmor, leaving
-    Appine hung. All four are fixed (see "Taken so far").
+    KazeTerm hung. All four are fixed (see "Taken so far").
 - **Not yet used:**
   - **kselftest**: mostly GPL, so download it at build time. Of 456 sources in the relevant
     directories, 311 pass a raw syntax check under musl. Of those directories, clone3,
@@ -121,14 +121,14 @@ in the module maps, not here.
 | 2a244d2, 4b4af75 | overlayfs with several lower layers and an upper one, after Linux 6.1 rather than Starnix's single-lower module; its `overlayfs_test`, fs_test's overlay tests and gVisor's overlay mount tests run |
 | 7b7f73b | Unhandled exceptions reported in the kernel log as arm64's `arm64_show_signal` does; `debug.exception-trace` starts at arm64's 0 (the recorded 1 was x86's), the app's kernels at 1 |
 | 39ea702 | `process_mrelease`, releasing around fork's copy-on-write (Starnix's `process_mrelease_test` runs in `starnix-mm`); `/proc/<pid>/oom_score`, also in thread directories, with vfork children at 0 and no longer picked by the OOM killer; `/proc/swaps`; `/proc/locks` and fdinfo's `lock:` lines, which lslocks needs for OFD locks; `NETLINK_SOCK_DIAG` refusing every query, so ss reads `/proc/net` quietly |
-| 99b4216 | Unimplemented paths counted as `track_stub!` and `not_found` count them: the `ENOSYS` arm, the default arms of prctl, fcntl, ioctl, madvise and futex, names Linux would have that are missing under `/proc`, `/sys` and `/dev`, and devices without a driver; the 10 called most go into kernel-bug reports and the app's copied report, and first hits into `APPINE_LOG` and the survey. Also `FIONREAD` on regular files, the first gap the counters showed |
-| 64a6107 | A BKL watchdog: a host thread that never takes the BKL reports a hold over 10 s (`APPINE_BKL_WATCHDOG`) with the guest process, thread, syscall or exception and pc, and whether the holder's host thread is running or in which host syscall; on stderr and in a notification with the bug report at once, and in the kernel log with its length once it ends. Each holder records itself on taking the lock, with no visible cost on the BKL path |
+| 99b4216 | Unimplemented paths counted as `track_stub!` and `not_found` count them: the `ENOSYS` arm, the default arms of prctl, fcntl, ioctl, madvise and futex, names Linux would have that are missing under `/proc`, `/sys` and `/dev`, and devices without a driver; the 10 called most go into kernel-bug reports and the app's copied report, and first hits into `KAZETERM_LOG` and the survey. Also `FIONREAD` on regular files, the first gap the counters showed |
+| 64a6107 | A BKL watchdog: a host thread that never takes the BKL reports a hold over 10 s (`KAZETERM_BKL_WATCHDOG`) with the guest process, thread, syscall or exception and pc, and whether the holder's host thread is running or in which host syscall; on stderr and in a notification with the bug report at once, and in the kernel log with its length once it ends. Each holder records itself on taking the lock, with no visible cost on the BKL path |
 | df6ee70 | Store reflinks: `FICLONE`, `FICLONERANGE` over a whole file, a whole-file `copy_file_range` and overlay copy-up make files share one store object, and the first change to one (any write, truncation, `fallocate`, a writable shared mapping) gives it its own, copied without the BKL; its open descriptions and shared mappings move along. Other clone ranges are copied; tmpfs, overlay files and memfds stay `EOPNOTSUPP` |
 | c008749 | FUSE after Linux 6.1's `fs/fuse` rather than Starnix's module: `/dev/fuse`, `mount -t fuse[.subtype]` (and through the setuid fusermount3), INIT, interrupts and aborts, about 30 opcodes; walks read a node cache and a miss makes the dispatcher ask the daemon with the BKL released and run the syscall again; no page cache (mapped pages are read from the daemon as they are touched, programs are copies), unused nodes forgotten above a limit or on `drop_caches`; fuse-overlayfs, sshfs and rclone mount in the `fuse` and `fuse-tools` cases |
-| 16364c0 | vDSO clock reads, from the host kernel's own vDSO rather than a vvar page of Appine's (whose parameters would drift from the host's NTP-adjusted clocks): its code is copied into each process with the host's vvar data mapped read-only below it as `[vvar]`, after a check in the interpreter at first use, with the svc-stub image as fallback; `clock_gettime` at Tier 1 went from 90 to 28 ns (19 natively). Time namespaces with offsets get svc stubs at the clock entries; tracers and seccomp see only the clocks Linux's vDSO leaves to the kernel; ECV's `CNTVCTSS_EL0` |
+| 16364c0 | vDSO clock reads, from the host kernel's own vDSO rather than a vvar page of KazeTerm's (whose parameters would drift from the host's NTP-adjusted clocks): its code is copied into each process with the host's vvar data mapped read-only below it as `[vvar]`, after a check in the interpreter at first use, with the svc-stub image as fallback; `clock_gettime` at Tier 1 went from 90 to 28 ns (19 natively). Time namespaces with offsets get svc stubs at the clock entries; tracers and seccomp see only the clocks Linux's vDSO leaves to the kernel; ECV's `CNTVCTSS_EL0` |
 | 1e5de64e | Stay awake while busy: Settings offers allow sleep, run while busy and always run; busy mode releases the Android wake lock after 30 seconds without observed guest CPU activity, checked every 2 seconds, while protecting startup, boot, restart, replacement, shutdown and distro downloads. The notification shows the selected policy and toggles always run against the last chosen non-always policy. Network waits and scheduled work can still need always run; polling does not wake a sleeping device |
 
-b295644, 5dcf7db and 63b9e59 fix bugs found while comparing Starnix's code with Appine's: readv
+b295644, 5dcf7db and 63b9e59 fix bugs found while comparing Starnix's code with KazeTerm's: readv
 and writev split datagrams per iovec, mremap with an old length of 0 was always `EINVAL`, and
 absolute timers were converted to the host's monotonic clock when set. The commits after 4e64e74
 fix deviations the full runs found (0b2c3c8, 0a4712e, b3e134a and 6d05aa9 those of gVisor's;
@@ -141,7 +141,7 @@ the list below.
 The host's activity-based wake-lock policy is implemented in 1e5de64e. The remaining power work
 is guest-facing interfaces:
 
-| Idea | What Starnix does | For Appine | Effort |
+| Idea | What Starnix does | For KazeTerm | Effort |
 |---|---|---|---|
 | Guest wake locks and battery information | Explicit wake locks through `/sys/power/wake_lock` | Let guest programs request wake locks through `/sys/power/wake_lock`; expose Android battery information under `/sys/class/power_supply` using `ACTION_BATTERY_CHANGED` | Medium |
 
@@ -152,7 +152,7 @@ is guest-facing interfaces:
 - **perf_event_open:** Starnix builds it on a Zircon job sampler and stubs the counters; perf and
   async-profiler fall back to itimers without it.
 - **process_madvise:** Linux 6.1 takes only hints (`MADV_COLD`, `MADV_PAGEOUT`, `MADV_WILLNEED`,
-  `MADV_COLLAPSE`) that Appine's own madvise ignores or refuses (no swap, no transparent huge
+  `MADV_COLLAPSE`) that KazeTerm's own madvise ignores or refuses (no swap, no transparent huge
   pages), so it would only check arguments and permissions (ptrace read access, `CAP_SYS_NICE`).
   It was made for Android's ActivityManager and no Linux userspace caller was found; Starnix
   itself answers `ENOSYS` (at 33c46967, 2026-11-08), docker's default seccomp makes it `EPERM`,
@@ -162,14 +162,14 @@ is guest-facing interfaces:
 - **Alarm clocks through AlarmManager, and a `CLOCK_MONOTONIC` that counts suspend:** the first
   needs exact-alarm permission and is not part of the run-while-busy policy. The second changes
   the 6.1 contract.
-- **Netlink stubs that only answer `NLMSG_DONE`:** Appine stopped doing this for unsupported
+- **Netlink stubs that only answer `NLMSG_DONE`:** KazeTerm stopped doing this for unsupported
   families in round 83.
 - **Guest-initiated suspend, container freezing, `wakeup_count`:** Android decides when the phone
   sleeps.
 - **tun:** Starnix's `modules/tun` (looked at on 2026-11-08, at 7e70df49) only handles
   `TUNSETIFF`, which asks Fuchsia's netstack3 over FIDL for an interface; `read` and `write` return
   `EOPNOTSUPP`, and its one test only checks that the interface name appears. The packets are
-  netstack3's work, in a separate component. Appine has no network stack to attach a device to
+  netstack3's work, in a separate component. KazeTerm has no network stack to attach a device to
   (kernel/netns map), so TUN would need one in the kernel layer (smoltcp is the candidate) plus a
   second socket backend chosen by route, and policy routing for full-tunnel VPNs. Its main user,
   rootless podman through pasta, can run as root instead, where bridge networks work.

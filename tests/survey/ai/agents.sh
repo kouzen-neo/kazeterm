@@ -24,7 +24,7 @@ with tools without accounts: Anthropic Messages (Claude Code), OpenAI Responses 
 The main conversation (requests carrying the tool that runs commands) asks for the tool calls in
 STEPS in turn, and answers "all steps done" once all tool results are back; other requests
 (making up a title, judging the topic and the like) get "ok". Each tool result is appended to LOG,
-which the survey prints to show each tool's result in Appine. Each request's path and tool names
+which the survey prints to show each tool's result in KazeTerm. Each request's path and tool names
 are recorded too.
 
     python3 mock_llm.py port log workdir
@@ -392,8 +392,8 @@ case_ claude-sandbox claude -p "do the steps" --allowedTools "Bash Read Write Ed
 rm $HOME/.claude/settings.json
 
 # Interactive UIs: only one open at a time (several at once exceed the app's memory limit in
-# Appine); wait a while in tmux and take a screenshot, then see how much memory all processes used
-# together (cgroup's memory.current: the app's usage in Appine, the container's natively). Codex's
+# KazeTerm); wait a while in tmux and take a screenshot, then see how much memory all processes used
+# together (cgroup's memory.current: the app's usage in KazeTerm, the container's natively). Codex's
 # background service cannot read process start times on Alpine (natively too), so use --no-daemon
 T="tmux -S /tmp/tmux-ai"
 mkdir -p $W

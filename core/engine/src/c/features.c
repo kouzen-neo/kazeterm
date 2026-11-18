@@ -17,30 +17,30 @@
 /* Features Tier 0 implements. FP, ASIMD and these optional extensions all depend on native
  * instruction stubs */
 #define IMPLEMENTED                                                                                \
-    (APPINE_HWCAP_FP | APPINE_HWCAP_ASIMD | APPINE_HWCAP_AES | APPINE_HWCAP_PMULL |                \
-     APPINE_HWCAP_SHA1 | APPINE_HWCAP_SHA2 | APPINE_HWCAP_CRC32 | APPINE_HWCAP_ATOMICS |          \
-     APPINE_HWCAP_SHA3 | APPINE_HWCAP_ASIMDDP | APPINE_HWCAP_SHA512 | APPINE_HWCAP_LRCPC |         \
-     APPINE_HWCAP_ILRCPC | APPINE_HWCAP_FPHP | APPINE_HWCAP_ASIMDHP | APPINE_HWCAP_JSCVT |       \
-     APPINE_HWCAP_ASIMDRDM | APPINE_HWCAP_FCMA | APPINE_HWCAP_ASIMDFHM)
-#define IMPLEMENTED2 (APPINE_HWCAP2_I8MM | APPINE_HWCAP2_BF16 | APPINE_HWCAP2_FRINT)
+    (KAZETERM_HWCAP_FP | KAZETERM_HWCAP_ASIMD | KAZETERM_HWCAP_AES | KAZETERM_HWCAP_PMULL |                \
+     KAZETERM_HWCAP_SHA1 | KAZETERM_HWCAP_SHA2 | KAZETERM_HWCAP_CRC32 | KAZETERM_HWCAP_ATOMICS |          \
+     KAZETERM_HWCAP_SHA3 | KAZETERM_HWCAP_ASIMDDP | KAZETERM_HWCAP_SHA512 | KAZETERM_HWCAP_LRCPC |         \
+     KAZETERM_HWCAP_ILRCPC | KAZETERM_HWCAP_FPHP | KAZETERM_HWCAP_ASIMDHP | KAZETERM_HWCAP_JSCVT |       \
+     KAZETERM_HWCAP_ASIMDRDM | KAZETERM_HWCAP_FCMA | KAZETERM_HWCAP_ASIMDFHM)
+#define IMPLEMENTED2 (KAZETERM_HWCAP2_I8MM | KAZETERM_HWCAP2_BF16 | KAZETERM_HWCAP2_FRINT)
 
 /* The ones not using native instruction stubs: for FlagM and FlagM2 the interpreter computes the
  * flags, SB and DC CVAP, DC CVADP need no work in the interpreter, and DIT is kept in the cpu;
  * Tier 1 copies CFINV, AXFLAG, XAFLAG, RMIF, SETF and SB verbatim, and the host thread's DIT
- * follows the guest's (appine_sync_dit), so the host must have them too. ECV's self-synchronized
+ * follows the guest's (kazeterm_sync_dit), so the host must have them too. ECV's self-synchronized
  * counter (CNTVCTSS_EL0) is read on the host by both tiers: the host's vDSO, which guests run
  * (the kernel/vdso map), reads it instead of CNTVCT_EL0 on hosts that have it */
-#define INTEGER (APPINE_HWCAP_FLAGM | APPINE_HWCAP_SB | APPINE_HWCAP_DCPOP | APPINE_HWCAP_DIT)
-#define INTEGER2 (APPINE_HWCAP2_FLAGM2 | APPINE_HWCAP2_DCPODP | APPINE_HWCAP2_ECV)
+#define INTEGER (KAZETERM_HWCAP_FLAGM | KAZETERM_HWCAP_SB | KAZETERM_HWCAP_DCPOP | KAZETERM_HWCAP_DIT)
+#define INTEGER2 (KAZETERM_HWCAP2_FLAGM2 | KAZETERM_HWCAP2_DCPODP | KAZETERM_HWCAP2_ECV)
 
 /* SHA3 and SHA512 are advertised only together, and also need SHA2: LLVM's sha3 feature covers
  * both groups, so the whitelist check cannot tell them apart, and real CPUs always implement them
  * together as well */
-#define SHA3_SET (APPINE_HWCAP_SHA2 | APPINE_HWCAP_SHA3 | APPINE_HWCAP_SHA512)
+#define SHA3_SET (KAZETERM_HWCAP_SHA2 | KAZETERM_HWCAP_SHA3 | KAZETERM_HWCAP_SHA512)
 
 /* Scalar and vector half precision are advertised only together: the whitelist decides by one
  * switch, and LLVM's fullfp16 is also one feature */
-#define FP16_SET (APPINE_HWCAP_FPHP | APPINE_HWCAP_ASIMDHP)
+#define FP16_SET (KAZETERM_HWCAP_FPHP | KAZETERM_HWCAP_ASIMDHP)
 
 static pthread_once_t once = PTHREAD_ONCE_INIT;
 static uint64_t guest_hwcap, guest_hwcap2;
@@ -49,65 +49,65 @@ static uint64_t host_midr;
 static void detect(void)
 {
     /* We emulate the ID registers ourselves (the engine map), independently of the host */
-    guest_hwcap = APPINE_HWCAP_CPUID;
+    guest_hwcap = KAZETERM_HWCAP_CPUID;
 #ifdef HOST_IS_AARCH64_LINUX
     uint64_t host = getauxval(AT_HWCAP);
     /* A host without FP and ASIMD supports no SIMD&FP instructions; the same holds when native
      * stubs are unavailable */
-    if ((host & APPINE_HWCAP_FP) && (host & APPINE_HWCAP_ASIMD) && appine_native_available()) {
+    if ((host & KAZETERM_HWCAP_FP) && (host & KAZETERM_HWCAP_ASIMD) && kazeterm_native_available()) {
         guest_hwcap |= host & IMPLEMENTED;
         if ((guest_hwcap & SHA3_SET) != SHA3_SET)
-            guest_hwcap &= ~(APPINE_HWCAP_SHA3 | APPINE_HWCAP_SHA512);
+            guest_hwcap &= ~(KAZETERM_HWCAP_SHA3 | KAZETERM_HWCAP_SHA512);
         if ((guest_hwcap & FP16_SET) != FP16_SET)
             guest_hwcap &= ~FP16_SET;
         /* FHM's source operands are half precision, so the architecture requires FP16 (LLVM's
          * fp16fml also implies fullfp16) */
-        if (!(guest_hwcap & APPINE_HWCAP_FPHP))
-            guest_hwcap &= ~APPINE_HWCAP_ASIMDFHM;
+        if (!(guest_hwcap & KAZETERM_HWCAP_FPHP))
+            guest_hwcap &= ~KAZETERM_HWCAP_ASIMDFHM;
         /* LRCPC2 includes LRCPC (they are the same field in the ID register) */
-        if (!(guest_hwcap & APPINE_HWCAP_LRCPC))
-            guest_hwcap &= ~APPINE_HWCAP_ILRCPC;
+        if (!(guest_hwcap & KAZETERM_HWCAP_LRCPC))
+            guest_hwcap &= ~KAZETERM_HWCAP_ILRCPC;
         guest_hwcap2 = getauxval(AT_HWCAP2) & IMPLEMENTED2;
     }
     guest_hwcap |= host & INTEGER;
     guest_hwcap2 |= getauxval(AT_HWCAP2) & INTEGER2;
     /* FlagM2 and DPB2 are both added on top of the previous level (value 2 of the same field in
      * the ID register) */
-    if (!(guest_hwcap & APPINE_HWCAP_FLAGM))
-        guest_hwcap2 &= ~APPINE_HWCAP2_FLAGM2;
-    if (!(guest_hwcap & APPINE_HWCAP_DCPOP))
-        guest_hwcap2 &= ~APPINE_HWCAP2_DCPODP;
-    if (host & APPINE_HWCAP_CPUID)
+    if (!(guest_hwcap & KAZETERM_HWCAP_FLAGM))
+        guest_hwcap2 &= ~KAZETERM_HWCAP2_FLAGM2;
+    if (!(guest_hwcap & KAZETERM_HWCAP_DCPOP))
+        guest_hwcap2 &= ~KAZETERM_HWCAP2_DCPODP;
+    if (host & KAZETERM_HWCAP_CPUID)
         __asm__ volatile("mrs %0, midr_el1" : "=r"(host_midr));
 #endif
 }
 
-uint64_t appine_guest_hwcap(void)
+uint64_t kazeterm_guest_hwcap(void)
 {
     pthread_once(&once, detect);
     return guest_hwcap;
 }
 
-uint64_t appine_guest_hwcap2(void)
+uint64_t kazeterm_guest_hwcap2(void)
 {
     pthread_once(&once, detect);
     return guest_hwcap2;
 }
 
-uint64_t appine_guest_midr(void)
+uint64_t kazeterm_guest_midr(void)
 {
     pthread_once(&once, detect);
     return host_midr;
 }
 
-bool appine_has(uint64_t hwcap)
+bool kazeterm_has(uint64_t hwcap)
 {
-    return (appine_guest_hwcap() & hwcap) == hwcap;
+    return (kazeterm_guest_hwcap() & hwcap) == hwcap;
 }
 
-bool appine_has2(uint64_t hwcap2)
+bool kazeterm_has2(uint64_t hwcap2)
 {
-    return (appine_guest_hwcap2() & hwcap2) == hwcap2;
+    return (kazeterm_guest_hwcap2() & hwcap2) == hwcap2;
 }
 
 /*
@@ -117,13 +117,13 @@ bool appine_has2(uint64_t hwcap2)
  * Unlike Linux, which raises SIGILL for CRm=1 and for CRm=0 registers other than MIDR, MPIDR and
  * REVIDR, those read 0 here.
  */
-bool appine_id_register(unsigned key, uint64_t *value)
+bool kazeterm_id_register(unsigned key, uint64_t *value)
 {
     unsigned op0 = key >> 14, op1 = (key >> 11) & 7, crn = (key >> 7) & 15;
     unsigned crm = (key >> 3) & 15, op2 = key & 7;
     if (op0 != 3 || op1 != 0 || crn != 0 || crm > 7)
         return false;
-    uint64_t h = appine_guest_hwcap(), h2 = appine_guest_hwcap2();
+    uint64_t h = kazeterm_guest_hwcap(), h2 = kazeterm_guest_hwcap2();
     uint64_t v = 0;
     if (crm == 0) {
         if (op2 == 0)
@@ -133,63 +133,63 @@ bool appine_id_register(unsigned key, uint64_t *value)
     } else if (crm == 4 && op2 == 0) { /* ID_AA64PFR0_EL1 */
         v = 1 | 1 << 4;                /* EL0 and EL1 support AArch64 only */
         /* FP, AdvSIMD: 0 is the base set, 1 includes half precision, f is absent */
-        if (!(h & APPINE_HWCAP_FP))
+        if (!(h & KAZETERM_HWCAP_FP))
             v |= UINT64_C(0xf) << 16;
-        else if (h & APPINE_HWCAP_FPHP)
+        else if (h & KAZETERM_HWCAP_FPHP)
             v |= UINT64_C(1) << 16;
-        if (!(h & APPINE_HWCAP_ASIMD))
+        if (!(h & KAZETERM_HWCAP_ASIMD))
             v |= UINT64_C(0xf) << 20;
-        else if (h & APPINE_HWCAP_ASIMDHP)
+        else if (h & KAZETERM_HWCAP_ASIMDHP)
             v |= UINT64_C(1) << 20;
-        if (h & APPINE_HWCAP_DIT)
+        if (h & KAZETERM_HWCAP_DIT)
             v |= UINT64_C(1) << 48;
     } else if (crm == 6 && op2 == 0) { /* ID_AA64ISAR0_EL1 */
-        if (h & APPINE_HWCAP_PMULL)
+        if (h & KAZETERM_HWCAP_PMULL)
             v |= UINT64_C(2) << 4;
-        else if (h & APPINE_HWCAP_AES)
+        else if (h & KAZETERM_HWCAP_AES)
             v |= UINT64_C(1) << 4;
-        if (h & APPINE_HWCAP_SHA1)
+        if (h & KAZETERM_HWCAP_SHA1)
             v |= UINT64_C(1) << 8;
-        if (h & APPINE_HWCAP_SHA512)
+        if (h & KAZETERM_HWCAP_SHA512)
             v |= UINT64_C(2) << 12;
-        else if (h & APPINE_HWCAP_SHA2)
+        else if (h & KAZETERM_HWCAP_SHA2)
             v |= UINT64_C(1) << 12;
-        if (h & APPINE_HWCAP_CRC32)
+        if (h & KAZETERM_HWCAP_CRC32)
             v |= UINT64_C(1) << 16;
-        if (h & APPINE_HWCAP_ATOMICS)
+        if (h & KAZETERM_HWCAP_ATOMICS)
             v |= UINT64_C(2) << 20;
-        if (h & APPINE_HWCAP_ASIMDRDM)
+        if (h & KAZETERM_HWCAP_ASIMDRDM)
             v |= UINT64_C(1) << 28;
-        if (h & APPINE_HWCAP_SHA3)
+        if (h & KAZETERM_HWCAP_SHA3)
             v |= UINT64_C(1) << 32;
-        if (h & APPINE_HWCAP_ASIMDDP)
+        if (h & KAZETERM_HWCAP_ASIMDDP)
             v |= UINT64_C(1) << 44;
-        if (h & APPINE_HWCAP_ASIMDFHM)
+        if (h & KAZETERM_HWCAP_ASIMDFHM)
             v |= UINT64_C(1) << 48;
-        if (h2 & APPINE_HWCAP2_FLAGM2) /* TS */
+        if (h2 & KAZETERM_HWCAP2_FLAGM2) /* TS */
             v |= UINT64_C(2) << 52;
-        else if (h & APPINE_HWCAP_FLAGM)
+        else if (h & KAZETERM_HWCAP_FLAGM)
             v |= UINT64_C(1) << 52;
     } else if (crm == 6 && op2 == 1) { /* ID_AA64ISAR1_EL1 */
-        if (h2 & APPINE_HWCAP2_DCPODP) /* DPB */
+        if (h2 & KAZETERM_HWCAP2_DCPODP) /* DPB */
             v |= 2;
-        else if (h & APPINE_HWCAP_DCPOP)
+        else if (h & KAZETERM_HWCAP_DCPOP)
             v |= 1;
-        if (h & APPINE_HWCAP_JSCVT)
+        if (h & KAZETERM_HWCAP_JSCVT)
             v |= UINT64_C(1) << 12;
-        if (h & APPINE_HWCAP_FCMA)
+        if (h & KAZETERM_HWCAP_FCMA)
             v |= UINT64_C(1) << 16;
-        if (h & APPINE_HWCAP_ILRCPC)
+        if (h & KAZETERM_HWCAP_ILRCPC)
             v |= UINT64_C(2) << 20;
-        else if (h & APPINE_HWCAP_LRCPC)
+        else if (h & KAZETERM_HWCAP_LRCPC)
             v |= UINT64_C(1) << 20;
-        if (h2 & APPINE_HWCAP2_FRINT) /* FRINTTS */
+        if (h2 & KAZETERM_HWCAP2_FRINT) /* FRINTTS */
             v |= UINT64_C(1) << 32;
-        if (h & APPINE_HWCAP_SB)
+        if (h & KAZETERM_HWCAP_SB)
             v |= UINT64_C(1) << 36;
-        if (h2 & APPINE_HWCAP2_BF16)
+        if (h2 & KAZETERM_HWCAP2_BF16)
             v |= UINT64_C(1) << 44;
-        if (h2 & APPINE_HWCAP2_I8MM)
+        if (h2 & KAZETERM_HWCAP2_I8MM)
             v |= UINT64_C(1) << 52;
     }
     *value = v;
