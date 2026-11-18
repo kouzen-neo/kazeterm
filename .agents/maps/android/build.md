@@ -5,7 +5,7 @@
 >
 > Verified: 2026-11-15 (split out of the android/native full mapping of 2026-11-10; the boundary was checked against the source at the split)
 >
-> Maintained: 2026-11-17 (targeted verification only since the full mapping; latest change: release shrinking, JNI keep rules and the Android release Cargo profile)
+> Maintained: 2026-11-18 (targeted verification only since the full mapping; latest change: CI release signing via Actions secrets and an on-demand signed release APK)
 
 ## Responsibilities
 
@@ -34,7 +34,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 
 ## Public entry points
 
-- Build: `./gradlew assembleDebug lintDebug` (what CI runs), `assembleRelease` (the optimized APK), `connectedDebugAndroidTest` (with
+- Build: `./gradlew assembleDebug lintDebug` (CI's default), `assembleRelease` (the optimized APK, also built by CI when `workflow_dispatch` selects `build=release`), `connectedDebugAndroidTest` (with
   `-Pandroid.testInstrumentationRunnerArguments.network=true` for the download of a distribution),
   `scripts/fetch-ghostty [dir]` (default `target/ghostty`), `scripts/release-sources [dir]` (default
   `target/release-sources`).
@@ -97,7 +97,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
   included) treats compiler warnings as errors, and lint treats its warnings as errors, except
   `GradleDependency`, `AndroidGradlePluginVersion`, `OldTargetApi`, `ExpiringTargetSdkVersion` and
   `OutdatedLibrary`, which follow data outside the repository and are informational.
-- Release: signed with the debug key, versionCode 1 and versionName 1.0.0. R8 uses the
+- Release: versionCode 1 and versionName 1.0.0. Local builds are signed with the debug key; CI can sign with a PKCS#12 keystore from Actions secrets. R8 uses the
   optimized Android defaults and shrinks unused resources. `app/proguard-rules.pro` keeps app
   JNI declarations and the public void `VtSession.on*` callbacks looked up by the native pump;
   callbacks outside that pattern need a matching keep rule. The release mapping is under
@@ -183,7 +183,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 
 ### Inbound
 
-- CI (`harness`) runs `assembleDebug lintDebug` and cargo-ndk clippy.
+- CI (`harness`) runs `assembleDebug lintDebug` and cargo-ndk clippy by default; an on-demand `build=release` run builds `assembleRelease` with a signing key from Actions secrets.
 - `android/native` and `android/vtcore` require the native build; `android/tests` uses the debug
   app and instrumentation runner. `android/setup` reads assets and `BuildConfig`;
   `android/licenses` reads static notice assets.
@@ -216,7 +216,7 @@ fetch/provisioning `android/setup`. CI orchestration remains `harness`.
 
 ## Confirmed bugs / technical debt
 
-- The release build is signed with the debug key; the Alpine tarball's checksum
+- Local release builds are signed with the debug key while CI release builds use a supplied PKCS#12 key; the Alpine tarball's checksum
   is checked only in `scripts/fetch-rootfs`.
 - `scripts/fetch-ghostty` checks only the pinned sha256s; the release's minisign signatures are to
   be checked by hand once when upgrading, before pinning the new sha256s.

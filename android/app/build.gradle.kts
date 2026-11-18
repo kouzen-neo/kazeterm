@@ -90,8 +90,20 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Installed locally only: signed with the debug key
-            signingConfig = signingConfigs.getByName("debug")
+            // CI can supply a PKCS#12 keystore; local builds keep using the debug key
+            val ciStore = System.getenv("APPINE_RELEASE_STORE_FILE")
+            if (ciStore != null) {
+                signingConfig = signingConfigs.create("releaseCi") {
+                    storeType = "PKCS12"
+                    storeFile = file(ciStore)
+                    storePassword = System.getenv("APPINE_RELEASE_STORE_PASSWORD")
+                    keyAlias = System.getenv("APPINE_RELEASE_KEY_ALIAS")
+                    keyPassword = System.getenv("APPINE_RELEASE_KEY_PASSWORD")
+                }
+            } else {
+                // Installed locally only: signed with the debug key
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 
