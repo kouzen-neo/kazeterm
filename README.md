@@ -6,7 +6,7 @@ Install packages, edit code, and build projects on your phone or tablet without 
 
 Alpine Linux comes bundled with the app. Debian is available from **Settings**.
 
-**[Get KazeTerm on Google Play](https://play.google.com/store/apps/details?id=com.kazeterm)** · **[Download the APK from GitHub Releases](../../releases)**
+**[Download the APK from GitHub Releases](../../releases)**
 
 Requires Android 11 or later on a 64-bit ARM device.
 

@@ -17,3 +17,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Commit and release policy documented.** Significant changes are committed and pushed with a matching `CHANGELOG.md` update, and git author identity stays in local repository configuration only — never in tracked files, code, or release notes.
 - **Agent instructions mirror the release workflow.** `AGENTS.md` now requires English across all repository content and records the licence/notices line, the post-release verification and stale-tag cleanup needed to reproduce a release.
 - **Rebranded as KazeTerm.** The application id and Kotlin package use `com.kazeterm`; JNI symbols, crate names, the `kazeterm-run` binary, environment variables and release artifacts follow the new name. Upstream Appine attribution is retained under AGPL.
+- **README install link simplified.** The unpublished Google Play link was removed; GitHub Releases is now the only download link.
