@@ -799,7 +799,8 @@ impl Mm {
             let space = match self.join_group(groups) {
                 Some(space) => space,
                 None => {
-                    let space = kazeterm_engine::DbtSpace::new(self.exe.unwrap_or(0), self.dbt_regs)?;
+                    let space =
+                        kazeterm_engine::DbtSpace::new(self.exe.unwrap_or(0), self.dbt_regs)?;
                     // With translations a previous user left in the pool, blocks in program files
                     // of the same version need no further check
                     space.trust(&self.code_sources());
@@ -2107,8 +2108,9 @@ impl Mm {
                 let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
                 let file_offset = start + offset;
                 let raw = std::os::fd::AsRawFd::as_raw_fd(&**fd);
-                let m = kazeterm_hal::map_file(raw, file_offset, host_len, true, template.may_write)
-                    .map_err(Errno)?;
+                let m =
+                    kazeterm_hal::map_file(raw, file_offset, host_len, true, template.may_write)
+                        .map_err(Errno)?;
                 let region = Arc::new(HostRegion {
                     base: m.base,
                     len: m.len,
@@ -2125,8 +2127,8 @@ impl Mm {
                 let fd = file.ok_or(Errno::ENOMEM)?;
                 let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
                 let file_offset = template.file_id.map_or(0, |(_, _, o)| o) + offset;
-                let m =
-                    kazeterm_hal::map_file(fd, file_offset, host_len, false, true).map_err(Errno)?;
+                let m = kazeterm_hal::map_file(fd, file_offset, host_len, false, true)
+                    .map_err(Errno)?;
                 let region = Arc::new(HostRegion {
                     base: m.base,
                     len: m.len,
@@ -2181,7 +2183,8 @@ impl Mm {
         let fill = v.fill.as_ref().ok_or(Errno::EFAULT)?;
         let host_len = usize::try_from(len).map_err(|_| Errno::ENOMEM)?;
         let shared = v.backing == Backing::Shared;
-        let m = kazeterm_hal::map_file(fill.fd(), offset, host_len, shared, false).map_err(Errno)?;
+        let m =
+            kazeterm_hal::map_file(fill.fd(), offset, host_len, shared, false).map_err(Errno)?;
         let region = Arc::new(HostRegion {
             base: m.base,
             len: m.len,
@@ -4632,7 +4635,12 @@ impl CodeGroup {
     /// and not overlap ranges private to other members, and private must not overlap registered
     /// ranges: if so, registers layout, installs this member's private ranges and returns true;
     /// otherwise changes nothing.
-    fn admit(&self, tag: u16, layout: &[kazeterm_engine::DbtSource], private: &[(u64, u64)]) -> bool {
+    fn admit(
+        &self,
+        tag: u16,
+        layout: &[kazeterm_engine::DbtSource],
+        private: &[(u64, u64)],
+    ) -> bool {
         let overlap = |start: u64, end: u64, s: u64, e: u64| start < e && s < end;
         let ranges = self.ranges.borrow();
         if private.iter().any(|&(s, e)| {
@@ -5905,7 +5913,11 @@ fn mmu_prot(p: u32) -> u32 {
 
 /// Bytes of the file that still have contents from `offset`, rounded up to a page, at most `len`.
 fn file_extent(fd: i32, offset: u64, len: u64) -> u64 {
-    extent(kazeterm_hal::fstat(fd).map_or(0, |s| s.st_size), offset, len)
+    extent(
+        kazeterm_hal::fstat(fd).map_or(0, |s| s.st_size),
+        offset,
+        len,
+    )
 }
 
 /// Bytes of a file of size `size` that still have contents from `offset` ([`file_extent`]).
@@ -6023,7 +6035,8 @@ mod tests {
     #[test]
     fn code_groups_register_only_consistent_mappings() {
         // Without Tier 1 support on the host there are no translations to share
-        let Some(space) = kazeterm_engine::DbtSpace::new(0, kazeterm_engine::DbtRegs::Default) else {
+        let Some(space) = kazeterm_engine::DbtSpace::new(0, kazeterm_engine::DbtRegs::Default)
+        else {
             return;
         };
         let src = |start: u64, len: u64, ino: u64, offset: u64| kazeterm_engine::DbtSource {
@@ -6083,7 +6096,8 @@ mod tests {
 
     #[test]
     fn code_groups_keep_private_code_apart_from_registered_files() {
-        let Some(space) = kazeterm_engine::DbtSpace::new(0, kazeterm_engine::DbtRegs::Default) else {
+        let Some(space) = kazeterm_engine::DbtSpace::new(0, kazeterm_engine::DbtRegs::Default)
+        else {
             return;
         };
         let src = |start: u64, len: u64, ino: u64| kazeterm_engine::DbtSource {

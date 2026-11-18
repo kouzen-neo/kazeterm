@@ -1785,9 +1785,8 @@ pub(super) fn getsockopt(
                 (SOL_SOCKET, SO_MARK) => s.mark().to_le_bytes().to_vec(),
                 // Raw ICMP is a ping socket on the host
                 (SOL_SOCKET, SO_TYPE) if s.raw => SOCK_RAW.to_le_bytes().to_vec(),
-                _ => {
-                    kazeterm_hal::net::getsockopt(s.fd, level, name, room.min(256)).map_err(Errno)?
-                }
+                _ => kazeterm_hal::net::getsockopt(s.fd, level, name, room.min(256))
+                    .map_err(Errno)?,
             },
             Socket::Netlink(_) => unreachable!("handled above"),
             Socket::Unix(u) => unix::getsockopt(u, level, name, &pid_ns, &cx.cred())?,

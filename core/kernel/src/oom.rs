@@ -203,7 +203,9 @@ fn footprint() -> Option<u64> {
 /// twice in the host's RssShmem, so one count is subtracted.
 pub(crate) fn app_memory() -> Option<kazeterm_hal::MemoryUsage> {
     let mut u = kazeterm_hal::memory_usage()?;
-    u.shmem = u.shmem.saturating_sub(kazeterm_engine::written_code_bytes());
+    u.shmem = u
+        .shmem
+        .saturating_sub(kazeterm_engine::written_code_bytes());
     Some(u)
 }
 

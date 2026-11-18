@@ -69,7 +69,11 @@ fn cat_reads_files_and_follows_symlinks() {
 fn uname_reports_the_abi_contract() {
     for (tier, out) in run(&["/bin/uname", "-srm"]) {
         assert_ok(tier, &out);
-        assert_eq!(stdout(&out), "Linux 6.1.0-kazeterm aarch64\n", "tier {tier}");
+        assert_eq!(
+            stdout(&out),
+            "Linux 6.1.0-kazeterm aarch64\n",
+            "tier {tier}"
+        );
     }
 }
 

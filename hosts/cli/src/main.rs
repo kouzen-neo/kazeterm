@@ -167,7 +167,10 @@ fn main() -> ExitCode {
                 } else {
                     err.to_string()
                 };
-                eprintln!("kazeterm-run: cannot import {}: {reason}", tarball.display());
+                eprintln!(
+                    "kazeterm-run: cannot import {}: {reason}",
+                    tarball.display()
+                );
                 ExitCode::from(1)
             }
         };
@@ -229,7 +232,9 @@ fn main() -> ExitCode {
                 (Some(pc), Some(addr)) => {
                     eprintln!("kazeterm-run: guest killed by {signal} (pc={pc:#x}, addr={addr:#x})")
                 }
-                (Some(pc), None) => eprintln!("kazeterm-run: guest killed by {signal} (pc={pc:#x})"),
+                (Some(pc), None) => {
+                    eprintln!("kazeterm-run: guest killed by {signal} (pc={pc:#x})")
+                }
                 _ => eprintln!("kazeterm-run: guest killed by {signal}"),
             }
             ExitCode::from((128 + signal.number()) as u8)

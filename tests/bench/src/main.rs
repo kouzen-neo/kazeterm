@@ -173,7 +173,10 @@ fn run_program(
         }
         Some(t)
     };
-    let (tier1, out) = measure(&os(&[&kazeterm_run, &"--tier", &"1", &exe, &rounds]), o.runs)?;
+    let (tier1, out) = measure(
+        &os(&[&kazeterm_run, &"--tier", &"1", &exe, &rounds]),
+        o.runs,
+    )?;
     if out != expected {
         return Err(format!(
             "{}: tier 1 output differs from native",

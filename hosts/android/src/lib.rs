@@ -25,11 +25,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, Once, PoisonError};
 
-use kazeterm_kernel::vfs::browse;
-use kazeterm_kernel::{ExitStatus, HostRoute, Machine, MachineOptions, Power, Stdio, Tier};
 use jni::JNIEnv;
 use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString};
 use jni::sys::{jboolean, jbooleanArray, jbyteArray, jint, jlong, jobjectArray, jstring};
+use kazeterm_kernel::vfs::browse;
+use kazeterm_kernel::{ExitStatus, HostRoute, Machine, MachineOptions, Power, Stdio, Tier};
 
 /// Runs the body of a JNI function. A panic in it (a kernel-layer bug outside the calls the kernel
 /// wraps itself, or one in this crate) would unwind out of `extern "system"` and abort the app

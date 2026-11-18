@@ -158,11 +158,22 @@ impl CpuState {
 unsafe extern "C" {
     fn kazeterm_mmu_new() -> *mut RawMmu;
     fn kazeterm_mmu_free(mmu: *mut RawMmu);
-    fn kazeterm_mmu_map(mmu: *mut RawMmu, gva: u64, host: *mut c_void, len: u64, prot: u32) -> c_int;
+    fn kazeterm_mmu_map(
+        mmu: *mut RawMmu,
+        gva: u64,
+        host: *mut c_void,
+        len: u64,
+        prot: u32,
+    ) -> c_int;
     fn kazeterm_mmu_unmap(mmu: *mut RawMmu, gva: u64, len: u64) -> c_int;
     fn kazeterm_mmu_protect(mmu: *mut RawMmu, gva: u64, len: u64, prot: u32) -> c_int;
-    fn kazeterm_mmu_fill(mmu: *mut RawMmu, gva: u64, host: *mut c_void, len: u64, prot: u32)
-    -> c_int;
+    fn kazeterm_mmu_fill(
+        mmu: *mut RawMmu,
+        gva: u64,
+        host: *mut c_void,
+        len: u64,
+        prot: u32,
+    ) -> c_int;
     fn kazeterm_mmu_move(mmu: *mut RawMmu, from: u64, to: u64, len: u64) -> c_int;
     fn kazeterm_mmu_next_present(mmu: *const RawMmu, gva: u64, end: u64) -> u64;
     fn kazeterm_mmu_translate(mmu: *const RawMmu, gva: u64, required_prot: u32) -> *mut c_void;
@@ -359,7 +370,9 @@ impl Mmu {
     /// present, and passing 0 only requires an accessible entry (ones with permission 0 do not
     /// count).
     pub fn translate(&self, gva: u64, required_prot: u32) -> Option<NonNull<u8>> {
-        NonNull::new(unsafe { kazeterm_mmu_translate(self.raw.as_ptr(), gva, required_prot) }.cast())
+        NonNull::new(
+            unsafe { kazeterm_mmu_translate(self.raw.as_ptr(), gva, required_prot) }.cast(),
+        )
     }
 }
 
@@ -803,9 +816,11 @@ impl Dbt {
     /// Attaches to `space`. `tag` is the tag of the thread's address space
     /// ([`DbtSpace::new_tag`]), 0 when the instance is not shared by several address spaces.
     pub fn attach(space: &Arc<DbtSpace>, tag: u16) -> Option<Self> {
-        NonNull::new(unsafe { kazeterm_dbt_attach(space.raw.as_ptr(), tag.into()) }).map(|raw| Dbt {
-            raw,
-            space: space.clone(),
+        NonNull::new(unsafe { kazeterm_dbt_attach(space.raw.as_ptr(), tag.into()) }).map(|raw| {
+            Dbt {
+                raw,
+                space: space.clone(),
+            }
         })
     }
 

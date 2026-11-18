@@ -5071,7 +5071,9 @@ pub(super) fn lseek(cx: &mut Cx<'_>, fd: i32, offset: i64, whence: u32) -> SysRe
     let mut f = file.borrow_mut();
     let OpenFile { kind, pos, .. } = &mut *f;
     let base = match kind {
-        FileKind::Host(fd) => return kazeterm_hal::lseek(*fd, offset, whence as i32).map_err(Errno),
+        FileKind::Host(fd) => {
+            return kazeterm_hal::lseek(*fd, offset, whence as i32).map_err(Errno);
+        }
         FileKind::Path(_) => return Err(Errno::EBADF),
         FileKind::Pipe(_)
         | FileKind::Pty(_)
@@ -5259,7 +5261,8 @@ pub(super) fn cachestat(cx: &mut Cx<'_>, fd: i32, range: u64, out: u64, flags: u
     let len = u64::from_le_bytes(r[8..].try_into().unwrap());
     let stats = match &file.borrow().kind {
         FileKind::Regular { file, .. } => {
-            kazeterm_hal::cachestat(std::os::fd::AsRawFd::as_raw_fd(file), off, len).map_err(Errno)?
+            kazeterm_hal::cachestat(std::os::fd::AsRawFd::as_raw_fd(file), off, len)
+                .map_err(Errno)?
         }
         _ => [0; 5],
     };

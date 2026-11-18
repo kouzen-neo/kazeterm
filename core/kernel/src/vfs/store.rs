@@ -3053,7 +3053,8 @@ mod tests {
     }
 
     fn temp_store(name: &str) -> (Store, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("kazeterm-store-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("kazeterm-store-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         let mut s = Store::create(&dir).unwrap();
         // Deferred write transactions are committed only when the test commits them itself,

@@ -56,10 +56,10 @@ mod vdso;
 pub mod vfs;
 mod watchdog;
 
-pub use kazeterm_engine::DbtStats;
-pub use kazeterm_hal::net::Route as HostRoute;
 pub use bug::{KillReason, KillReport};
 pub use inittab::Power;
+pub use kazeterm_engine::DbtStats;
+pub use kazeterm_hal::net::Route as HostRoute;
 pub use loader::LoadError;
 pub use machine::{Machine, MachineOptions, SHUTDOWN_TIMEOUT, Stdio, run};
 pub use portmap::ListenEvent;

@@ -1576,7 +1576,12 @@ pub(crate) fn proc_listing(
             continue;
         };
         let fd = inet.fd;
-        let proto = int(kazeterm_hal::net::getsockopt(fd, SOL_SOCKET, SO_PROTOCOL, 4));
+        let proto = int(kazeterm_hal::net::getsockopt(
+            fd,
+            SOL_SOCKET,
+            SO_PROTOCOL,
+            4,
+        ));
         let listed = inet.family == family
             && match table {
                 // MPTCP sockets are listed here too (the first subflow is a TCP socket; Go 1.24

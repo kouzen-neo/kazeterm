@@ -510,8 +510,8 @@ fn open(t: &Target, client: Option<([u8; 4], u16)>) -> Result<(i32, bool, Option
         Some((ip, port)) => {
             let host = take_outside();
             let at = |p: u16| kazeterm_hal::net::sockaddr(std::net::SocketAddr::from((host, p)));
-            let r =
-                kazeterm_hal::net::bind(fd, &at(port)).or_else(|_| kazeterm_hal::net::bind(fd, &at(0)));
+            let r = kazeterm_hal::net::bind(fd, &at(port))
+                .or_else(|_| kazeterm_hal::net::bind(fd, &at(0)));
             if r.is_ok() {
                 let hport = kazeterm_hal::net::sockname(fd, false)
                     .ok()

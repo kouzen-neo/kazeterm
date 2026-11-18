@@ -31,10 +31,10 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, Once, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use kazeterm_kernel::Machine;
 use jni::JNIEnv;
 use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jbyteArray, jfloat, jint, jintArray, jlong, jobject, jstring};
+use kazeterm_kernel::Machine;
 
 use super::{machine, string, throw};
 
@@ -106,7 +106,13 @@ unsafe extern "C" {
     fn kazeterm_vt_feed(vt: *mut KazeTermVt, data: *const u8, len: usize, background: bool);
     fn kazeterm_vt_take_replies(vt: *mut KazeTermVt, len: *mut usize) -> *const u8;
     fn kazeterm_vt_set_password_input(vt: *mut KazeTermVt, on: bool);
-    fn kazeterm_vt_resize(vt: *mut KazeTermVt, cols: u16, rows: u16, cell_width: u32, cell_height: u32);
+    fn kazeterm_vt_resize(
+        vt: *mut KazeTermVt,
+        cols: u16,
+        rows: u16,
+        cell_width: u32,
+        cell_height: u32,
+    );
     fn kazeterm_vt_scroll(vt: *mut KazeTermVt, delta: i32);
     fn kazeterm_vt_at_prompt(vt: *mut KazeTermVt) -> bool;
     fn kazeterm_vt_jump_prompt(vt: *mut KazeTermVt, delta: i32);
@@ -133,7 +139,12 @@ unsafe extern "C" {
         out: *mut u8,
         cap: usize,
     ) -> isize;
-    fn kazeterm_vt_paste(vt: *mut KazeTermVt, data: *const u8, len: usize, allow_unsafe: bool) -> i32;
+    fn kazeterm_vt_paste(
+        vt: *mut KazeTermVt,
+        data: *const u8,
+        len: usize,
+        allow_unsafe: bool,
+    ) -> i32;
     #[allow(clippy::too_many_arguments)]
     fn kazeterm_vt_mouse(
         vt: *mut KazeTermVt,
@@ -190,7 +201,11 @@ unsafe extern "C" {
     fn kazeterm_vt_prompt_click(vt: *mut KazeTermVt, x: u16, y: u16) -> bool;
     fn kazeterm_vt_search(vt: *mut KazeTermVt, needle: *const u8, len: usize) -> bool;
     fn kazeterm_vt_search_select(vt: *mut KazeTermVt, older: bool) -> bool;
-    fn kazeterm_vt_search_rows(vt: *mut KazeTermVt, len: *mut usize, selected: *mut i64) -> *const u32;
+    fn kazeterm_vt_search_rows(
+        vt: *mut KazeTermVt,
+        len: *mut usize,
+        selected: *mut i64,
+    ) -> *const u32;
     fn kazeterm_vt_search_end(vt: *mut KazeTermVt);
     fn kazeterm_vt_clear(vt: *mut KazeTermVt) -> i32;
     fn kazeterm_vt_reset(vt: *mut KazeTermVt) -> bool;
@@ -1029,7 +1044,8 @@ pub extern "system" fn Java_com_kazeterm_VtNative_paste<'l>(
         };
         let bytes = {
             let mut term = tab.term();
-            match unsafe { kazeterm_vt_paste(term.0, text.as_ptr(), text.len(), allow_unsafe != 0) } {
+            match unsafe { kazeterm_vt_paste(term.0, text.as_ptr(), text.len(), allow_unsafe != 0) }
+            {
                 0 => term.take_replies(),
                 1 => return std::ptr::null_mut(),
                 _ => Vec::new(),
@@ -1090,7 +1106,8 @@ pub extern "system" fn Java_com_kazeterm_VtNative_focus<'l>(
             return std::ptr::null_mut();
         };
         let mut out = [0u8; 16];
-        let n = unsafe { kazeterm_vt_focus(tab.term().0, gained != 0, out.as_mut_ptr(), out.len()) };
+        let n =
+            unsafe { kazeterm_vt_focus(tab.term().0, gained != 0, out.as_mut_ptr(), out.len()) };
         encoded(&mut env, &out, n)
     })
 }
@@ -1287,9 +1304,9 @@ pub extern "system" fn Java_com_kazeterm_VtNative_selectContext<'l>(
     y: jint,
 ) -> jboolean {
     guarded!("VtNative.selectContext", 0, {
-        tab(handle)
-            .is_some_and(|tab| unsafe { kazeterm_vt_select_context(tab.term().0, cell(x), cell(y)) })
-            as jboolean
+        tab(handle).is_some_and(|tab| unsafe {
+            kazeterm_vt_select_context(tab.term().0, cell(x), cell(y))
+        }) as jboolean
     })
 }
 
@@ -1334,7 +1351,8 @@ pub extern "system" fn Java_com_kazeterm_VtNative_selectAdjust<'l>(
     adjustment: jint,
 ) -> jboolean {
     guarded!("VtNative.selectAdjust", 0, {
-        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_adjust(tab.term().0, adjustment) })
+        tab(handle)
+            .is_some_and(|tab| unsafe { kazeterm_vt_select_adjust(tab.term().0, adjustment) })
             as jboolean
     })
 }
@@ -1354,7 +1372,8 @@ pub extern "system" fn Java_com_kazeterm_VtNative_selectRectangle<'l>(
     on: jboolean,
 ) -> jboolean {
     guarded!("VtNative.selectRectangle", 0, {
-        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_rectangle(tab.term().0, on != 0) })
+        tab(handle)
+            .is_some_and(|tab| unsafe { kazeterm_vt_select_rectangle(tab.term().0, on != 0) })
             as jboolean
     })
 }
@@ -1401,7 +1420,8 @@ pub extern "system" fn Java_com_kazeterm_VtNative_selectOutput<'l>(
     handle: jlong,
 ) -> jboolean {
     guarded!("VtNative.selectOutput", 0, {
-        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_output(tab.term().0) }) as jboolean
+        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_select_output(tab.term().0) })
+            as jboolean
     })
 }
 
@@ -1514,7 +1534,8 @@ pub extern "system" fn Java_com_kazeterm_VtNative_searchSelect<'l>(
     older: jboolean,
 ) -> jboolean {
     guarded!("VtNative.searchSelect", 0, {
-        tab(handle).is_some_and(|tab| unsafe { kazeterm_vt_search_select(tab.term().0, older != 0) })
+        tab(handle)
+            .is_some_and(|tab| unsafe { kazeterm_vt_search_select(tab.term().0, older != 0) })
             as jboolean
     })
 }
@@ -1690,10 +1711,7 @@ pub extern "system" fn Java_com_kazeterm_VtNative_version<'l>(
 /// Compresses the cold scrollback of every tab at once, idle or not (the app trimming its memory),
 /// so a tab whose output never pauses is compressed too.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_kazeterm_VtNative_compressAll<'l>(
-    _: JNIEnv<'l>,
-    _: JClass<'l>,
-) {
+pub extern "system" fn Java_com_kazeterm_VtNative_compressAll<'l>(_: JNIEnv<'l>, _: JClass<'l>) {
     guarded!("VtNative.compressAll", (), {
         let tabs: Vec<Arc<Tab>> = TABS
             .lock()
